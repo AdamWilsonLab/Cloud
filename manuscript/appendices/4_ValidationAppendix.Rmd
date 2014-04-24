@@ -4,7 +4,7 @@ Validation
 ```{r,echo=F}
 
 ## working directory
-setwd("/mnt/data/personal/adamw/projects/cloud/")
+#setwd("/mnt/data/personal/adamw/projects/cloud/")
 ## libraries
 library(rasterVis)
 library(latticeExtra)
