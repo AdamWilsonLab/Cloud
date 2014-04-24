@@ -51,7 +51,7 @@ i=1
 ### add boundaries to file list to remove problematic pixels at high latitudes
 ## these boundaries were later added to the earth engine script, so if it is re-run this is not necessary
 #xmin,xmax,ymin,ymax
-mextent=list(
+mextent=rbind.data.frame(
     "01"=c(-180,-90,180,73.5),#
     "02"=c(-180,-90,180,84),  #
     "03"=c(-180,-90,180,90),
@@ -65,11 +65,15 @@ mextent=list(
     "11"=c(-180,-90,180,77),
     "12"=c(-180,-90,180,69)
 )    
+colnames(mextent)=c("xmin","ymin","xmax","ymax")
 
 ## project to sinusoidal
 proj="'+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 +b=6371007.181 +units=m +no_defs'"
 
-mextentsin=lapply(mextent,function(x) c(project(t(x[1:2]),sub("'","",proj)),project(t(x[3:4]),sub("'","",proj))))
+mextentsin=data.frame(t(apply(mextent,1,function(x) c(project(t(x[1:2]),sub("'","",proj)),project(t(x[3:4]),sub("'","",proj))))))
+colnames(mextentsin)=c("xmin","ymin","xmax","ymax")
+mextentsin$xmin=project(t(c(-180,0)),sub("'","",proj))[1]
+mextentsin$xmax=project(t(c(180,0)),sub("'","",proj))[1]
 
 ## Loop over data to mosaic tifs, compress, and add metadata
     foreach(i=1:nrow(jobs)) %dopar% {
@@ -93,7 +97,7 @@ mextentsin=lapply(mextent,function(x) c(project(t(x[1:2]),sub("'","",proj)),proj
         if(!rerun&file.exists(ttif)) return(NA)
         ## build VRT to merge tiles
         ## include subseting using mextentsin object created above to ensure cropping of problematic values
-        system(paste("gdalbuildvrt -b 1 -b 2 -te ",paste(round(mextentsin[[cm]]),collapse=" ")," -srcnodata -32768 -vrtnodata 32767 ",tvrt," ",paste(df$path[df$month==m&df$sensor==s],collapse=" ")))
+        system(paste("gdalbuildvrt -b 1 -b 2 -te ",paste(mextentsin[m,],collapse=" ")," -srcnodata -32768 -vrtnodata 32767 ",tvrt," ",paste(df$path[df$month==m&df$sensor==s],collapse=" ")))
         ## Merge to geotif in temporary directory
         ## specify sourc projection because it gets it slightly wrong by default 
         ops=paste("-multi -of vrt --config GDAL_CACHEMAX 500 -wm 500 -wo NUM_THREADS:10 -srcnodata 32767 -dstnodata 32767 -s_srs ",proj,"  -t_srs 'EPSG:4326' ",
