@@ -1,10 +1,17 @@
-Validation
-----------------------
+Appendix A: Methods & Validation
+=======================
 
-```{r,echo=F}
+This appendix includes details of the validation procedure.
 
-## working directory
-#setwd("/mnt/data/personal/adamw/projects/cloud/")
+
+```{r,setup,echo=F,results='hide',message=F}
+## some setup
+
+uploadimages=F  # upload all images to imgur.com for easy viewing on github
+opts_knit$set(progress = TRUE, verbose = TRUE,root.dir="../../",cache=!uploadimages)
+if(uploadimages) opts_knit$set(upload.fun =imgur_upload)
+opts_chunk$set(fig.width=10, fig.height=8, cache=!uploadimages)
+getwd()
 ## libraries
 library(rasterVis)
 library(latticeExtra)
@@ -14,6 +21,10 @@ library(reshape)
 library(caTools)
 library(rgeos)
 library(raster)
+library(plyr)
+library(knitr)
+require(knitcitations)
+library(BayesFactor)
 
 ## read in global coasts for nice plotting
 library(maptools)
@@ -21,11 +32,11 @@ library(rgdal)
 
 ```
 
-```{r, loaddata,echo=F}
-# read in data
-cldm=read.csv("data/NDP026D/cldm.csv")
-st=read.csv("data/NDP026D/stations.csv")
+```{r, loaddata,echo=FALSE,results='hide',message=F}
 
+# read in data
+cldm=read.csv("data/validation/cldm.csv",sep=",",row.names=NULL)
+st=readOGR("data/validation","stations")
 ## month factors
 cldm$month2=factor(cldm$month,labels=month.name,ordered=T)
 
@@ -36,11 +47,18 @@ cldm$cldsd_all[cldm$cldn_all<20]=NA
 cldm$cld[cldm$cldn<10]=NA
 cldm$cldsd[cldm$cldn<10]=NA
 
-coordinates(st)=c("lon","lat")
-projection(st)=CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")
+cldm$seas=ifelse(cldm$month%in%c(12,1,2),"DJF",
+                 ifelse(cldm$month%in%3:4,"MAM",
+                        ifelse(cldm$month%in%5:8,"JJA",
+                               ifelse(cldm$month%in%9:11,"SON",NA))))
+cldm$seas=factor(cldm$seas,levels=c("DJF","MAM","JJA","SON"),ordered=T)
 
-#coast=getRgshhsMap("/mnt/data/jetzlab/Data/environ/global/gshhg/gshhs_h.b", xlim = NULL, ylim = NULL, level = 4) 
-land=readShapePoly("/mnt/data/jetzlab/Data/environ/global/gshhg/GSHHS_shp/c/GSHHS_c_L1.shp",force_ring=TRUE)
+## compute seasonal means
+cldml=melt(cldm,id.vars=c("StaID","lat","lon","lulcc","biome","seas"),measure.vars=c("cld_all","cldsd_all","cldn_all","cld","cldsd","cldn","mod09","mod09sd"))
+clds=cast(cldml,StaID+lat+lon+lulcc+biome+seas~variable,value="value",fun=mean,na.rm=T)
+
+## load land data for nice plotting
+land=readShapePoly("data/gshhs/GSHHS_c_L1.shp",force_ring=TRUE)
 projection(land)="+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
 CP <- as(extent(-180, 180, -60, 84), "SpatialPolygons")
 proj4string(CP) <- CRS(proj4string(land))
@@ -49,24 +67,11 @@ coast=as(land[land$area>50,],"SpatialLines")
 land <- gIntersection(land, CP, byid=F)
 coast <- gIntersection(coast, CP, byid=F)
 
-#### Evaluate MOD35 Cloud data
-##mod09=brick("data/cloud_monthly.nc")
-```
-
-```{r}
-## Figures
+## plotting parameters
 n=100
 at=seq(0,100,length=n)
 colr=colorRampPalette(c("black","green","red"))
 cols=colr(n)
-
-## set plotting parameters
-my.theme = trellis.par.get()
-my.theme$strip.background=list(col="transparent")
-trellis.par.set(my.theme)
-
-#pdf("output/Figures.pdf",width=11,height=8.5)
-png("output/CF_Figures_%03d.png",width=5000,height=4000,res=600,pointsize=42,bg="white")
 
 ## set plotting parameters
 my.theme = trellis.par.get()
@@ -82,26 +87,46 @@ bgr=function(x,n=100,br=0,c1=c("darkblue","blue","grey"),c2=c("grey","red","purp
     return(list(at=at,col=c(bg(sum(at<br)),gr(sum(at>=br)))))
 }
 
-cldm$resid=NA
-# get residuals of simple linear model
-cldm$resid[!is.na(cldm$cld_all)&!is.na(cldm$mod09)]=residuals(lm(mod09~cld_all,data=cldm))
-colat=bgr(cldm$resid)
-phist=histogram(cldm$resid,breaks=colat$at,border=NA,col=colat$col,xlim=c(-30,30),type="count",xlab="MODCF Residuals")#,seq(0,1,len=6),na.rm=T)
-pmap=xyplot(lat~lon|month2,data=cldm,groups=cut(cldm$resid,rev(colat$at)),
-       par.settings=list(superpose.symbol=list(col=colat$col)),pch=16,cex=.25,
-       auto.key=F,#list(space="right",title="Difference\n(MOD09-NDP026D)",cex.title=1),asp=1,
-       ylab="Latitude",xlab="Longitude")+
-  layer(sp.lines(coast,col="black",lwd=.1),under=F)
-print(phist,position=c(0,.75,1,1),more=T)
-print(pmap,position=c(0,0,1,.78))
+````
 
-### heatmap of mod09 vs. NDP for all months
+```{r,getvariables,echo=FALSE,message=F}
+#########################################
+### Some stats 
+## number of stations retained
+nstation_all=length(unique(cldm$StaID[!is.na(cldm$cld_all)]))
+nstation_mod=length(unique(cldm$StaID[!is.na(cldm$cld)]))
+
+# approximate size of M*D09GA archive - get total size for one day from the USGS website
+size=as.numeric(
+  sub("M","",
+      grep("[0-9]*M$",
+           scan("http://e4ftl01.cr.usgs.gov/MOLT/MOD09GA.005/2000.04.30/",what="char"),
+           value=T)))
+## extract all filesizes in MB (all the HDFs) and sum them and covert to TB for the length of the full record
+tsize=sum(size)/1024/1024*as.numeric(as.Date("2014-03-31")-as.Date("2000-02-24"))*2
+
+## Validation table construction
+#quantile(cldm$difm,na.rm=T)
+#summary(lm(cld_all~mod09+lat,data=cldm))
+```
+
+## Station Observations
+
+The monthly CF were validated using a global observational dataset of synoptic weather reports collected at 5388 stations over 1971-2009 (Eastman and Warren 2012).  We extracted the mean “total cloud” amount for each month, which represents the mean proportion of the sky that was covered by all types of cloud during the observations in that month.  Comparison of these observations to satellite data must take into account that the sampling radius of these observations (the visible sky) depends on cloud height, cloud thickness, the curvature of the earth, and other factors, but is typically much larger than a single 1km MODIS pixel.  We followed Dybbroe, Karlsson, and Thoss (2005) and took the mean monthly MODCF for a circle with 16km radius around each station location.  Additionally, this converts the temporal MODCF to mean cloud amount within the sample radius to make it comparable to the station observations.
+
+
+
+The monthly MODCF (including data from 2000-2013) were compared to station observations using linear models over the full station record (1970-2009) and the MODIS era (2000-2009) to assess accuracy and relevance of the 14-year satellite-derived data for estimating long-term monthly climatologies.  For the full record comparison, the station dataset was filtered to include only stations with at least 20 observations per month for at least 20 years, which retained `r nstation_all` stations.  Several countries (notably the USA, Canada, and New Zealand) converted from human cloud observations to automated laser ceilometers over the past decade leading to a decline in the number of observations over 1997-2009 (Eastman and Warren 2012). For the MODIS era comparison, we included only stations with at least 20 observations per month for the full 10-year period (2000-2009), so the number of stations available was reduced to `r nstation_mod`. 
+
+
+### Monthly Comparison
+```{r,monthscatter,results='hide',echo=FALSE,message=F}
 hmcols=colorRampPalette(c("grey","blue","red","purple"))
 #hmcols=colorRampPalette(c(grey(.8),grey(.3),grey(.2)))
-tr=c(0,66)
+tr=c(0,20)
 colkey <- draw.colorkey(list(col = hmcols(tr[2]), at = tr[1]:tr[2],height=.25))
 
-xyplot(cld_all~mod09|month2,data=cldm,panel=function(x,y,subscripts){
+xyplot(cld~mod09|month2,data=cldm,panel=function(x,y,subscripts){
   n=50
   bins=seq(0,100,len=n)
   tb=melt(as.matrix(table(
@@ -117,116 +142,72 @@ xyplot(cld_all~mod09|month2,data=cldm,panel=function(x,y,subscripts){
   panel.text(70,10,bquote(paste(R^2,"=",.(round(summary(lm(y ~ x))$r.squared,2)))),cex=1)
 },asp=1,scales=list(at=seq(0,100,len=6),useRaster=T,colorkey=list(width=.5,title="Number of Stations")),
           ylab="NDP Mean Cloud Amount (%)",xlab="MODCF Cloud Frequency (%)",
-              legend= list(right = list(fun = colkey)))#+ layer(panel.abline(0,1,col="black",lwd=2))
+              legend= list(right = list(fun = colkey)))+ layer(panel.abline(0,1,col="grey",lwd=2),under=T)
+```
+Mean monthly cloud amount over 1970-2009 from 5388 global stations versus mean 2000-2009 MOD09 cloud frequency by month.  Coefficient of determination is shown in each panel.  Colors represent the number of monthly station observations within each grid cell of the scatterplot.
 
 
-bwplot(lulcc~difm,data=cldm,horiz=T,xlab="Difference (MOD09-Observed)",varwidth=T,notch=T)+layer(panel.abline(v=0))
+#### Spatial Distribution 
+```{r,mapresidmonth,echo=FALSE,message=F}
+cldm$resid=NA
+# get residuals of simple linear model
+cldm$resid[!is.na(cldm$cld_all)&!is.na(cldm$mod09)]=residuals(lm(mod09~cld_all,data=cldm[!is.na(cldm$cld_all)&!is.na(cldm$mod09),]))
+colat=bgr(cldm$resid)
+phist=histogram(cldm$resid,breaks=colat$at,border=NA,col=colat$col,xlim=c(-30,30),type="count",xlab="MODCF Residuals")#,seq(0,1,len=6),na.rm=T)
+pmap=xyplot(lat~lon|month2,data=cldm,groups=cut(cldm$resid,rev(colat$at)),
+       par.settings=list(superpose.symbol=list(col=colat$col)),pch=16,cex=.25,
+       auto.key=F,#list(space="right",title="Difference\n(MOD09-NDP026D)",cex.title=1),asp=1,
+       ylab="Latitude",xlab="Longitude")+
+  layer(sp.lines(coast,col="black",lwd=.1),under=F)
+print(phist,position=c(0,.75,1,1),more=T)
+print(pmap,position=c(0,0,1,.78))
+```
 
-dev.off()
-
-####################################################################
-### Regional Comparisons
-## Compare with worldclim and NPP
-#wc=stack(as.list(paste("/mnt/data/jetzlab/Data/environ/global/worldclim/prec_",1:12,".bil",sep="")))
-wc_map=stack(as.list(paste("/mnt/data/jetzlab/Data/environ/global/worldclim/bio_12.bil",sep="")))
-wc_dem=stack(as.list(paste("/mnt/data/jetzlab/Data/environ/global/worldclim/alt.bil",sep="")))
-
-regs=list(
-  Cascades=extent(c(-122.8,-118,44.9,47)),
-  Hawaii=extent(c(-156.5,-154,18.75,20.5)),
-  Boliva=extent(c(-71,-63,-20,-15)),
-  Venezuela=extent(c(-69,-59,0,7)),
-  CFR=extent(c(17.75,22.5,-34.8,-32.6)),
-  Madagascar=extent(c(46,52,-17,-12))
-  #reg2=extent(c(-81,-70,-4,10))
-  )
+Histogram and spatial distribution of residuals from linear model between station and satellite cloud amount at station locations.  Negative (positive) values indicate locations where MODCF was less than (greater than) expected given the global relationship between MODCF and station observations.  
 
 
-## read in GEWEX 1-degree data
-gewex=mean(brick("data/gewex/CA_PATMOSX_NOAA.nc",varname="a_CA"))
-names(gewex)="PATMOS-x GEWEX AVHRR"
+### Seasonal Validation
+In addition to monthly validation we also performed the same validation on the seasonal (DFJ,MAM,JJA,SON) mean values.
+```{r,seasscatter,echo=FALSE,message=F,results='hide'}
+tr2=c(0,37)
+xyplot(cld_all~mod09|seas,data=clds,panel=function(x,y,subscripts){
+  n=75
+  bins=seq(0,100,len=n)
+  tb=melt(as.matrix(table(
+    x=cut(x,bins,labels=bins[-1]),
+    y=cut(y,bins,labels=bins[-1]))))
+  qat=unique(tb$value)
+  print(max(qat))
+  qat=tr2[1]:tr2[2]#unique(tb$value)
+  panel.levelplot(tb$x,tb$y,tb$value,at=qat,col.regions=c("transparent",hmcols(length(qat))),subscripts=1:nrow(tb))
+#  panel.abline(0,1,col="black",lwd=2)
+  panel.abline(lm(y ~ x),col="black",lwd=2)
+#  panel.ablineq(lm(y ~ x), r.sq = TRUE,at = 0.6,pos=1, offset=0,digits=2,col="blue")
+  panel.text(70,10,bquote(paste(R^2,"=",.(round(summary(lm(y ~ x))$r.squared,2)))),cex=1)
+},asp=1,scales=list(at=seq(0,100,len=6),useRaster=T,colorkey=list(width=.5,title="Number of Stations")),
+          ylab="NDP Mean Cloud Amount (%)",xlab="MODCF Cloud Frequency (%)",
+              legend= list(right = list(fun = colkey)))+ layer(panel.abline(0,1,col="grey",lwd=2),under=T)
+```
 
-## calculate 1-degree means of MODCF data
-#MOD_gewex=gewex
-#MOD_gewex@data@values=1:length(MOD_gewex@data@values)
-#MOD_gewex2=zonal(mod09a,MOD_gewex,fun='mean')
-png("output/Resolution_Figures_%03d.png",width=5500,height=4000,res=600,pointsize=36,bg="white")
-trellis.par.set(my.theme)
-#pdf("output/mod09_resolution.pdf",width=11,height=8.5)
+```{r,seasmapresid,echo=FALSE,message=F}
+clds$resid=NA
+# get residuals of simple linear model
+clds$resid[!is.na(clds$cld_all)&!is.na(clds$mod09)]=residuals(lm(mod09~cld_all,data=clds[!is.na(clds$cld_all)&!is.na(clds$mod09),]))
+colat=bgr(clds$resid)
+phist=histogram(clds$resid,breaks=colat$at,border=NA,col=colat$col,xlim=c(-30,30),type="count",xlab="MODCF Residuals")#,seq(0,1,len=6),na.rm=T)
+pmap=xyplot(lat~lon|seas,data=clds,groups=cut(clds$resid,rev(colat$at)),
+       par.settings=list(superpose.symbol=list(col=colat$col)),pch=16,cex=.25,
+       auto.key=F,#list(space="right",title="Difference\n(MOD09-NDP026D)",cex.title=1),asp=1,
+       ylab="Latitude",xlab="Longitude")+
+  layer(sp.lines(coast,col="black",lwd=.1),under=F)
+print(phist,position=c(0,.75,1,1),more=T)
+print(pmap,position=c(0,0,1,.78))
+```
 
-r="Venezuela"
-# ylab.right = "Cloud Frequency (%)",par.settings = list(layout.widths = list(axis.key.padding = 0.1,axis.left=0.6,ylab.right = 3,right.padding=2)),
-pars=list(layout.heights=list(key.bottom=2,key.top=1),layout.widths = list(axis.key.padding = 3,axis.left=0.6))
-p1=levelplot(crop(mod09a,regs[[r]]),col.regions=grey(seq(0,1,len=100)),at=seq(45,100,len=99),
-    colorkey=list(space="top",width=1,height=.75,labels=list(labels=c(50,75,100),at=c(50,75,100))),
-    cuts=99,margin=F,max.pixels=1e6,par.settings = pars)
-p2=levelplot(crop(gewex,regs[[r]]),col.regions=grey(seq(0,1,len=100)),at=seq(.45,1,len=99),cuts=99,margin=F,max.pixels=1e6,
-    colorkey=list(space="top",width=1,height=.75,labels=list(labels=c(50,75,100),at=c(.50,.75,1))),
-    par.settings = pars)
-tmap=crop(wc_map,regs[[r]])
-p3=levelplot(tmap,col.regions=grey(seq(0,1,len=100)),cuts=100,at=seq(tmap@data@min,tmap@data@max,len=100),margin=F,maxpixels=1e6,
-    colorkey=list(space="bottom",height=.75,width=1),xlab="",ylab="",main=names(regs)[r],useRaster=T,
-    par.settings = pars)
-p4=levelplot(crop(wc_dem,regs[[r]]),col.regions=grey(seq(0,1,len=100)),cuts=99,margin=F,max.pixels=1e6,
-    colorkey=list(space="bottom",height=.75,width=1),
-    par.settings = pars)#,labels=list(labels=c(1000,4000),at=c(1000,4000))))
-print(c("MODCF (%)"=p1,"PATMOS-x GEWEX (%)"=p2,"WorldClim Precip (mm)"=p3,"Elevation (m)"=p4,x.same=T,y.same=T,merge.legends=T,layout=c(2,2)))
+___________________________
+## Temporal Stability
 
-
-dev.off()
-
-
-#########################################
-### Some stats for paper
-
-## number of stations retained
-length(unique(cldm$StaID[!is.na(cldm$cld_all)]))
-length(unique(cldm$StaID[!is.na(cldm$cld)]))
-
-# approximate size of mod09ga archive - get total size for one day from the USGS website
-size=scan("http://e4ftl01.cr.usgs.gov/MOLT/MOD09GA.005/2000.04.30/",what="char")
-## extract all filesizes in MB (all the HDFs) and sum them and covert to TB for the length of the full record
-sum(as.numeric(sub("M","",grep("[0-9]*M$",size,value=T))))/1024/1024*as.numeric(as.Date("2013-12-31")-as.Date("2000-02-24"))
-
-## seasonal variability
-cellStats(mod09sd,"mean")
-
-## Validation table construction
-quantile(cldm$difm,na.rm=T)
-
-summary(lm(cld_all~mod09+lat,data=cldm))
-
-              
-
-###################################################################
-### summary by biome
-biomep$id=1:nrow(biomep)
-biomepl=melt(biomep@data,id.vars=c("id","code","biome","realm"))
-colnames(biomepl)[grep("variable",colnames(biomepl))]="month"
-biomepl$month=factor(biomepl$month,ordered=T,levels=month.name)
-biomepl$realm=factor(biomepl$realm,ordered=T,levels=c("Antarctic","Australasia","Oceania", "IndoMalay", "Neotropics","Palearctic","Nearctic" ))
-biomepl$value[biomepl$value<0]=NA
-
-
-png("output/Biome_Figures_%03d.png",width=5500,height=4000,res=600,pointsize=36,bg="white")
-trellis.par.set(my.theme)
-
-#[biomepl$id%in%sample(biomep$id,10000),]
-p1=useOuterStrips(xyplot(value~month|realm+biome,groups=id,data=biomepl,panel=function(x,y,groups = groups, subscripts = subscripts){
-    panel.xyplot(x,y,col=grey(0.6,0.2),type="l",lwd=.5,groups=groups,subscripts=subscripts)
-    panel.smoother(y ~ s(x), method = "gam",lwd=2,subscripts=subscripts,n=24)
-},scales=list(y=list(at=c(0,100),lim=c(-20,120),cex=.75,alternating=2,tck=c(0,1)),x=list(at=c(1,7),rot=45,alternating=1)),ylab="Biome",xlab.top="Geographic Realm",ylab.right="MODCF (%)", xlab="Month"),
-    strip=strip.custom(par.strip.text = list(cex = .7)),strip.left=strip.custom(horizontal=TRUE,par.strip.text = list(cex = .75)))
-p1$par.settings$layout.widths$strip.left[1]=13
-p1$par.strip.text$lines=.65
-print(p1)
-
-dev.off()
-
-
-####################################################################
-## assess temporal stability
-
+```{r,tempsubset,echo=F,results='hide',message=F}
 ## spatialy subset data to stations at least 10km apart
 st2=remove.duplicates(st,zero=10)
 
@@ -241,55 +222,6 @@ cldm.t=cldm.t[!cldm.t$StaID%in%stdrop,]
 cldm.t=cldm.t[cldm.t$StaID%in%st2$id,]
 ## Subset to only some months, if desired
 #cldm.t=cldm.t[cldm.t$month%in%1:3,]
-
-
-## Select Knots
-knots=spsample(land,500,type="regular")
-
-                                        #  reshape data
-m.cld=cast(cldm.t,StaID+lat+lon+biome~month,value="cld_all");colnames(m.cld)[-(1:4)]=paste("cld.",colnames(m.cld)[-(1:4)],sep="")
-m.mod09=cast(cldm.t,StaID~month,value="mod09");colnames(m.mod09)[-1]=paste("mod09.",colnames(m.mod09)[-1],sep="")
-mdata=cbind(m.cld,m.mod09)
-
-## cast to 
-coords <- as.matrix(m.cld[,c("lon","lat")])#as.matrix(ne.temp[,c("UTMX", "UTMY")]/1000)
-max.d <- max(iDist(coords))
-
-##make symbolic model formula statement for each month
-mods <- lapply(paste(paste(paste("cld.",1:N.t,sep=''),paste("mod09.",1:N.t,sep=''),sep='~'),"",sep=""), as.formula)
-
-tlm=model.matrix(lm(mods[[1]],data=mdata))
-
-N.t <- ncol(m.mod09)-1 ##number of months
-n <- nrow(m.cld) ##number of observation per months
-p <- ncol(tlm) #number of regression parameters in each month
-
-starting <- list("beta"=rep(0,N.t*p), "phi"=rep(3/(0.5*max.d), N.t),
-                 "sigma.sq"=rep(2,N.t), "tau.sq"=rep(1, N.t),
-                 "sigma.eta"=diag(rep(0.01, p)))
-tuning <- list("phi"=rep(5, N.t))
-
-priors <- list("beta.0.Norm"=list(rep(0,p), diag(1000,p)),
-               "phi.Unif"=list(rep(3/(0.9*max.d), N.t), rep(3/(0.05*max.d), N.t)),
-               "sigma.sq.IG"=list(rep(2,N.t), rep(10,N.t)),
-               "tau.sq.IG"=list(rep(2,N.t), rep(5,N.t)),
-               "sigma.eta.IW"=list(2, diag(0.001,p)))
-cov.model <- "exponential"
-
-## Run the model
-n.samples <- 500
-m.1=spDynLM(mods,data=mdata,coords=coords,knots=coordinates(knots),n.samples=n.samples,starting=starting,tuning=tuning,priors=priors,cov.model=cov.model,get.fitted=T,n.report=25)
-
-save(m.1,file="output/m.1.Rdata")
-## summarize
-burn.in <- floor(0.75*n.samples)
-quant <- function(x){quantile(x, prob=c(0.5, 0.025, 0.975))}
-beta <- apply(m.1$p.beta.samples[burn.in:n.samples,], 2, quant)
-beta.0 <- beta[,grep("Intercept", colnames(beta))]
-beta.1 <- beta[,grep("mod09", colnames(beta))]
-
-
-
 
 ### Compare time periods
 library(texreg)
@@ -309,7 +241,10 @@ library(texreg)
      return(tr)
  }
 setMethod("extract", signature = className("lm", "stats"),definition = extract.lm)
+```
 
+To assess the accuracy of the MODCF product in estimating multi-decadal cloud frequencies, we used linear models between the 2000-2014 satellite climatologies and station observations divided into two periods including the full station record (1970-2009) and the MODIS-era subset (2000-2009).     
+```{r,modcomparetable,echo=F,results='asis',message=F}
 forms=c("cld~mod09+month2+lat")
 lm_all=lm(cld_all~mod09+lat,data=cldm[!is.na(cldm$cld),])
 
@@ -320,54 +255,71 @@ lm_all1=lm(cld_all~mod09,data=cldm[!is.na(cldm$cld)&cldm$cldn_all>=10,])
 lm_mod=lm(cld~mod09,data=cldm[cldm$cldn==10,])
 mods=list("1970-2009"=lm_all1,"2000-2009"=lm_mod)
 
-screenreg(mods,digits=2,single.row=T,custom.model.names=names(mods),custom.coef.names = c("Intercept", "MODCF"))
+#screenreg(mods,digits=2,single.row=T,custom.model.names=names(mods),custom.coef.names = c("Intercept", "MODCF"))
 
-htmlreg(mods,file = "output/tempstab.doc",
-        custom.model.names = names(mods),
-        single.row = T, inline.css = FALSE,doctype = TRUE, html.tag = TRUE, head.tag = TRUE, body.tag = TRUE)
+htmlreg(mods,custom.model.names = names(mods),custom.coef.names = c("Intercept", "MODCF"),
+        single.row = T, inline.css = T,doctype = F, html.tag = F, head.tag = F, body.tag = F,
+        caption="Comparison of MODCF accuracy over two time periods, the full station record (1970-2009) and the 'MODIS-era' (2000-2014).")
+```
 
+____________________________
+## Latitudinal Bias in MODCF
 
-## assess latitude bias
-cldm$abslat=abs(cldm$lat)
-cldm$absdif=abs(cldm$difm)
-abslm=lm(absdif~abslat*I(abslat^2),data=cldm[cldm$cldn_all>30,])
+```{r,latbiasboxplot,echo=F,results='asis',message=F}
+## add latitudinal bins to cldm
+cldm$latbin=cut(cldm$lat,seq(-90,90,by=20),include.lowest=T)
 
-xyplot(absdif~abslat|month2,type=c("p","smooth"),data=cldm,cex=.25,pch=16)
+bwcols=list(col=grey(0.4),pch=16,cex=.5)
+bwplot(latbin~resid|seas,type=c("p","smooth"),data=cldm,cex=.25,pch=16,xlab="Validation Error (MODCF-Station)",ylab="20-Degree Latitude Bin",fill="grey",layout=c(4,1),scales=list(x=list(rot=45)),
+       par.settings = list(plot.symbol=bwcols,box.dot =bwcols),notch=T,varwidth=T)+
+  layer(panel.abline(h=5,col="grey"),under=T)+
+  layer(panel.abline(v=0,col="red"),under=T)
 
-plot(absdif~abslat,data=cldm[cldm$cldn_all>30,],cex=.25,pch=16)
-lines(0:90,predict(abslm,newdata=data.frame(abslat=0:90),type="response"),col="red")
+#bf=anovaBF(resid~lulcc+month2,data=cldm[!is.na(cldm$resid)&!is.na(cldm$lulcc),])
+#ch=posterior(bf, iterations = 1000)
+#summary(bf)
+#plot(bf)
+```
 
-bf=anovaBF(dif~lulcc+month2,data=cldm[!is.na(cldm$dif)&!is.na(cldm$lulcc),])
-ch=posterior(bf, iterations = 1000)
-summary(bf)
-plot(bf)
+The MODCF tends to overestimate CF at higher latitudes in winter months, and underestimate it in summer months.  
 
-## explore validation error
-cldm$lulcc=as.factor(IGBP$class[match(cldm$lulc,IGBP$ID)])
+```{r,latbias,echo=F,results='asis',message=F}
+sumfun=function(x){
+    n <- length(na.omit(x))
+    rmse=sqrt(mean((x^2),na.rm=T))
+    if(is.nan(rmse))return("")
+    paste(round(rmse,1)," (",n,")",sep="")
+     }
+lb=cast(cldm,seas~latbin,value="resid",fun=sumfun)
 
+print(xtable(lb),type="html")
+
+```
+
+____________________________
+## Assess Land-Use Land-Cover bias
+```{r,lulcbias,echo=FALSE,message=F,results='hide'}
+bwplot(lulcc~resid,data=cldm,horiz=T,xlab="Residuals (MOD09-Observed)",varwidth=T,notch=T)+layer(panel.abline(v=0))
+```
+
+Boxplot showing residuals (MOD09-Station) by land cover type.  
+
+```{r,lulctable,echo=F,message=F,results='asis'}
 ## Table of RMSE's by lulc by month
-lulctl=ddply(cldm,c("month","lulc"),function(x) c(count=nrow(x),rmse=sqrt(mean((x$mod09-x$cld)^2,na.rm=T))))
-lulctl=lulctl[!is.na(lulctl$lulc),]
-lulctl$lulcc=as.factor(IGBP$class[match(lulctl$lulc,IGBP$ID)])
 
-lulctl=ddply(cldm,c("lulc"),function(x) c(count=nrow(x),mean=paste(round(mean(x$difm,na.rm=T),2)," (",round(sd(x$difm,na.rm=T),2),")",sep=""),rmse=round(sqrt(mean((x$difm)^2,na.rm=T)),2)))
-lulctl$lulcc=as.factor(IGBP$class[match(lulctl$lulc,IGBP$ID)])
-    print(xtable(lulctl[order(lulctl$rmse),c("lulcc","count","mean","rmse")],digits=1),type="html",include.rownames=F,file="output/lulcc.doc",row.names=F)
-    
+lulct=cast(cldm,lulcc~seas,value="resid",fun=sumfun)
 
-lulcrmse=cast(lulcrmsel,lulcc~month,value="rmse")
-lulcrmse
+print(xtable(lulct,caption="Table of RMSE's (count) by season (column) and Land Cover (row)"),type="html",include.rownames=F,row.names=F)
+```
 
-lulcrmse.q=round(do.call(rbind,apply(lulcrmse,1,function(x) data.frame(Min=min(x,na.rm=T),Mean=mean(x,na.rm=T),Max=max(x,na.rm=T),SD=sd(x,na.rm=T)))),1)#quantile,c(0.025,0.5,.975),na.rm=T)),1)
-lulcrmse.q=lulcrmse.q[order(lulcrmse.q$Mean,decreasing=T),]
-lulcrmse.q
 
-print(xtable(lulcrmse,digits=1),"html")
+```{r,lulclevelplot,echo=FALSE,message=F,results='hide'}
+lulctl=ddply(cldm,c("seas","lulcc"),function(x) c(count=nrow(x),rmse=sqrt(mean(x$resid^2,na.rm=T))))
+lulctl=lulctl[!is.na(lulctl$lulcc),]
 
 bgyr=colorRampPalette(c("blue","green","yellow","red"))
-levelplot(rmse~month*lulcc,data=lulcrmsel,col.regions=bgyr(1000),at=quantile(lulcrmsel$rmse,seq(0,1,len=100),na.rm=T))
+levelplot(rmse~seas*lulcc,data=lulctl,col.regions=bgyr(1000),at=quantile(lulctl$rmse,seq(0,1,len=100),na.rm=T),xlab="Season",ylab="Land Cover")
 
+```
 
-### Linear models
-summary(lm(dif~as.factor(lulc)+lat+month2,data=cldm))
 
