@@ -1,0 +1,51 @@
+Appendix B:  Regional Comparisons
+========================================================
+
+
+```{r}
+## Compare with worldclim and NPP
+#wc=stack(as.list(paste("/mnt/data/jetzlab/Data/environ/global/worldclim/prec_",1:12,".bil",sep="")))
+wc_map=stack(as.list(paste("/mnt/data/jetzlab/Data/environ/global/worldclim/bio_12.bil",sep="")))
+wc_dem=stack(as.list(paste("/mnt/data/jetzlab/Data/environ/global/worldclim/alt.bil",sep="")))
+
+regs=list(
+  Cascades=extent(c(-122.8,-118,44.9,47)),
+  Hawaii=extent(c(-156.5,-154,18.75,20.5)),
+  Boliva=extent(c(-71,-63,-20,-15)),
+  Venezuela=extent(c(-69,-59,0,7)),
+  CFR=extent(c(17.75,22.5,-34.8,-32.6)),
+  Madagascar=extent(c(46,52,-17,-12))
+  #reg2=extent(c(-81,-70,-4,10))
+  )
+
+
+## read in GEWEX 1-degree data
+gewex=mean(brick("data/gewex/CA_PATMOSX_NOAA.nc",varname="a_CA"))
+names(gewex)="PATMOS-x GEWEX AVHRR"
+
+## calculate 1-degree means of MODCF data
+#MOD_gewex=gewex
+#MOD_gewex@data@values=1:length(MOD_gewex@data@values)
+#MOD_gewex2=zonal(mod09a,MOD_gewex,fun='mean')
+png("output/Resolution_Figures_%03d.png",width=5500,height=4000,res=600,pointsize=36,bg="white")
+trellis.par.set(my.theme)
+#pdf("output/mod09_resolution.pdf",width=11,height=8.5)
+
+r="Venezuela"
+# ylab.right = "Cloud Frequency (%)",par.settings = list(layout.widths = list(axis.key.padding = 0.1,axis.left=0.6,ylab.right = 3,right.padding=2)),
+pars=list(layout.heights=list(key.bottom=2,key.top=1),layout.widths = list(axis.key.padding = 3,axis.left=0.6))
+p1=levelplot(crop(mod09a,regs[[r]]),col.regions=grey(seq(0,1,len=100)),at=seq(45,100,len=99),
+    colorkey=list(space="top",width=1,height=.75,labels=list(labels=c(50,75,100),at=c(50,75,100))),
+    cuts=99,margin=F,max.pixels=1e6,par.settings = pars)
+p2=levelplot(crop(gewex,regs[[r]]),col.regions=grey(seq(0,1,len=100)),at=seq(.45,1,len=99),cuts=99,margin=F,max.pixels=1e6,
+    colorkey=list(space="top",width=1,height=.75,labels=list(labels=c(50,75,100),at=c(.50,.75,1))),
+    par.settings = pars)
+tmap=crop(wc_map,regs[[r]])
+p3=levelplot(tmap,col.regions=grey(seq(0,1,len=100)),cuts=100,at=seq(tmap@data@min,tmap@data@max,len=100),margin=F,maxpixels=1e6,
+    colorkey=list(space="bottom",height=.75,width=1),xlab="",ylab="",main=names(regs)[r],useRaster=T,
+    par.settings = pars)
+p4=levelplot(crop(wc_dem,regs[[r]]),col.regions=grey(seq(0,1,len=100)),cuts=99,margin=F,max.pixels=1e6,
+    colorkey=list(space="bottom",height=.75,width=1),
+    par.settings = pars)#,labels=list(labels=c(1000,4000),at=c(1000,4000))))
+print(c("MODCF (%)"=p1,"PATMOS-x GEWEX (%)"=p2,"WorldClim Precip (mm)"=p3,"Elevation (m)"=p4,x.same=T,y.same=T,merge.legends=T,layout=c(2,2)))
+````
