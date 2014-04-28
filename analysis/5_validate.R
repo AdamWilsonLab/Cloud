@@ -145,10 +145,11 @@ Mode <- function(x) {
       ux <- na.omit(unique(x))
         ux[which.max(tabulate(match(x, ux)))]
       }
-lulcst=extract(lulc,st,fun=Mode,buffer=buf,df=T)
+lulcst=raster::extract(lulc,st,fun=Mode,buffer=buf,df=T)
 colnames(lulcst)=c("id","lulc")
+lulcst$StaID=st$id
 ## add it to cld
-cldm$lulc=lulcst$lulc[match(cldm$StaID,lulcst$id)]
+cldm$lulc=lulcst$lulc[match(cldm$StaID,lulcst$StaID)]
 cldm$lulcc=IGBP$class[match(cldm$lulc,IGBP$ID)]
 
 
