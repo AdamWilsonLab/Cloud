@@ -1,4 +1,4 @@
-Appendix A: Methods & Validation
+Appendix B: Validation
 =======================
 
 This appendix includes details of the validation procedure.
