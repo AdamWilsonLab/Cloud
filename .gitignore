@@ -1,6 +1,12 @@
 .Rproj.user
 .Rhistory
 .RData
-manuscript/appendices/cache
-manuscript/appendices/figure
+manuscript/SupplementaryMaterials/cache
+manuscript/SupplementaryMaterials/figure
 data/MCD09
+
+## tex files
+*.bbl
+*.html
+*.toc
+*.tex

@@ -16,6 +16,9 @@ library(maptools)
 library(rgdal)
 library(coda)
 
+## register parallel backend
+library(doMC)
+registerDoMC(12)
 
 ## Working Directory
 setwd("/media/data/Cloud")
