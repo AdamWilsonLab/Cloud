@@ -10,3 +10,5 @@ data/MCD09
 *.html
 *.toc
 *.tex
+*.log
+*.synctex.gz
