@@ -94,8 +94,8 @@ foreach(i=1:length(f2), .options.multicore=list(preschedule=FALSE)) %dopar% {
 
 ################
 ### calculate inter vs. intra annual variability
-f3=list.files(paste(datadir,"/mcd09ctif",sep=""),pattern=paste(".*MCD09_mean_[0-9].[.]tif$",sep=""),full=T)
-f3sd=list.files(paste(datadir,"/mcd09ctif",sep=""),pattern=paste(".*MCD09_sd_[0-9].[.]tif$",sep=""),full=T)
+f3=list.files("data/MCD09/",pattern=paste(".*MCD09_mean_[0-9].[.]tif$",sep=""),full=T)
+f3sd=list.files("data/MCD09",pattern=paste(".*MCD09_sd_[0-9].[.]tif$",sep=""),full=T)
 
 dmean=stack(as.list(f3))
 dsd=stack(as.list(f3sd))
@@ -105,23 +105,26 @@ beginCluster(12)
 ## Function to calculate standard deviation and round it to nearest integer
 Rsd=function(x) calc(x,function(x) round(sd(x,na.rm=T)))
 
-dinter=clusterR(dmean,Rsd,file=paste(datadir,"/mcd09ctif/inter.tif",sep=""),options=c("COMPRESS=LZW","PREDICTOR=2"),overwrite=T,dataType='INT1U',NAflag=255)
-dintra=clusterR(dsd,mean,file=paste(datadir,"/mcd09ctif/intra.tif",sep=""),options=c("COMPRESS=LZW","PREDICTOR=2"),overwrite=T,dataType='INT1U',NAflag=255)
+dinter=clusterR(dmean,Rsd,file="data/MCD09_deriv/inter.tif",sep=""),options=c("COMPRESS=LZW","PREDICTOR=2"),overwrite=T,dataType='INT1U',NAflag=255)
+dintra=clusterR(dsd,mean,file="data/MCD09_deriv/intra.tif",sep=""),options=c("COMPRESS=LZW","PREDICTOR=2"),overwrite=T,dataType='INT1U',NAflag=255)
+
+
+
+### Calculate Markham's Seasonality
+mod09_seas=calc(crop(dmean,extent(-0,10,0,10)),seasconc,return.Pc=T,return.thetat=F,overwrite=T,
+                    options=c("COMPRESS=LZW","PREDICTOR=2"),
+                    filename="data/MCD09_deriv/mod09_seas.tif",NAflag=255,datatype="INT1U")
+mod09_seas2=(dmean,seasconc,return.Pc=F,return.thetat=T,overwrite=T,
+             options=c("COMPRESS=LZW","PREDICTOR=2"),
+             filename="data/MCD09_deriv/mod09_theta.tif",NAflag=255,datatype="INT1U")
+
 
 endCluster()
 
-tplot=F
-if(tplot){
-    gcol=colorRampPalette(c("blue","yellow","red"))
-    gcol=colorRampPalette(c("black","white"))
-    levelplot(res[["bias"]],col.regions=gcol(100),cuts=99,margin=F,maxpixels=1e6)
-    levelplot(stack(list(Original=res[["d"]],Corrected=res[["dc"]])),col.regions=gcol(100),cuts=99,maxpixels=1e6)
-    levelplot(stack(list(Original=res[["d"]],Corrected=res[["dc"]])),col.regions=gcol(100),cuts=99,maxpixels=1e6,ylim=c(10,13),xlim=c(-7,-1))
-}
 
 
 
-
+########################################################################################
 #### stuff below here is old junk.....       
         
         ##  convert to netcdf, subset to mean/sd bands
@@ -231,47 +234,5 @@ system(paste("cdo  -f nc4c -O inttime,2012-01-15,12:00:00,7day  -sellonlatbox,",
              "  data/cloud_monthly.nc data/daily_",names(regs[r]),".nc",sep=""))
 
 
-
-
-### Long term summaries
-seasconc <- function(x,return.Pc=T,return.thetat=F) {
-          #################################################################################################
-          ## Precipitation Concentration function
-          ## This function calculates Precipitation Concentration based on Markham's (1970) technique as described in Schulze (1997)
-          ## South Africa Atlas of Agrohydology and Climatology - R E Schulze, M Maharaj, S D Lynch, B J Howe, and B Melvile-Thomson
-          ## Pages 37-38
-          #################################################################################################
-          ## x is a vector of precipitation quantities - the mean for each factor in "months" will be taken,
-          ## so it does not matter if the data are daily or monthly, as long as the "months" factor correctly
-          ## identifies them into 12 monthly bins, collapse indicates whether the data are already summarized as monthly means.
-          #################################################################################################
-          theta=seq(30,360,30)*(pi/180)                                       # set up angles for each month & convert to radians
-                  if(sum(is.na(x))==12) { return(cbind(Pc=NA,thetat=NA)) ; stop}
-                  if(return.Pc) {
-                              rt=sqrt(sum(x * cos(theta))^2 + sum(x * sin(theta))^2)    # the magnitude of the summation
-                                        Pc=as.integer(round((rt/sum(x))*100))}
-                  if(return.thetat){
-                              s1=sum(x*sin(theta),na.rm=T); s2=sum(x*cos(theta),na.rm=T)
-                                        if(s1>=0 & s2>=0)  {thetat=abs((180/pi)*(atan(sum(x*sin(theta),na.rm=T)/sum(x*cos(theta),na.rm=T))))}
-                                        if(s1>0 & s2<0)  {thetat=180-abs((180/pi)*(atan(sum(x*sin(theta),na.rm=T)/sum(x*cos(theta),na.rm=T))))}
-                                        if(s1<0 & s2<0)  {thetat=180+abs((180/pi)*(atan(sum(x*sin(theta),na.rm=T)/sum(x*cos(theta),na.rm=T))))}
-                                        if(s1<0 & s2>0)  {thetat=360-abs((180/pi)*(atan(sum(x*sin(theta),na.rm=T)/sum(x*cos(theta),na.rm=T))))}
-                             thetat=as.integer(round(thetat))
-                            }
-                  if(return.thetat&return.Pc) return(c(conc=Pc,theta=thetat))
-                  if(return.Pc)          return(Pc)
-                  if(return.thetat)  return(thetat)
-        }
-
-
-
-## read in monthly dataset
-mod09=brick("data/cloud_ymonmean.nc",varname="CF")
-plot(mod09[1])
-
-mod09_seas=calc(mod09,seasconc,return.Pc=T,return.thetat=F,overwrite=T,filename="data/mod09_seas.nc",NAflag=255,datatype="INT1U")
-mod09_seas2=calc(mod09,seasconc,return.Pc=F,return.thetat=T,overwrite=T,filename="data/mod09_seas_theta.nc",datatype="INT1U")
-
-plot(mod09_seas)
 
 
