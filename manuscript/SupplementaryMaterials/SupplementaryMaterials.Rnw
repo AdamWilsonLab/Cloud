@@ -83,7 +83,10 @@ bgr=function(x,n=100,br=0,c1=c("darkblue","blue","grey"),c2=c("grey","red","purp
 
 @
 
-\section{Methods:  Removal of Orbital Artifacts}
+
+\section{Methods}
+
+\subsection{Removal of Orbital Artifacts}
 
 The MODIS orbit results in incomplete daily coverage in the mid-latitudes, resulting in unequal observation frequency in nearly longitudinal banding between approximately -30$^o$ and 30$^o$ latitude.  
 We used the Variational Stationary Noise Remover (VSNR,available at \url{http://www.math.univ-toulouse.fr/~weiss/Codes/VSNR/VNSR_VariationalStationaryNoiseRemover.html}) to remove these artifacts. The VSNR was well suited to this situation because it allows specification of the shape and scale of the `noise'.  We explored various filter dimensions and visually evaluated the output to minimize artifacts (See Figure \ref{fig:Sahara}).   We used a gabor filter with y=200, x=5, and $\theta$=15 for Terra and $\theta$=-15 for Aqua.
@@ -106,6 +109,11 @@ bcols=colorRampPalette(c("#08306b","#0d57a1","#2878b8","#4997c9","#72b2d7","#a2c
 levelplot(dt,col.regions=bcols(100),at=seq(0,100,len=101),
     cuts=99,margin=F,max.pixels=1e6,par.settings = pars)+layer(sp.lines(coast))
 @
+
+\subsection{Calculation of Seasonal Metrics}
+\newpage
+Let $m$ index months ($m\in1:12$) and $y$ index years ($y\in2000:2014$).  The timeseries of monthly cloud frequencies $CF_{m,y}$  (proportion of days with cloud flag equal to 1) was calculated separately from the daily MOD09GA and MYD09GA.  These were then summarized to the `climatological' cloud frequency mean and standard deviation: $\mu_m=$mean$(CF_{m,y})$ and $\sigma_m=$SD$(CF_{m,y})$.  The inter-annual variability was then calculated as mean($\sigma_m$) and intra-annual variability (seasonality) as SD$(\mu_m)$.
+
 
 \section{Validation}
 
