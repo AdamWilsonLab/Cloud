@@ -23,6 +23,9 @@ registerDoMC(12)
 ## Working Directory
 setwd("/media/data/Cloud")
 
+## color ramp
+colR=colorRampPalette(c("#08306b","#0d57a1","#2878b8","#4997c9","#72b2d7","#a2cbe2","#c7dcef","#deebf7","#f7fbff"))
+
 
 ## Load coast object for easy plotting
 land=readShapePoly("/mnt/data/jetzlab/Data/environ/global/gshhg/GSHHS_shp/c/GSHHS_c_L1.shp",force_ring=TRUE)

@@ -105,8 +105,11 @@ beginCluster(12)
 ## Function to calculate standard deviation and round it to nearest integer
 Rsd=function(x) calc(x,function(x) round(sd(x,na.rm=T)))
 
-dinter=clusterR(dmean,Rsd,file="data/MCD09_deriv/inter.tif",sep=""),options=c("COMPRESS=LZW","PREDICTOR=2"),overwrite=T,dataType='INT1U',NAflag=255)
-dintra=clusterR(dsd,mean,file="data/MCD09_deriv/intra.tif",sep=""),options=c("COMPRESS=LZW","PREDICTOR=2"),overwrite=T,dataType='INT1U',NAflag=255)
+dinter=clusterR(dmean,Rsd,file="data/MCD09_deriv/inter.tif",options=c("COMPRESS=LZW","PREDICTOR=2"),overwrite=T,dataType='INT1U',NAflag=255)
+dintra=clusterR(dsd,mean,file="data/MCD09_deriv/intra.tif",options=c("COMPRESS=LZW","PREDICTOR=2"),overwrite=T,dataType='INT1U',NAflag=255)
+
+## Overall annual mean
+dmeanannual=calc(dmean,mean,na.rm=T,file="data/MCD09_deriv/MCD09_meanannual.tif",options=c("COMPRESS=LZW","PREDICTOR=2"),overwrite=T,dataType='INT1U',NAflag=255)
 
 
 

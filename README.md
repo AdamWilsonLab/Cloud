@@ -19,7 +19,7 @@ Code associated with the generation of  a Global Cloud Climatology derived from 
 * Detailed images of interesting regions
 * Comparison to coarser products in appendix
 
-four stories
+## Four stories
  * Amazing detail of cloud cover
     * confirms detail in some regions with real differences
  * Getting it wrong in landscape  (interpolated precipitation layers)

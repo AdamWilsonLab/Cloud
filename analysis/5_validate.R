@@ -173,3 +173,22 @@ write.csv(cldm,file="data/validation/cldm.csv",row.names=F)
 writeOGR(st,dsn="data/validation/",layer="stations",driver="ESRI Shapefile",overwrite_layer=T)
 #########################################################################
 
+
+### Extract regional transects
+cids=c(10866,10980,11130,11135,11138,11146,11210,11212,13014)
+
+cids=c(10858,10865,10866,10980,11130,11135,11138,11204,11207,16040) #11138,11146,11210,11212,13014)
+ts=cldm[cldm$StaID%in%cids,]
+ts$trans=match(ts$StaID,cids)
+ts$cld_allpsd=ts$cld_all+ts$cldsd_all
+ts$cld_allmsd=ts$cld_all-ts$cldsd_all
+ts$mod09msd=ts$mod09-ts$mod09sd
+ts$mod09psd=ts$mod09+ts$mod09sd
+
+tsl=melt(ts,id.vars=c("month","trans"),measure.vars=c("cld_all","cld_allmsd","cld_allpsd","mod09","mod09psd","mod09msd"))
+
+#as("SpatialLinesDataFrame")
+xyplot(value~trans|month,groups=variable,data=tsl,type="l",auto.key=T,ylim=c(0,100))
+
+xyplot(cld_all~mod09|month,data=ts,type="p",auto.key=T)
+

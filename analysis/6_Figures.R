@@ -1,16 +1,8 @@
 ### Figures and tables for MOD09 Cloud Manuscript
 source("analysis/setup.R")
 
-## calculated differences
-cldm$difm=cldm$mod09-cldm$cld_all
-cldm$difs=cldm$mod09sd+cldm$cldsd_all
-
-#clda$dif=clda$mod09-clda$cld
-
-## read in global coasts for nice plotting
-library(maptools)
-library(rgdal)
-
+### Load data
+cf_mean=raster("data/MCD09_deriv/MCD09_meanannual.tif")
 
 ## Figures
 n=100
@@ -36,12 +28,12 @@ greg=list(ylim=c(-60,84),xlim=c(-180,180))
     
 ## Figure 1: 4-panel summaries
 #- Annual average
-levelplot(mod09a,col.regions=colr(n),cuts=100,at=seq(0,100,len=100),colorkey=list(space="bottom",adj=1),
+levelplot(cf_mean,col.regions=colR(n),cuts=100,at=seq(0,100,len=100),colorkey=list(space="bottom",adj=1),
   margin=F,maxpixels=res,ylab="",xlab="",useRaster=T,ylim=greg$ylim)+
     layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col="black"),under=T)+
     layer(sp.lines(coast,col="black"),under=F)
 ## Mean annual with validation stations
-levelplot(mod09a,col.regions=colr(n),cuts=100,at=seq(0,100,len=100),colorkey=list(title="Cloud Frequency (%)",space="bottom",adj=1),
+levelplot(cf_mean,col.regions=colr(n),cuts=100,at=seq(0,100,len=100),colorkey=list(title="Cloud Frequency (%)",space="bottom",adj=1),
   margin=F,maxpixels=res,ylab="",xlab="",useRaster=T,ylim=greg$ylim)+
     layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col="black"),under=T)+
     layer(panel.xyplot(lon,lat,pch=16,cex=.3,col="black"),data=data.frame(coordinates(st)))+
