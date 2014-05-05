@@ -23,18 +23,14 @@ registerDoMC(12)
 ## Working Directory
 setwd("/media/data/Cloud")
 
-## color ramp
+## color ramps
 colR=colorRampPalette(c("#08306b","#0d57a1","#2878b8","#4997c9","#72b2d7","#a2cbe2","#c7dcef","#deebf7","#f7fbff"))
+bgr=colorRampPalette(c("#0000ff","#00ff00","#ff0000"))
+bgyrp=colorRampPalette(c("blue","darkgreen","goldenrod","red","purple"))
 
 
-## Load coast object for easy plotting
-land=readShapePoly("/mnt/data/jetzlab/Data/environ/global/gshhg/GSHHS_shp/c/GSHHS_c_L1.shp",force_ring=TRUE)
-projection(land)="+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
-CP <- as(extent(-180, 180, -60, 84), "SpatialPolygons")
-proj4string(CP) <- CRS(proj4string(land))
-coast=as(land[land$area>50,],"SpatialLines")
-land <- gIntersection(land, CP, byid=F)
-coast <- gIntersection(coast, CP, byid=F)
+## read in coast line
+coast=readOGR("data/gshhs/","coast")
 
 
 #######  Functions

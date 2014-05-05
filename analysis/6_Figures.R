@@ -15,25 +15,26 @@ my.theme = trellis.par.get()
 my.theme$strip.background=list(col="transparent")
 trellis.par.set(my.theme)
 
-#pdf("output/Figures.pdf",width=11,height=8.5)
-png("manuscript/figures/CF_Figures_%03d.png",width=5000,height=4000,res=600,pointsize=42,bg="white")
+pdf("manuscript/figures/Figures.pdf",width=11,height=8.5,pointsize=14)
+#png("manuscript/figures/CF_Figures_%03d.png",width=5000,height=4000,res=600,pointsize=42,bg="white")
 
 ## set plotting parameters
 my.theme = trellis.par.get()
 my.theme$strip.background=list(col="transparent")
 trellis.par.set(my.theme)
 
-res=1e6
+res=1e5
 greg=list(ylim=c(-60,84),xlim=c(-180,180))
     
 ## Figure 1: 4-panel summaries
 #- Annual average
-levelplot(cf_mean,col.regions=colR(n),cuts=100,at=seq(0,100,len=100),colorkey=list(space="bottom",adj=1),
-  margin=F,maxpixels=res,ylab="",xlab="",useRaster=T,ylim=greg$ylim)+
-    layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col="black"),under=T)+
-    layer(sp.lines(coast,col="black"),under=F)
+levelplot(cf_mean,col.regions=colR(n),cuts=99,at=seq(0,100,len=100),colorkey=list(space="right",adj=1),
+          panel=panel.levelplot.raster,margin=F,maxpixels=res,ylab="",xlab="",useRaster=T,ylim=greg$ylim)+
+    layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col="white"),under=T)+
+    layer(sp.lines(hcoast,lwd=.2,),under=F)
+
 ## Mean annual with validation stations
-levelplot(cf_mean,col.regions=colr(n),cuts=100,at=seq(0,100,len=100),colorkey=list(title="Cloud Frequency (%)",space="bottom",adj=1),
+levelplot(cf_mean,col.regions=colr(n),cuts=99,at=seq(0,100,len=100),colorkey=list(title="Cloud Frequency (%)",space="bottom",adj=1),
   margin=F,maxpixels=res,ylab="",xlab="",useRaster=T,ylim=greg$ylim)+
     layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col="black"),under=T)+
     layer(panel.xyplot(lon,lat,pch=16,cex=.3,col="black"),data=data.frame(coordinates(st)))+
@@ -82,26 +83,38 @@ bgr=function(x,n=100,br=0,c1=c("darkblue","blue","grey"),c2=c("grey","red","purp
     return(list(at=at,col=c(bg(sum(at<br)),gr(sum(at>=br)))))
 }
 
-cldm$resid=NA
-# get residuals of simple linear model
-cldm$resid[!is.na(cldm$cld_all)&!is.na(cldm$mod09)]=residuals(lm(mod09~cld_all,data=cldm))
-colat=bgr(cldm$resid)
-phist=histogram(cldm$resid,breaks=colat$at,border=NA,col=colat$col,xlim=c(-30,30),type="count",xlab="MODCF Residuals")#,seq(0,1,len=6),na.rm=T)
-pmap=xyplot(lat~lon|month2,data=cldm,groups=cut(cldm$resid,rev(colat$at)),
-       par.settings=list(superpose.symbol=list(col=colat$col)),pch=16,cex=.25,
-       auto.key=F,#list(space="right",title="Difference\n(MOD09-NDP026D)",cex.title=1),asp=1,
-       ylab="Latitude",xlab="Longitude")+
-  layer(sp.lines(coast,col="black",lwd=.1),under=F)
-print(phist,position=c(0,.75,1,1),more=T)
-print(pmap,position=c(0,0,1,.78))
+
+###################
+### Presentation/Poster
+pdf("poster/figures/PosterFigures.pdf",width=11,height=8.5,pointsize=36)
+res=1e7
+
+pres.theme = trellis.par.get()
+pres.theme$strip.background=list(col="transparent")
+pres.theme$par.ylab.text$cex=2
+pres.theme$par.xlab.text$cex=2
+pres.theme$axis.text$cex=2
+pres.theme$layout.widths$key.right=1.5
+trellis.par.set(pres.theme)
+
+levelplot(cf_mean,col.regions=colR(n),cuts=99,at=seq(0,100,len=100),colorkey=list(space="right",adj=1),
+          panel=panel.levelplot.raster,margin=F,maxpixels=res,ylab="",xlab="",useRaster=T,ylim=greg$ylim,
+          scales=)+
+  layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col="white"),under=T)+
+  layer(sp.lines(hcoast,lwd=.2,),under=F)
+
+xyplot(lat~lon,data=cldm[cldm$month==1,],pch=16,cex=.25,col="red",
+              ylab="Latitude",xlab="Longitude",ylim=greg$ylim)+
+layer(sp.polygons(hland,fill=grey(.8),lwd=.1),col=grey(0.5),under=T)
+
 
 ### heatmap of mod09 vs. NDP for all months
 hmcols=colorRampPalette(c("grey","blue","red","purple"))
 #hmcols=colorRampPalette(c(grey(.8),grey(.3),grey(.2)))
-tr=c(0,66)
-colkey <- draw.colorkey(list(col = hmcols(tr[2]), at = tr[1]:tr[2],height=.25))
+tr=c(0,137)
+colkey <- draw.colorkey(list(col = hmcols(tr[2]), at = tr[1]:tr[2],labels=list(at=c(0,60,120),labels=c(0,60,120)),height=.4))
 
-xyplot(cld_all~mod09|month2,data=cldm,panel=function(x,y,subscripts){
+xyplot(cld_all~mod09|seas,data=cldm,panel=function(x,y,subscripts){
   n=50
   bins=seq(0,100,len=n)
   tb=melt(as.matrix(table(
@@ -111,13 +124,19 @@ xyplot(cld_all~mod09|month2,data=cldm,panel=function(x,y,subscripts){
   print(max(qat))
   qat=tr[1]:tr[2]#unique(tb$value)
   panel.levelplot(tb$x,tb$y,tb$value,at=qat,col.regions=c("transparent",hmcols(length(qat))),subscripts=1:nrow(tb))
-#  panel.abline(0,1,col="black",lwd=2)
+  #  panel.abline(0,1,col="black",lwd=2)
   panel.abline(lm(y ~ x),col="black",lwd=2)
-#  panel.ablineq(lm(y ~ x), r.sq = TRUE,at = 0.6,pos=1, offset=0,digits=2,col="blue")
-  panel.text(70,10,bquote(paste(R^2,"=",.(round(summary(lm(y ~ x))$r.squared,2)))),cex=1)
-},asp=1,scales=list(at=seq(0,100,len=6),useRaster=T,colorkey=list(width=.5,title="Number of Stations")),
-          ylab="NDP Mean Cloud Amount (%)",xlab="MODCF Cloud Frequency (%)",
-              legend= list(right = list(fun = colkey)))#+ layer(panel.abline(0,1,col="black",lwd=2))
+  #  panel.ablineq(lm(y ~ x), r.sq = TRUE,at = 0.6,pos=1, offset=0,digits=2,col="blue")
+  panel.text(70,10,bquote(paste(R^2,"=",.(round(summary(lm(y ~ x))$r.squared,2)))),cex=1.5)
+},asp=1,scales=list(at=seq(0,100,len=3)),useRaster=T,
+                    ylab.right="# of Stations",
+                    ylab="Validation Mean Cloud\nAmount (%)",xlab="MODIS Cloud Frequency (%)",
+                    alternating=2, strip=strip.custom(par.strip.text = list(cex = 2)),
+       par.settings = list(layout.heights=list(strip=1.5)),as.table=T,
+       legend= list(right = list(fun = colkey)))#+ layer(panel.abline(0,1,col="black",lwd=2))
+
+dev.off()
+
 
 
 bwplot(lulcc~difm,data=cldm,horiz=T,xlab="Difference (MOD09-Observed)",varwidth=T,notch=T)+layer(panel.abline(v=0))
