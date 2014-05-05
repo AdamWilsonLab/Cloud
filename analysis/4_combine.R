@@ -1,6 +1,5 @@
 ################################################################################
 ###  calculate monthly means of terra and aqua
-setwd("/mnt/data/personal/adamw/projects/cloud")
 datadir="/mnt/data2/projects/cloud/"
 
 library(raster)
@@ -103,23 +102,27 @@ dsd=stack(as.list(f3sd))
 beginCluster(12)
 
 ## Function to calculate standard deviation and round it to nearest integer
-Rsd=function(x) calc(x,function(x) round(sd(x,na.rm=T)))
+Rsd=function(x) calc(x,function(x) {
+  sd=sd(x,na.rm=T)
+  if(is.na(sd)) sd=0
+  return(round(sd))
+})
 
-dinter=clusterR(dmean,Rsd,file="data/MCD09_deriv/inter.tif",options=c("COMPRESS=LZW","PREDICTOR=2"),overwrite=T,dataType='INT1U',NAflag=255)
-dintra=clusterR(dsd,mean,file="data/MCD09_deriv/intra.tif",options=c("COMPRESS=LZW","PREDICTOR=2"),overwrite=T,dataType='INT1U',NAflag=255)
+dintra=clusterR(dmean,Rsd,na.rm=T,file="/media/data/Cloud/data/MCD09_deriv/intra.tif",options=c("COMPRESS=LZW","PREDICTOR=2"),overwrite=T,dataType='INT1U',NAflag=255)
+dinter=clusterR(dsd,mean,na.rm=T,file="/media/data/Cloud/data/MCD09_deriv/inter.tif",options=c("COMPRESS=LZW","PREDICTOR=2"),overwrite=T,dataType='INT1U',NAflag=255)
 
 ## Overall annual mean
-dmeanannual=calc(dmean,mean,na.rm=T,file="data/MCD09_deriv/MCD09_meanannual.tif",options=c("COMPRESS=LZW","PREDICTOR=2"),overwrite=T,dataType='INT1U',NAflag=255)
+dmeanannual=calc(dmean,mean,na.rm=T,file="/media/data/Cloud/data/MCD09_deriv/meanannual.tif",options=c("COMPRESS=LZW","PREDICTOR=2"),overwrite=T,dataType='INT1U',NAflag=255)
 
 
 
 ### Calculate Markham's Seasonality
 mod09_seas=calc(crop(dmean,extent(-0,10,0,10)),seasconc,return.Pc=T,return.thetat=F,overwrite=T,
                     options=c("COMPRESS=LZW","PREDICTOR=2"),
-                    filename="data/MCD09_deriv/mod09_seas.tif",NAflag=255,datatype="INT1U")
+                    filename="/media/data/Cloud/data/MCD09_deriv/seas_conc.tif",NAflag=255,datatype="INT1U")
 mod09_seas2=(dmean,seasconc,return.Pc=F,return.thetat=T,overwrite=T,
              options=c("COMPRESS=LZW","PREDICTOR=2"),
-             filename="data/MCD09_deriv/mod09_theta.tif",NAflag=255,datatype="INT1U")
+             filename="/media/data/Cloud/data/MCD09_deriv/seas_theta.tif",NAflag=255,datatype="INT1U")
 
 
 endCluster()

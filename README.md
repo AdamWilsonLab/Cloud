@@ -18,6 +18,7 @@ Code associated with the generation of  a Global Cloud Climatology derived from 
 * Timeseries
 * Detailed images of interesting regions
 * Comparison to coarser products in appendix
+* Could you develop correlograms that characterizes the spatial autocorrelation for the main global precipitation or could related products and our cloud climatology (mean or intra-annual variation), ideally including the full (or 95%CI) global variation around the mean estimate for a given lag, and potentially separating the tropics from non-tropics. So this could include Worldclim (which also starts at 1km lag) and other cloud or prec products (CRU etc) that start at say 5 or 50km smallest lag. Sounds easy of course, but the computationally challenging (and also additionally novel) part would be to truly get all 1km pixels represented.  This could be a great way to not only characterize the world’s climate variation in an integrative way, but to bring out the particular scale and associated processes that empirical models to date have failed to address over large extents. Sound right?
 
 ## Four stories
  * Amazing detail of cloud cover
