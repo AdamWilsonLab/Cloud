@@ -117,10 +117,11 @@ dmeanannual=calc(dmean,mean,na.rm=T,file="/media/data/Cloud/data/MCD09_deriv/mea
 
 
 ### Calculate Markham's Seasonality
-mod09_seas=calc(crop(dmean,extent(-0,10,0,10)),seasconc,return.Pc=T,return.thetat=F,overwrite=T,
+tdmean=crop(dmean,extent(c(-10,0,))
+mod09_seas=calc(dmean,seasconc,return.Pc=T,return.thetat=F,overwrite=T,
                     options=c("COMPRESS=LZW","PREDICTOR=2"),
                     filename="/media/data/Cloud/data/MCD09_deriv/seas_conc.tif",NAflag=255,datatype="INT1U")
-mod09_seas2=(dmean,seasconc,return.Pc=F,return.thetat=T,overwrite=T,
+mod09_seas2=calc(dmean,seasconc,return.Pc=F,return.thetat=T,overwrite=T,
              options=c("COMPRESS=LZW","PREDICTOR=2"),
              filename="/media/data/Cloud/data/MCD09_deriv/seas_theta.tif",NAflag=255,datatype="INT1U")
 

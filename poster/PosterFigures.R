@@ -60,7 +60,7 @@ levelplot(cf_mean,col.regions=colR(n),cuts=99,at=seq(0,100,len=100),colorkey=lis
 dev.off()
 
 
-res=3e6
+res=1e7
 
 pdf("poster/figures/InterAnnual.pdf",width=11,height=8.5,pointsize=36)
 trellis.par.set(pres.theme)
