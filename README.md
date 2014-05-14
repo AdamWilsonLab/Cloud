@@ -31,5 +31,10 @@ Code associated with the generation of  a Global Cloud Climatology derived from 
     * 
     
 
+New lens to look at the planet and monitor change
+  cloud forest-environment niches could be shifting/disappearing
+  
+  
+
 
 

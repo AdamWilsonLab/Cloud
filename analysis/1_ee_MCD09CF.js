@@ -11,7 +11,7 @@
 
 //  Specify destination and run name
 var driveFolder="ee_mcd09cf";
-var run="g3"
+var run="g4"
 
 // limit overall date range  (only dates in this range will be included)
 var datestart=new Date("2000-01-01")  // default time zone is UTC
@@ -25,9 +25,9 @@ var monthstop=12
 var mcols = ['MOD09GA','MYD09GA'];
 
 // specify what happens
-var verbose=false       // print info about collections along the way (slows things down)
+var verbose=true       // print info about collections along the way (slows things down)
 var drawmap=true       // add image to map
-var test1=false         // report on all images requested via dates above, but only add image below to map
+var test1=true         // report on all images requested via dates above, but only add image below to map
 var exportDrive=!test1  // add exports to task window
 
 // set testing sensor and month, these only apply if test1==t above
@@ -80,9 +80,12 @@ var monthmean=function(collection,month){
   var mod = new Array (nYears);
   // loop over years and and put the mean monthly CF in the array
     for (var i=0; i<nYears; i ++) {
+      var mstart=new Date(years[i], month,1)
+      var mstop=new Date(years[i], month+1,1)
       mod[i]= fyearmonth(collection,years[i],month). // filter by year-month
       map(getcf).                              // extract cloud frequency
-      mean();                                  // take the mean
+      mean().                                  // take the mean
+      set({'system:time_start' : mstart.valueOf(),'system:time_end' : mstop.valueOf()}); //.valueOf()
       }
   if(verbose){print('Processing '+nYears+' years of data for Month '+month)}
   // build an image collection for all years for this month using the array
@@ -222,8 +225,15 @@ var MCD09_nObs = MCD09all.filter(ee.Filter.calendarRange(tmonth,tmonth,"month"))
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 //  Process monthly cloud trends
-//var trend= MCD09m.formaTrend(null,2)
-//if(verbose) print(trend.getInfo())
+print(MCD09m.getInfo());
+var trend = MCD09m.formaTrend();
+var trendP = trend.
+  select(['long-trend']).
+  mask(trend.select(['long-tstat']).lte(ee.Image(0.01))).
+  divide(MCD09_mean).
+  multiply(ee.Image(100));
+  
+if(verbose) print(trend.getInfo())
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
 // Build a single 8-bit image with all bands
@@ -257,12 +267,12 @@ if(test1) break;  // if running testing, dont complete the loop
 
 // Draw the map?
 if(drawmap) {
-//  var palette="000000,00FF00,FF0000";
-  var palette="000000,FFFFFF";
+  var palette="000000,00FF00,FF0000";
+//  var palette="000000,FFFFFF";
 
-  addToMap(MCD09.select([0]),{min:0,max:10000,palette:palette}, "mean");
-  addToMap(MCD09.select([1]),{min:0,max:5000,palette:palette}, "sd");
-  addToMap(MCD09.select([2]),{min:0,max:15000,palette:palette}, "nObs");
-  addToMap(MCD09.select([3]),{min:0,max:10000,palette:palette}, "pObs");
-//  addToMap(trend.select('long-trend'), {min:-10, max:10, palette:palette}, 'trend');
+  addToMap(MCD09.select([0]),{min:0,max:10000,palette:palette}, "mean",1);
+  addToMap(MCD09.select([1]),{min:0,max:5000,palette:palette}, "sd",0);
+  addToMap(MCD09.select([2]),{min:0,max:15000,palette:palette}, "nObs",0);
+  addToMap(MCD09.select([3]),{min:0,max:10000,palette:palette}, "pObs",0);
+  addToMap(trendP, {min:-50, max:50, palette:palette}, 'trend',1);
 }
