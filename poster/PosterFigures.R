@@ -22,7 +22,7 @@ modc=raster(list.files("/mnt/data2/projects/cloud/mcd09ctif",pattern="MOD09_01_m
 modc3=raster(list.files("/mnt/data2/projects/cloud/mcd09ctif",pattern="MOD09_03_mean.tif",full=T))
 
 ## interannual variability
-inter=raster("data/MCD09_deriv/inter_old.tif")
+inter=raster("data/MCD09_deriv/inter.tif")
 gain(inter)=0.01
 intra=raster("data/MCD09_deriv/intra.tif")
 gain(intra)=0.01
@@ -202,3 +202,33 @@ print(c("MODCF (%)"=p1,"PATMOS-x GEWEX (%)"=p2,"WorldClim Precip (mm)"=p3,"Eleva
 
 dev.off()
 
+
+
+### CFR Figure
+
+#crop coast to cfr
+cfrext=extent(c(17,30,-35,-28))
+cfrext2=as(cfrext, "SpatialPolygons")
+coast_cfr <- gIntersection(coast, cfrext2, byid=F)
+
+## crop data
+mean_cfr=crop(cf_mean,cfrext)
+seas_cfr=stack(crop(inter,cfrext),crop(intra,cfrext))
+names(seas_cfr)=c("Interannual Variability","Intra-annual Variability")
+
+pdf("poster/figures/CFR_CloudSummary.pdf",width=11,height=8.5,pointsize=36)
+
+trellis.par.set(pres.theme)
+pars=list(layout.heights=list(strip=1.5,key.bottom=2,key.top=1),layout.widths = list(axis.key.padding = 3,axis.left=1))
+levelplot(mean_cfr,col.regions=colR(n),cuts=99,at=seq(0,100,len=100),colorkey=list(space="right",adj=1),
+          main="Mean Annual Cloud Frequency (%)",
+          panel=panel.levelplot.raster,margin=F,maxpixels=res,ylab="",xlab="",useRaster=T)+
+  layer(sp.lines(coast_cfr,col="black",lwd=.7),under=F)
+
+levelplot(seas_cfr[[2]],col.regions=bgyrp(n),cuts=99,colorkey=list(space="right",adj=1),
+          main="Cloud Intra-annual Seasonality (SD)",
+          panel=panel.levelplot.raster,margin=F,maxpixels=res,ylab="",xlab="",useRaster=T)+
+  layer(sp.lines(coast_cfr,col="black",lwd=.7),under=F)
+
+
+dev.off()
