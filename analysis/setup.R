@@ -65,3 +65,9 @@ seasconc <- function(x,return.Pc=T,return.thetat=F) {
   if(return.thetat)  return(thetat)
 }
 
+### 
+knitsDoc <- function(name) {
+  library(knitr)
+  knit(paste0(name, ".Rmd"), encoding = "utf-8")
+  system(paste0("pandoc -o ", name, ".docx ", name, ".md --bibliography manuscript/biblio/MODCF.bib"))
+}

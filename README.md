@@ -34,7 +34,17 @@ Code associated with the generation of  a Global Cloud Climatology derived from 
 New lens to look at the planet and monitor change
   cloud forest-environment niches could be shifting/disappearing
   
-  
+## Data distribution
+Environmental layers on standardized grid
+
+### Use-cases
+1.  Regional (rectangular) subset
+2.  Regional (polygons) uploaded or drawn subset with ID.  For each ID, person wants average, min, max, other summaries
+3.  Points (single pixel or with buffer) with ID.
+4.  
+
+
+
 
 
 
