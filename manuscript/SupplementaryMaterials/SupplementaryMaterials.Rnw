@@ -98,7 +98,7 @@ We used the Variational Stationary Noise Remover (VSNR,available at \url{http://
 
 <<Sahara,dev='png',fig.cap="Comparison of January cloud frequency over the Southwestern Sahara from A) corrected Terra and B) uncorrected Terra, C) Uncorrected Aqua, and D) Corrected Aqua.  Note the banding in the uncorrected data resulting from variable observation frequency due to orbital artefacts of the MODIS Satellite.",dpi=150,fig.width=8,fig.height=8,fig.align='center',out.width='1.2\\textwidth'>>=
 ## pick regions to illustrate
-dt=stack("data/out/SaharaBiasCorrectionExample.tif"")
+dt=raster("data/out/SaharaBiasCorrectionExample.tif")
 names(dt)=c("A)Uncorrected_Terra ","B)Corrected_Terra","C)Uncorrected_Aqua","D)Corrected_Aqua")
 
 trellis.par.set(my.theme)
