@@ -48,7 +48,7 @@ seasconc <- function(x,return.Pc=T,return.thetat=T) {
   ## identifies them into 12 monthly bins, collapse indicates whether the data are already summarized as monthly means.
   #################################################################################################
   theta=seq(30,360,30)*(pi/180)                                       # set up angles for each month & convert to radians
-  if(sum(is.na(x))==12) { return(cbind(Pc=NA,thetat=NA)) ; stop}
+  if(any(is.na(x))) { return(cbind(Pc=NA,thetat=NA))}
   if(return.Pc) {
     rt=sqrt(sum(x * cos(theta))^2 + sum(x * sin(theta))^2)    # the magnitude of the summation
     Pc=as.integer(round((rt/sum(x))*1000))}
