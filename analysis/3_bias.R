@@ -8,12 +8,8 @@ library(rgdal)
 registerDoMC(12)
 
 
-# final output will be written to data directory here:
-setwd("/mnt/data/personal/adamw/projects/cloud")
-
 # temporary files will be written here:
 datadir="/mnt/data2/projects/cloud/"
-
 
 ## Specify path to VSNR souce code and add it to RcppOctave path
 library(RcppOctave)
@@ -200,3 +196,18 @@ for(i in 1:nrow(df2)) {
     print(ifile)
     system(paste("gdalinfo ",outfile3,"| grep 'Size is'"))
 }
+
+#### Export small region for easy plotting
+## uncorrected data
+mod=raster(list.files(paste(datadir,"/mcd09tif",sep=""),pattern="MOD09_01_mean.tif",full=T))
+modc=raster(list.files(paste(datadir,"/mcd09ctif",sep=""),pattern="MOD09_01_mean.tif",full=T))
+
+myd=raster(list.files(paste(datadir,"/mcd09tif",sep=""),pattern="MYD09_01_mean.tif",full=T))
+mydc=raster(list.files(paste(datadir,"/mcd09ctif",sep=""),pattern="MYD09_01_mean.tif",full=T))
+
+## adjust gain
+gain(mod)=0.1;gain(modc)=0.1;gain(myd)=0.1;gain(mydc)=0.1
+
+## crop and save tif in data/out folder
+dt=crop(stack(mod,modc,myd,mydc),extent(c(-5,5,5,15)),file="data/out/SaharaBiasCorrectionExample.tif",
+        options=c("COMPRESS=LZW","PREDICTOR=2"),overwrite=T)

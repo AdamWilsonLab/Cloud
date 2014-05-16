@@ -36,7 +36,7 @@ coast=readOGR("data/gshhs/","coast")
 #######  Functions
 
 ## Long term summaries
-seasconc <- function(x,return.Pc=T,return.thetat=F) {
+seasconc <- function(x,return.Pc=T,return.thetat=T) {
   #################################################################################################
   ## Precipitation Concentration function
   ## This function calculates Precipitation Concentration based on Markham's (1970) technique as described in Schulze (1997)
@@ -51,14 +51,14 @@ seasconc <- function(x,return.Pc=T,return.thetat=F) {
   if(sum(is.na(x))==12) { return(cbind(Pc=NA,thetat=NA)) ; stop}
   if(return.Pc) {
     rt=sqrt(sum(x * cos(theta))^2 + sum(x * sin(theta))^2)    # the magnitude of the summation
-    Pc=as.integer(round((rt/sum(x))*100))}
+    Pc=as.integer(round((rt/sum(x))*1000))}
   if(return.thetat){
     s1=sum(x*sin(theta),na.rm=T); s2=sum(x*cos(theta),na.rm=T)
     if(s1>=0 & s2>=0)  {thetat=abs((180/pi)*(atan(sum(x*sin(theta),na.rm=T)/sum(x*cos(theta),na.rm=T))))}
-    if(s1>0 & s2<0)  {thetat=180-abs((180/pi)*(atan(sum(x*sin(theta),na.rm=T)/sum(x*cos(theta),na.rm=T))))}
-    if(s1<0 & s2<0)  {thetat=180+abs((180/pi)*(atan(sum(x*sin(theta),na.rm=T)/sum(x*cos(theta),na.rm=T))))}
-    if(s1<0 & s2>0)  {thetat=360-abs((180/pi)*(atan(sum(x*sin(theta),na.rm=T)/sum(x*cos(theta),na.rm=T))))}
-    thetat=as.integer(round(thetat))
+    if(s1>=0 & s2<=0)  {thetat=180-abs((180/pi)*(atan(sum(x*sin(theta),na.rm=T)/sum(x*cos(theta),na.rm=T))))}
+    if(s1<=0 & s2<=0)  {thetat=180+abs((180/pi)*(atan(sum(x*sin(theta),na.rm=T)/sum(x*cos(theta),na.rm=T))))}
+    if(s1<=0 & s2>=0)  {thetat=360-abs((180/pi)*(atan(sum(x*sin(theta),na.rm=T)/sum(x*cos(theta),na.rm=T))))}
+    thetat=as.integer(round(thetat*10))
   }
   if(return.thetat&return.Pc) return(c(conc=Pc,theta=thetat))
   if(return.Pc)          return(Pc)
