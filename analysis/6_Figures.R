@@ -83,7 +83,6 @@ bgr=function(x,n=100,br=0,c1=c("darkblue","blue","grey"),c2=c("grey","red","purp
     return(list(at=at,col=c(bg(sum(at<br)),gr(sum(at>=br)))))
 }
 
-
 ###################
 ### Presentation/Poster
 pdf("poster/figures/PosterFigures.pdf",width=11,height=8.5,pointsize=36)
@@ -194,3 +193,98 @@ print(c("MODCF (%)"=p1,"PATMOS-x GEWEX (%)"=p2,"WorldClim Precip (mm)"=p3,"Eleva
 
 dev.off()
 
+
+
+### Seasonality plots
+seas=stack("data/MCD09_deriv/seas_conc.tif")
+gain(seas)=.1
+names(seas)=c("conc","theta")
+
+levelplot(seas[[1]],col.regions=rainbow(100),cuts=100)
+levelplot(seas[[2]],col.regions=rainbow(100),cuts=100)
+
+## Generate color vector
+cellStats(seas,range)
+concs=seq(0,40,len=100)
+thetas=seq(0,360,len=360)
+col=expand.grid(conc=concs,theta=thetas)
+col=cbind.data.frame(col,t(col2rgb(as.character(cut(col$theta,breaks=1000,labels=rainbow(1000))))))
+col=cbind.data.frame(col,t(rgb2hsv(r=col$red,g=col$green,b=col$blue,maxColorValue=255)))
+col$id=as.integer(1:nrow(col))
+col$x=col$conc*cos((pi/180)*-col$theta)
+col$y=col$conc*sin((pi/180)*-col$theta)
+## adjust saturation and value to bring low concentration values down
+cbreak=10
+col$s=as.numeric(as.character(cut(col$conc,breaks=c(0,seq(1,cbreak,len=51),seq(cbreak+1,max(concs),len=50)),labels=c(0,seq(0.01,1,.01)))))
+col$v=as.numeric(as.character(cut(col$conc,breaks=c(0,seq(1,cbreak,len=51),seq(cbreak+1,max(concs),len=50)),labels=c(0,seq(0.01,1,.01)))))
+col$s[is.na(col$s)]=0;col$v[is.na(col$v)]=0
+col$val=hsv(h=col$h,s=col$s,v=col$v)
+
+
+
+## create new raster referencing this color table
+tcol=as(cast(col,conc~theta,value="id",df=F,fill=NA),"matrix")
+dimnames(tcol)=NULL
+seas2=calc(seas,fun=function(x,na.rm=T){
+if(any(is.na(x))) return(NA)
+tcol[which.min(abs(concs-x[1])),which.min(abs(thetas-x[2]))]
+ },dataType="INT2U",file="data/MCD09_deriv/seas_vis.tif",na.rm=T,overwrite=T)
+## assign the color table
+seas2@legend@colortable=c(col$val)#,rep("#030303",(2^16)-nrow(col)))
+
+rcols=unique(values(seas2))
+col$exists=col$id%in%rcols
+
+
+
+seasl=as.data.frame(rasterToPoints(seas2))
+seasl$col=col$val[match(seasl$seas_vis,col$id)]
+
+l1=xyplot(conc~theta,col=col$val[col$exists],data=col[col$exists,],pch=16,cex=1,
+          scales=list(
+            x=list(labels=c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"),
+                   at=seq(15,360,30))),
+          xlab="Month",ylab="Concentration (%)")
+
+
+l2=levelplot(x~x*y,colours=seasl$col,data=seasl,pch=16,cex=1,
+            panel = function(x, y, colours, subscripts, ...) {
+            panel.xyplot(x, y, pch = 21, col = "transparent",fill = colours[subscripts])
+            },ylab="",xlab="",
+          colorkey=F,scales=list(draw=T))+
+    layer(sp.lines(coast,col="black"),under=F)
+
+pdf(width=11,height=8.5,file="manuscript/figures/Seasonality.pdf",useDingbats=F,pointsize=12)
+my.theme = trellis.par.get()
+my.theme$strip.background=list(col="transparent")
+trellis.par.set(my.theme)
+
+print(l1,position=c(0,0,1,.25),more=T)
+print(l2,position=c(0,.2,1,1),more=F)
+
+dev.off()
+
+# mangle=seq(30,360,30)*(pi/180)
+plot(col$x,col$y,xaxt="n",yaxt="n",xlab="",ylab="",col=col$val,pch=16,cex=1.5,new=F,asp=1,bty="n",xlim=c(-16,16),ylim=c(-40,40))
+plot(col$x[col$exists],col$y[col$exists],xaxt="n",yaxt="n",xlab="",ylab="",col=col$val[col$exists],pch=16,cex=2,new=F,asp=1,bty="n",xlim=c(-16,16),ylim=c(-45,45))
+n=10; circ=seq(0,30,n) #define the circle diameters
+symbols(rep(0,length(circ)),rep(0,length(circ)),circles=circ,add=T,fg="grey",lwd=2,inches=F) #draw circles
+segments(0,0,30*cos(mangle),30*sin(mangle),col="grey") #draw angles
+text(x=-2,y=-circ[2:n],circ[2:n],pos=4,cex=1.5) #add scale text
+mon=c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec") # month names
+ladj=35
+for(i in c(1:3,9:12)) text(x=ladj*cos(-mangle[i]),y=ladj*sin(-mangle[i]),mon[i],pos=4,cex=1.8,offset=0,srt=-mangle[i]*180/pi) #add left months
+for(i in 4:8) text(x=ladj*cos(-mangle[i]),y=ladj*sin(-mangle[i]),mon[i],pos=2,cex=1.8,offset=0,srt=(-mangle[i]*180/pi)-180) # add right months
+
+
+# pushViewport(viewport(x=.75,y=.65,width=.42,height=.35,name="d1"))
+# grid.rect(gp=gpar(fill="white", lty=1))
+# par(fig=gridFIG(),mar=c(0,0,0,0),new=T)
+# popViewport()
+
+## vector plot of seasonality
+vectorplot(seas,narrows=2e3, lwd.arrows=0.6, length=unit(5e-2, 'npc'),
+           maxpixels=1e5, region=TRUE, margin=FALSE,
+           isField=TRUE, reverse=FALSE,
+           unit='degrees', scaleSlope=TRUE,
+           aspX=0.08)
