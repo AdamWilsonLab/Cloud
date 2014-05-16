@@ -12,6 +12,7 @@
 
 
 \begin{document}
+\SweaveOpts{concordance=TRUE}
 
 
 \maketitle
@@ -29,27 +30,20 @@
 \makeatother
 
 
-<<setup, eval=T,results='hide',echo=F,message=F,cache=F>>=
+<<setup, eval=T,results=hide,echo=F,message=F,cache=F>>=
 ## some setup
+library(knitr)
 opts_knit$set(progress = TRUE, verbose = TRUE,root.dir="../../",cache=T)
-opts_chunk$set(comment=NA, eval=T,results='hide',echo=F,message=F,fig.width=7, fig.height=6,cache=T)
+opts_chunk$set(comment=NA, eval=T,results="hide",echo=F,message=F,fig.width=7, fig.height=6,cache=T)
 
 bigdata="/mnt/data/personal/adamw/projects/cloud/"
-
+print(getwd())
 
 @
 
 <<loaddata>>=
 ## Run the setup script
 source("analysis/setup.R")
-
-## uncorrected data
-mod=raster(list.files("/mnt/data2/projects/cloud/mcd09tif",pattern="MOD09_01_mean.tif",full=T))
-modc=raster(list.files("/mnt/data2/projects/cloud/mcd09ctif",pattern="MOD09_01_mean.tif",full=T))
-
-myd=raster(list.files("/mnt/data2/projects/cloud/mcd09tif",pattern="MYD09_01_mean.tif",full=T))
-mydc=raster(list.files("/mnt/data2/projects/cloud/mcd09ctif",pattern="MYD09_01_mean.tif",full=T))
-
 
 ## load land data for nice plotting
 land=readShapePoly("data/gshhs/GSHHS_c_L1.shp",force_ring=TRUE)
@@ -83,6 +77,16 @@ bgr=function(x,n=100,br=0,c1=c("darkblue","blue","grey"),c2=c("grey","red","purp
 
 @
 
+\section{Background}
+
+\begin{table}[h]
+\begin{tabular}{lllllll}
+Name       & Description                                              & Spatial Domain & Spatial Resolution & Temporal Domain & Temporal Resolution & Reference                 \\
+GEWEX/ICCP & Compiled from 12 satellite products for comparison study & Global          & 1$^o$ ($/sim$110km) & 1983-2009   & Monthly & \citep{Stubenrauch_assessment_2013} \\
+                                                       &                                                                                                    &                &                    &                 &                     &                           \\
+                                                       &                                                                                                    &                &                    &                 &                     &                          
+\end{tabular}
+\end{table}
 
 \section{Methods}
 
@@ -91,18 +95,12 @@ bgr=function(x,n=100,br=0,c1=c("darkblue","blue","grey"),c2=c("grey","red","purp
 The MODIS orbit results in incomplete daily coverage in the mid-latitudes, resulting in unequal observation frequency in nearly longitudinal banding between approximately -30$^o$ and 30$^o$ latitude.  
 We used the Variational Stationary Noise Remover (VSNR,available at \url{http://www.math.univ-toulouse.fr/~weiss/Codes/VSNR/VNSR_VariationalStationaryNoiseRemover.html}) to remove these artifacts. The VSNR was well suited to this situation because it allows specification of the shape and scale of the `noise'.  We explored various filter dimensions and visually evaluated the output to minimize artifacts (See Figure \ref{fig:Sahara}).   We used a gabor filter with y=200, x=5, and $\theta$=15 for Terra and $\theta$=-15 for Aqua.
 
-<<SaharaProcess>>=
-regs=list(
-  Sahara=extent(c(-5,5,5,15))
-  )
-
-r="Sahara"
-dt=crop(stack(mod,modc,myd,mydc),regs[[r]])/100
-names(dt)=c("A)Uncorrected_Terra ","B)Corrected_Terra","C)Uncorrected_Aqua","D)Corrected_Aqua")
-@
 
 <<Sahara,dev='png',fig.cap="Comparison of January cloud frequency over the Southwestern Sahara from A) corrected Terra and B) uncorrected Terra, C) Uncorrected Aqua, and D) Corrected Aqua.  Note the banding in the uncorrected data resulting from variable observation frequency due to orbital artefacts of the MODIS Satellite.",dpi=150,fig.width=8,fig.height=8,fig.align='center',out.width='1.2\\textwidth'>>=
 ## pick regions to illustrate
+dt=stack("data/out/SaharaBiasCorrectionExample.tif"")
+names(dt)=c("A)Uncorrected_Terra ","B)Corrected_Terra","C)Uncorrected_Aqua","D)Corrected_Aqua")
+
 trellis.par.set(my.theme)
 pars=list(layout.heights=list(key.bottom=2,key.top=1),layout.widths = list(axis.key.padding = 3,axis.left=0.6))
 bcols=colorRampPalette(c("#08306b","#0d57a1","#2878b8","#4997c9","#72b2d7","#a2cbe2","#c7dcef","#deebf7","#f7fbff"))
@@ -306,7 +304,7 @@ setMethod("extract", signature = className("lm", "stats"),definition = extract.l
 
 To assess the accuracy of the MODCF product in estimating multi-decadal cloud frequencies, we used linear models between the 2000-2014 satellite climatologies and station observations divided into two periods including the full station record (1970-2009) and the MODIS-era subset (2000-2009).     
 
-<<modcomparetable,results='asis'>>=
+<<modcomparetable,results="tex">>=
 ### Compare two time periods
 lm_all1=lm(cld_all~mod09,data=cldm[!is.na(cldm$cld_all)&cldm$cldn_all>=10,])
 lm_mod=lm(cld~mod09,data=cldm[!is.na(cldm$cld)&cldm$cldn==10,])
@@ -366,7 +364,7 @@ bwplot(lulcc~resid,data=cldm,horiz=T,xlab="Residuals (MOD09-Observed)",varwidth=
 @
 
 
-<<lulctable,results='asis'>>=
+<<lulctable,results=>>=
 
 ## Table of RMSE's by lulc by month
 
@@ -388,7 +386,7 @@ print(xtable(lulct,caption="Table of RMSE's (count) by season (column) and Land 
 \newpage
 \section{Biome Summaries}
 
-<<BiomeTable,results='asis'>>=
+<<BiomeTable,results="tex">>=
 bs=read.csv(file="data/sum/biomesummary.csv")
 bs$monthname=factor(month.name[as.numeric(as.character(bs$month))],ordered=T,levels=month.name)
 bs$realm=factor(bs$realm,ordered=T,levels=c("Antarctic","Australasia","Oceania","Afrotropics","IndoMalay", "Neotropics","Palearctic","Nearctic" ))
@@ -402,7 +400,7 @@ print(xtable(bcode,caption="Biome and realm codes used in Table \\ref{tab:BiomeT
 @
 
 \begin{landscape}
-<<BiomeTable2,results='asis'>>=
+<<BiomeTable2,results="tex">>=
 bst=cast(bs,code~monthname,value="meansd")
 colnames(bst)[1]="Code"
 print(xtable(bst,caption="Mean (SD) monthly cloud frequency summarized by biome and geographic realm. See Table \\ref{tab:BiomeTable} for  Code descriptions.",label = "tab:BiomeTable2"),type="latex",include.rownames=F,row.names=F,tabular.environment='longtable',floating=F,size="footnotesize",caption.placement='top')
