@@ -124,9 +124,10 @@ dmeanannual=clusterR(dmean,Rmean,na.rm=T,file="data/MCD09_deriv/meanannual.tif",
 tdmean=crop(dmean,extent(c(17,30,-35,-28)))
 
 
-seasconc(tdmean[20000],return.Pc=T,return.thetat=T)
+seasconc(dmean[400000],return.Pc=T,return.thetat=T)
 
-seas=clusterR(dmean,function(x) calc(x, seasconc,return.Pc=T,return.thetat=T,na.rm=T),overwrite=T,
+#Rseasconc=function(x,na.rm=T) calc(x, seasconc)
+seas=calc(dmean,seasconc ,overwrite=T,
                     options=c("COMPRESS=LZW","PREDICTOR=2"),
                     filename="data/MCD09_deriv/seas_conc.tif",NAflag=65535,datatype="INT2U")
 
