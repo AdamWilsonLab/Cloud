@@ -20,8 +20,6 @@ library(coda)
 library(doMC)
 registerDoMC(12)
 
-## Working Directory
-setwd("/media/data/Cloud")
 
 ## color ramps
 colR=colorRampPalette(c("#08306b","#0d57a1","#2878b8","#4997c9","#72b2d7","#a2cbe2","#c7dcef","#deebf7","#f7fbff"))
