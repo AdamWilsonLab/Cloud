@@ -93,8 +93,8 @@ foreach(i=1:length(f2), .options.multicore=list(preschedule=FALSE)) %dopar% {
 
 ################
 ### calculate inter vs. intra annual variability
-f3=list.files("data/MCD09/",pattern=paste(".*MCD09_mean_[0-9].[.]tif$",sep=""),full=T)
-f3sd=list.files("data/MCD09",pattern=paste(".*MCD09_sd_[0-9].[.]tif$",sep=""),full=T)
+f3=list.files(paste(datadir,"/mcd09ctif/",sep=""),pattern=paste(".*MCD09_mean_[0-9].[.]tif$",sep=""),full=T)
+f3sd=list.files(paste(datadir,"/mcd09ctif/",sep=""),pattern=paste(".*MCD09_sd_[0-9].[.]tif$",sep=""),full=T)
 
 dmean=stack(as.list(f3))
 dsd=stack(as.list(f3sd))
@@ -105,30 +105,35 @@ beginCluster(12)
 Rsd=function(x) calc(x,function(x) {
   sd=sd(x,na.rm=T)
   if(is.na(sd)) sd=0
-  return(round(sd))
+  return(round(sd/100))
 })
 
-dintra=clusterR(dmean,Rsd,na.rm=T,file="/media/data/Cloud/data/MCD09_deriv/intra.tif",options=c("COMPRESS=LZW","PREDICTOR=2"),overwrite=T,dataType='INT1U',NAflag=255)
-dinter=clusterR(dsd,mean,na.rm=T,file="/media/data/Cloud/data/MCD09_deriv/inter.tif",options=c("COMPRESS=LZW","PREDICTOR=2"),overwrite=T,dataType='INT1U',NAflag=255)
+Rmean=function(x) calc(x,function(x) {
+  return(round(mean(x,na.rm=T)/100))
+})
+
+dintra=clusterR(dmean,Rsd,na.rm=T,file="data/MCD09_deriv/intra.tif",options=c("COMPRESS=LZW","PREDICTOR=2"),overwrite=T,dataType='INT1U',NAflag=255)
+dinter=clusterR(dsd,Rmean,na.rm=T,file="data/MCD09_deriv/inter.tif",options=c("COMPRESS=LZW","PREDICTOR=2"),overwrite=T,dataType='INT1U',NAflag=255)
 
 ## Overall annual mean
-dmeanannual=calc(dmean,mean,na.rm=T,file="/media/data/Cloud/data/MCD09_deriv/meanannual.tif",options=c("COMPRESS=LZW","PREDICTOR=2"),overwrite=T,dataType='INT1U',NAflag=255)
+dmeanannual=clusterR(dmean,Rmean,na.rm=T,file="data/MCD09_deriv/meanannual.tif",options=c("COMPRESS=LZW","PREDICTOR=2"),overwrite=T,dataType='INT1U',NAflag=255)
 
 
 
 ### Calculate Markham's Seasonality
-tdmean=crop(dmean,extent(c(-10,0,))
-mod09_seas=calc(dmean,seasconc,return.Pc=T,return.thetat=F,overwrite=T,
-                    options=c("COMPRESS=LZW","PREDICTOR=2"),
-                    filename="/media/data/Cloud/data/MCD09_deriv/seas_conc.tif",NAflag=255,datatype="INT1U")
-mod09_seas2=calc(dmean,seasconc,return.Pc=F,return.thetat=T,overwrite=T,
-             options=c("COMPRESS=LZW","PREDICTOR=2"),
-             filename="/media/data/Cloud/data/MCD09_deriv/seas_theta.tif",NAflag=255,datatype="INT1U")
+tdmean=crop(dmean,extent(c(17,30,-35,-28)))
 
+
+seasconc(tdmean[20000],return.Pc=T,return.thetat=T)
+
+seas=clusterR(dmean,function(x) calc(x, seasconc,return.Pc=T,return.thetat=T,na.rm=T),overwrite=T,
+                    options=c("COMPRESS=LZW","PREDICTOR=2"),
+                    filename="data/MCD09_deriv/seas_conc.tif",NAflag=65535,datatype="INT2U")
 
 endCluster()
 
 
+            
 
 
 ########################################################################################
