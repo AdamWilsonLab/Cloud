@@ -69,3 +69,15 @@ knitsDoc <- function(name) {
   knit(paste0(name, ".Rmd"), encoding = "utf-8")
   system(paste0("pandoc -o ", name, ".docx ", name, ".md --bibliography manuscript/biblio/MODCF.bib"))
 }
+
+
+#### Definition of regions to use for subsetting
+regs=list(
+  Cascades=extent(c(-122.8,-118,44.9,47)),
+  Hawaii=extent(c(-156.5,-154,18.75,20.5)),
+  Boliva=extent(c(-71,-63,-20,-15)),
+  Venezuela=extent(c(-69,-59,0,7)),
+  CFR=extent(c(17.75,22.5,-34.8,-32.6)),
+  Madagascar=extent(c(46,52,-17,-12))
+)
+
