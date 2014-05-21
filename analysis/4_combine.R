@@ -1,13 +1,14 @@
 ################################################################################
 ###  calculate monthly means of terra and aqua
-datadir="/mnt/data2/projects/cloud/"
+source('analysis/setup.R')
 
 library(raster)
 library(foreach)
 library(multicore)
 library(doMC)
-registerDoMC(12)
+registerDoMC(20)
 
+beginCluster(20)
 
 ### assemble list of files to process
 df=data.frame(path=list.files(paste(datadir,"/mcd09ctif",sep=""),full=T,pattern="M[Y|O].*[0-9]*[mean|sd].*tif$"),stringsAsFactors=F)
@@ -99,7 +100,6 @@ f3sd=list.files(paste(datadir,"/mcd09ctif/",sep=""),pattern=paste(".*MCD09_sd_[0
 dmean=stack(as.list(f3))
 dsd=stack(as.list(f3sd))
 
-beginCluster(12)
 
 ## Function to calculate standard deviation and round it to nearest integer
 Rsd=function(x) calc(x,function(x) {
@@ -119,22 +119,177 @@ dinter=clusterR(dsd,Rmean,na.rm=T,file="data/MCD09_deriv/inter.tif",options=c("C
 dmeanannual=clusterR(dmean,Rmean,na.rm=T,file="data/MCD09_deriv/meanannual.tif",options=c("COMPRESS=LZW","PREDICTOR=2"),overwrite=T,dataType='INT1U',NAflag=255)
 
 
-
+#################################################
 ### Calculate Markham's Seasonality
-tdmean=crop(dmean,extent(c(17,30,-35,-28)))
+#tdmean=crop(dmean,extent(c(17,30,-35,-28)))
 
 
-seasconc(dmean[400000],return.Pc=T,return.thetat=T)
+#seasconc(dmean[400000],return.Pc=T,return.thetat=T)
 
-#Rseasconc=function(x,na.rm=T) calc(x, seasconc)
+## calculate seasonality
 seas=calc(dmean,seasconc ,overwrite=T,
                     options=c("COMPRESS=LZW","PREDICTOR=2"),
                     filename="data/MCD09_deriv/seas_conc.tif",NAflag=65535,datatype="INT2U")
 
+
+
+### generate color key
+seas=stack("data/MCD09_deriv/seas_conc.tif")
+gain(seas)=.1
+names(seas)=c("conc","theta")
+
+#r="Venezuela"
+#seas=crop(seas,regs[[r]])
+
+
+## extract unique values from seas to develop color table
+## takes ~30 minutes
+parUnique=function(x){
+  ## break up raster into chunks for more efficient unique value search
+  blks=blockSize(x, n=nlayers(seas), minblocks=200, minrows=1)
+  uv=foreach(i=1:blks$n,.combine=rbind,.inorder=F)%dopar%{
+    # extract values for this chunk
+    tvals=round(getValues(x, blks$row[i], blks$nrows[i])/10)
+    ## convert to single vector for faster unique()
+    tvals2=paste(tvals[,1],tvals[,2],sep="_")
+    ## split back to separate values
+    tuvals=do.call(rbind,strsplit(unique(tvals2),split="_"))
+    rcols=data.frame(conc=as.numeric(tuvals[,1]),theta=as.numeric(tuvals[,2]))  
+    return(rcols)
+  }
+  ## find overall unique values
+  uvals=unique(uv)
+}
+
+fuvals="data/out/uniqueseasonality.csv"
+if(!file.exists(fuvals)){
+  uvals=parUnique(seas)
+  write.csv(uvals,file=fuvals,row.names=F)
+}
+
+## read in unique colors
+uvals=read.csv(fuvals)
+
+
+## Generate color table
+summary(uvals)
+concs=seq(0,76,len=150)
+thetas=seq(0,360,len=360)
+col=expand.grid(conc=concs,theta=thetas)
+col=cbind.data.frame(col,t(col2rgb(as.character(cut(col$theta,breaks=1000,labels=rainbow(1000))))))
+col=cbind.data.frame(col,t(rgb2hsv(r=col$red,g=col$green,b=col$blue,maxColorValue=255)))
+col$id=as.integer(1:nrow(col))
+col$x=col$conc*cos((pi/180)*-col$theta)
+col$y=col$conc*sin((pi/180)*-col$theta)
+## adjust saturation and value to bring low concentration values down
+cbreak=10
+col$s=as.numeric(as.character(cut(col$conc,breaks=c(0,seq(1,cbreak,len=51),seq(cbreak+1,max(concs),len=50)),labels=c(0,seq(0.01,1,.01)))))
+col$v=as.numeric(as.character(cut(col$conc,breaks=c(0,seq(1,cbreak,len=51),seq(cbreak+1,max(concs),len=50)),labels=c(0,seq(0.01,1,.01)))))
+col$s[is.na(col$s)]=0;col$v[is.na(col$v)]=0
+col$val=hsv(h=col$h,s=col$s,v=col$v)
+## rewrite RGB values to update saturation and value
+col[c("r","g","b","alpha")]=t(col2rgb(col$val,alpha=T))
+col$rgbcol=rgb(red=col$r,blue=col$b,green=col$g,max=255)
+
+col$exists=paste(round(col$conc),round(col$theta))%in%paste(uvals$conc,uvals$theta)
+
+## Write the table to disk for pkcreatect
+#write.table(col[,c("id","r","g","b","alpha")],row.names=F,col.names=F,file="data/MCD09_deriv/coltable.txt")
+
+## create new raster referencing this color table
+tcol=as(cast(col,conc~theta,value="id",df=F,fill=NA),"matrix")
+dimnames(tcol)=NULL
+
+tcol_red=as(cast(col,conc~theta,value="r",df=F,fill=NA),"matrix")
+dimnames(tcol_red)=NULL
+tcol_green=as(cast(col,conc~theta,value="g",df=F,fill=NA),"matrix")
+dimnames(tcol_green)=NULL
+tcol_blue=as(cast(col,conc~theta,value="b",df=F,fill=NA),"matrix")
+dimnames(tcol_blue)=NULL
+
+
+iseas=function(x,...){
+  calc(x,function(v,...) {
+    if(any(is.na(v))) return(NA)
+    tcol[which.min(abs(concs-v[1])),which.min(abs(thetas-v[2]))]
+#  print(c(x,tval))
+#  return(tval)
+    })
+}
+
+#seas2 <- clusterR(seas, calc, args=list(fun=iseas), export=c('concs','thetas','tcol'),
+#                  dataType="INT2U",#filename="data/MCD09_deriv/seas_vis.tif",
+#                  options=c("COMPRESS=LZW","PREDICTOR=2"),na.rm=T,overwrite=T)
+
+beginCluster(20)
+
+## for some unknown reason, this cannot write directly to a geotiff and needs to go to native .grd file
+seas2 <- clusterR(seas, iseas, export=c('concs','thetas','tcol'),
+                  dataType="INT2U",filename="data/MCD09_deriv/seas_ind.tif",
+                  NAflag=65534,na.rm=T,overwrite=T)
+#seas2@legend@colortable=c(col$val)#,rep("#030303",(2^16)-nrow(col)))
+#image(seas2)
+## convert to geotif
+#writeRaster(seas2,dataType="INT2U",filename="data/MCD09_deriv/seas_ind.asc",
+#            NAflag=2^16,options=c("COMPRESS=LZW","PREDICTOR=2"),overwrite=T)
+
+#seas2 <- calc(seas, fun=iseas,
+#                dataType="INT2U",format="GTiff",filename="data/MCD09_deriv/seas_ind.tif",NAFlag=65534,
+#                  #options=c("COMPRESS=LZW","PREDICTOR=2"),na.rm=T,
+#              overwrite=T)
+
+
 endCluster()
 
 
-            
+#seas2=calc(seas,fun=function(x,na.rm=T){
+#  if(any(is.na(x))) return(NA)
+#  tcol[which.min(abs(concs-x[1])),which.min(abs(thetas-x[2]))]
+#},dataType="INT2U",file="data/MCD09_deriv/seas_vis.tif",
+#           options=c("COMPRESS=LZW","PREDICTOR=2"),na.rm=T,overwrite=T)
+
+## update color table via VRT
+seasvrt="data/MCD09_deriv/seas_vis.vrt"
+system(paste("gdal_translate -of VRT  data/MCD09_deriv/seas_ind.tif ",seasvrt)) 
+
+## add color table for 8-bit data
+vrt=scan(seasvrt,what="char")
+hd=c("<ColorInterp>Palette</ColorInterp>","<ColorTable>")
+ft="</ColorTable>"
+ct=paste("<Entry c1=\"",col$r,"\" c2=\"",col$g,"\" c3=\"",col$b,"\" c4=\"255\"/>")
+cti=grep("ColorInterp",vrt)  # get index of current color table
+vrt2=c(vrt[1:(cti-1)],hd,ct,ft,vrt[(cti+1):length(vrt)])
+## update missing data flag following http://lists.osgeo.org/pipermail/gdal-dev/2010-February/023541.html
+write.table(vrt2,file=seasvrt,col.names=F,row.names=F,quote=F)              
+
+system(paste("gdal_translate -co COMPRESS=LZW -co PREDICTOR=2 -of GTIFF -ot UInt16 ",seasvrt,"  data/MCD09_deriv/seas_visct.tif")) 
+
+seas_visct=raster("data/MCD09_deriv/seas_visct.tif")
+image(seas_visct)
+
+## separate out three bands (RGB) instead of using a color table
+seas_rgb=calc(seas,fun=function(x,na.rm=T){
+  if(any(is.na(x))) return(c(NA,NA,NA))
+  inds=c(which.min(abs(concs-x[1])),which.min(abs(thetas-x[2])))
+  c(tcol_red[inds[1],inds[2]],tcol_green[inds[1],inds[2]],tcol_blue[inds[1],inds[2]])
+},dataType="INT1U",file="data/MCD09_deriv/seas_visrgb.tif",
+              options=c("COMPRESS=LZW","PREDICTOR=2"),na.rm=T,overwrite=T)
+
+
+plotRGB(seas_rgb, r=1, g=2, b=3, colNA='black',xlab='', ylab='', asp=NULL, add=FALSE)
+
+#seas2=raster("data/MCD09_deriv/seas_vis.tif")
+## assign the color table
+
+writeRaster(seas2,dataType="INT2U",file="data/MCD09_deriv/seas_visct.tif",options=c("COMPRESS=LZW","PREDICTOR=2"),na.rm=T,overwrite=T)
+system("gdalinfo data/MCD09_deriv/seas_visct.tif")
+system(paste("pkcreatect -co COMPRESS=LZW -co PREDICTOR=2 -ot UInt16 ",
+        " -i data/MCD09_deriv/seas_vis.tif -o data/MCD09_deriv/seas_visct.tif -ct data/MCD09_deriv/coltable.txt"))
+
+image(seas2)
+
+
+
 
 
 ########################################################################################
