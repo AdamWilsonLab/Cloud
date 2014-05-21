@@ -3,13 +3,23 @@ source("analysis/setup.R")
 #cf_mean=raster("/Users/adamw/Downloads/clouds/mcd09tif_g3/MCD09_01.tif")
 cf_mean=raster("data/MCD09_deriv/MCD09_meanannual.tif")
 r="Venezuela"
-tcld=cf_mean#crop(cf_mean,regs[[r]])
+tcld=cf_mean#
+tcld=crop(cf_mean,regs[[r]])
 #tmap=crop(raster("/mnt/data/jetzlab/Data/environ/global/worldclim/bio_12.bil"),tcld)
 #projection(tmap)="+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
 #td=stack(tmap,tcld)
 
 
 x=as.matrix(tcld)
+
+
+library(fields)
+
+td=vgram.matrix(x, R=100, dx = 1,dy = 1 )
+plot(td$d.full, td$vgram.full, xlab="separation distance")
+
+head(td)
+
 
 
 #### Use xcorr2 to get spatial autocorrelation of complete image
