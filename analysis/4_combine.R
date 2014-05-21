@@ -170,6 +170,8 @@ if(!file.exists(fuvals)){
 ## read in unique colors
 uvals=read.csv(fuvals)
 
+## Set polar rotation for polar plot of color values
+prot=-180
 
 ## Generate color table
 summary(uvals)
@@ -179,12 +181,12 @@ col=expand.grid(conc=concs,theta=thetas)
 col=cbind.data.frame(col,t(col2rgb(as.character(cut(col$theta,breaks=1000,labels=rainbow(1000))))))
 col=cbind.data.frame(col,t(rgb2hsv(r=col$red,g=col$green,b=col$blue,maxColorValue=255)))
 col$id=as.integer(1:nrow(col))
-col$x=col$conc*cos((pi/180)*-col$theta)
-col$y=col$conc*sin((pi/180)*-col$theta)
+col$x=col$conc*cos((pi/180)*(-col$theta+prot))
+col$y=col$conc*sin((pi/180)*(-col$theta+prot))
 ## adjust saturation and value to bring low concentration values down
 cbreak=10
-col$s=as.numeric(as.character(cut(col$conc,breaks=c(0,seq(1,cbreak,len=51),seq(cbreak+1,max(concs),len=50)),labels=c(0,seq(0.01,1,.01)))))
-col$v=as.numeric(as.character(cut(col$conc,breaks=c(0,seq(1,cbreak,len=51),seq(cbreak+1,max(concs),len=50)),labels=c(0,seq(0.01,1,.01)))))
+col$s=as.numeric(as.character(cut(col$conc,breaks=c(0,seq(1,cbreak*1.5,len=51),seq(cbreak*1.5+1,max(concs),len=50)),labels=c(0,seq(0.3,1,len=100)))))
+col$v=as.numeric(as.character(cut(col$conc,breaks=c(0,seq(1,cbreak*1.5,len=51),seq(cbreak*1.5+1,max(concs),len=50)),labels=c(0,seq(0.01,1,len=100)))))
 col$s[is.na(col$s)]=0;col$v[is.na(col$v)]=0
 col$val=hsv(h=col$h,s=col$s,v=col$v)
 ## rewrite RGB values to update saturation and value
@@ -193,104 +195,96 @@ col$rgbcol=rgb(red=col$r,blue=col$b,green=col$g,max=255)
 
 col$exists=paste(round(col$conc),round(col$theta))%in%paste(uvals$conc,uvals$theta)
 
-## Write the table to disk for pkcreatect
-#write.table(col[,c("id","r","g","b","alpha")],row.names=F,col.names=F,file="data/MCD09_deriv/coltable.txt")
+## Write the color key table
+write.csv(col,row.names=F,file="data/MCD09_deriv/coltable.csv")
 
 ## create new raster referencing this color table
 tcol=as(cast(col,conc~theta,value="id",df=F,fill=NA),"matrix")
 dimnames(tcol)=NULL
-
-tcol_red=as(cast(col,conc~theta,value="r",df=F,fill=NA),"matrix")
-dimnames(tcol_red)=NULL
-tcol_green=as(cast(col,conc~theta,value="g",df=F,fill=NA),"matrix")
-dimnames(tcol_green)=NULL
-tcol_blue=as(cast(col,conc~theta,value="b",df=F,fill=NA),"matrix")
-dimnames(tcol_blue)=NULL
-
-
+## function to look up color table value for each pixel
 iseas=function(x,...){
   calc(x,function(v,...) {
     if(any(is.na(v))) return(NA)
     tcol[which.min(abs(concs-v[1])),which.min(abs(thetas-v[2]))]
-#  print(c(x,tval))
-#  return(tval)
     })
 }
-
-#seas2 <- clusterR(seas, calc, args=list(fun=iseas), export=c('concs','thetas','tcol'),
-#                  dataType="INT2U",#filename="data/MCD09_deriv/seas_vis.tif",
-#                  options=c("COMPRESS=LZW","PREDICTOR=2"),na.rm=T,overwrite=T)
-
-beginCluster(20)
-
-## for some unknown reason, this cannot write directly to a geotiff and needs to go to native .grd file
+## run the function to find the color ID for each pixel
+## must not use compression flag (COMPRESS=LZW) or geotif export will fail
 seas2 <- clusterR(seas, iseas, export=c('concs','thetas','tcol'),
                   dataType="INT2U",filename="data/MCD09_deriv/seas_ind.tif",
                   NAflag=65534,na.rm=T,overwrite=T)
-#seas2@legend@colortable=c(col$val)#,rep("#030303",(2^16)-nrow(col)))
-#image(seas2)
-## convert to geotif
-#writeRaster(seas2,dataType="INT2U",filename="data/MCD09_deriv/seas_ind.asc",
-#            NAflag=2^16,options=c("COMPRESS=LZW","PREDICTOR=2"),overwrite=T)
-
-#seas2 <- calc(seas, fun=iseas,
-#                dataType="INT2U",format="GTiff",filename="data/MCD09_deriv/seas_ind.tif",NAFlag=65534,
-#                  #options=c("COMPRESS=LZW","PREDICTOR=2"),na.rm=T,
-#              overwrite=T)
-
 
 endCluster()
 
-
-#seas2=calc(seas,fun=function(x,na.rm=T){
-#  if(any(is.na(x))) return(NA)
-#  tcol[which.min(abs(concs-x[1])),which.min(abs(thetas-x[2]))]
-#},dataType="INT2U",file="data/MCD09_deriv/seas_vis.tif",
-#           options=c("COMPRESS=LZW","PREDICTOR=2"),na.rm=T,overwrite=T)
-
 ## update color table via VRT
 seasvrt="data/MCD09_deriv/seas_vis.vrt"
-system(paste("gdal_translate -of VRT  data/MCD09_deriv/seas_ind.tif ",seasvrt)) 
-
-## add color table for 8-bit data
+## write a VRT
+system(paste("gdal_translate -of VRT -a_nodata 65534 data/MCD09_deriv/seas_ind.tif ",seasvrt)) 
+## read in the VRT and update the color information using the color table
 vrt=scan(seasvrt,what="char")
 hd=c("<ColorInterp>Palette</ColorInterp>","<ColorTable>")
 ft="</ColorTable>"
 ct=paste("<Entry c1=\"",col$r,"\" c2=\"",col$g,"\" c3=\"",col$b,"\" c4=\"255\"/>")
 cti=grep("ColorInterp",vrt)  # get index of current color table
 vrt2=c(vrt[1:(cti-1)],hd,ct,ft,vrt[(cti+1):length(vrt)])
-## update missing data flag following http://lists.osgeo.org/pipermail/gdal-dev/2010-February/023541.html
 write.table(vrt2,file=seasvrt,col.names=F,row.names=F,quote=F)              
+## convert back to geotif and compress
+system(paste("gdal_translate -co COMPRESS=LZW -a_nodata 65534 -co PREDICTOR=2 -of GTIFF -ot UInt16 ",seasvrt,"  data/MCD09_deriv/seas_visct.tif")) 
 
-system(paste("gdal_translate -co COMPRESS=LZW -co PREDICTOR=2 -of GTIFF -ot UInt16 ",seasvrt,"  data/MCD09_deriv/seas_visct.tif")) 
-
-seas_visct=raster("data/MCD09_deriv/seas_visct.tif")
-image(seas_visct)
-
-## separate out three bands (RGB) instead of using a color table
-seas_rgb=calc(seas,fun=function(x,na.rm=T){
-  if(any(is.na(x))) return(c(NA,NA,NA))
-  inds=c(which.min(abs(concs-x[1])),which.min(abs(thetas-x[2])))
-  c(tcol_red[inds[1],inds[2]],tcol_green[inds[1],inds[2]],tcol_blue[inds[1],inds[2]])
-},dataType="INT1U",file="data/MCD09_deriv/seas_visrgb.tif",
-              options=c("COMPRESS=LZW","PREDICTOR=2"),na.rm=T,overwrite=T)
+## expand to RGB for EarthEngine
+system(paste("gdal_translate -a_nodata 255 -expand rgba -co COMPRESS=LZW -co PREDICTOR=2 -of GTIFF -ot Byte ",seasvrt,"  data/MCD09_deriv/seas_rgb.tif")) 
 
 
-plotRGB(seas_rgb, r=1, g=2, b=3, colNA='black',xlab='', ylab='', asp=NULL, add=FALSE)
+pCirc=function(r,n=100) {
+  angs=seq(0,360,len=100)
+  #lapply(r,function(r) {
+      cbind(
+      y=r*cos((pi/180)*(-angs)),
+      x=r*sin((pi/180)*(-angs))
+      )
+  #})
+}
 
-#seas2=raster("data/MCD09_deriv/seas_vis.tif")
-## assign the color table
+mangle=(-seq(30,360,30)+prot+15)*(pi/180)
+rmons=c(1:3,9:12)
+lmons=4:8
+mon=c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec") # month names
+ladj=65
+lims=c(-75,75)
 
-writeRaster(seas2,dataType="INT2U",file="data/MCD09_deriv/seas_visct.tif",options=c("COMPRESS=LZW","PREDICTOR=2"),na.rm=T,overwrite=T)
-system("gdalinfo data/MCD09_deriv/seas_visct.tif")
-system(paste("pkcreatect -co COMPRESS=LZW -co PREDICTOR=2 -ot UInt16 ",
-        " -i data/MCD09_deriv/seas_vis.tif -o data/MCD09_deriv/seas_visct.tif -ct data/MCD09_deriv/coltable.txt"))
+png(width=1000,height=1000,pointsize=32,file="manuscript/figures/SeasKey_%0d.png")
+### Create the color key
+xyplot(conc~theta,col=col$val[col$exists],data=col[col$exists,],pch=16,cex=1,
+       scales=list(
+         x=list(labels=c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"),
+                at=seq(15,360,30))),
+       xlab="Month",ylab="Concentration (%)")
 
-image(seas2)
+xyplot(y~x,col=col$val[col$exists],data=col[col$exists,],pch=16,cex=1.5,
+       xlab="",ylab="",scales=list(draw=F),ylim=lims,xlim=lims,asp=1,
+       par.settings = list(axis.line = list(col = "transparent")))+
+  layer(panel.polygon(pCirc(r=20,n=100),border="grey"))+
+  layer(panel.polygon(pCirc(r=40,n=100),border="grey"))+
+  layer(panel.polygon(pCirc(r=60,n=100),border="grey"))+
+  layer(panel.segments(0,0,60*cos(mangle-(15*pi/180)),60*sin(mangle-(15*pi/180)),col="grey"))+ #draw angles
+  layer(panel.text(x=ladj*cos(mangle[lmons]),y=ladj*sin(mangle[lmons]),mon[lmons],pos=4,cex=3,offset=0,srt=(mangle[lmons])*180/pi))+ #add left months))
+  layer(panel.text(x=ladj*cos(mangle[rmons]),y=ladj*sin(mangle[rmons]),mon[rmons],pos=2,cex=3,offset=0,srt=((mangle[rmons])*180/pi)-180))+ # add right months
+  layer(panel.text(x=-2,y=c(-20,-40,-60),c(20,40,60),pos=4,cex=3)) #add scale text
+
+dev.off()
 
 
-
-
+## standard graphics plotting
+#plot(col$x,col$y,xaxt="n",yaxt="n",xlab="",ylab="",col=col$val,pch=16,cex=1.5,new=F,asp=1,bty="n",xlim=c(-16,16),ylim=c(-40,40))
+#plot(col$x[col$exists],col$y[col$exists],xaxt="n",yaxt="n",xlab="",ylab="",col=col$val[col$exists],pch=16,cex=2,new=F,asp=1,bty="n",xlim=c(-16,16),ylim=c(-45,45))
+#n=10; circ=seq(0,30,n) #define the circle diameters
+#symbols(rep(0,length(circ)),rep(0,length(circ)),circles=circ,add=T,fg="grey",lwd=2,inches=F) #draw circles
+#segments(0,0,30*cos(mangle),30*sin(mangle),col="grey") #draw angles
+#text(x=-2,y=-circ[2:n],circ[2:n],pos=4,cex=1.5) #add scale text
+#mon=c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec") # month names
+#ladj=35
+#for(i in c(1:3,9:12)) text(x=ladj*cos(-mangle[i]),y=ladj*sin(-mangle[i]),mon[i],pos=4,cex=1.8,offset=0,srt=-mangle[i]*180/pi) #add left months
+#for(i in 4:8) text(x=ladj*cos(-mangle[i]),y=ladj*sin(-mangle[i]),mon[i],pos=2,cex=1.8,offset=0,srt=(-mangle[i]*180/pi)-180) # add right months
 
 ########################################################################################
 #### stuff below here is old junk.....       
