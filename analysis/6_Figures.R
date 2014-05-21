@@ -1,6 +1,7 @@
 ### Figures and tables for MOD09 Cloud Manuscript
 source("analysis/setup.R")
 
+
 ### Load data
 cf_mean=raster("data/MCD09_deriv/MCD09_meanannual.tif")
 
@@ -149,16 +150,6 @@ dev.off()
 wc_map=stack(as.list(paste("/mnt/data/jetzlab/Data/environ/global/worldclim/bio_12.bil",sep="")))
 wc_dem=stack(as.list(paste("/mnt/data/jetzlab/Data/environ/global/worldclim/alt.bil",sep="")))
 
-regs=list(
-  Cascades=extent(c(-122.8,-118,44.9,47)),
-  Hawaii=extent(c(-156.5,-154,18.75,20.5)),
-  Boliva=extent(c(-71,-63,-20,-15)),
-  Venezuela=extent(c(-69,-59,0,7)),
-  CFR=extent(c(17.75,22.5,-34.8,-32.6)),
-  Madagascar=extent(c(46,52,-17,-12))
-  #reg2=extent(c(-81,-70,-4,10))
-  )
-
 
 ## read in GEWEX 1-degree data
 gewex=mean(brick("data/gewex/CA_PATMOSX_NOAA.nc",varname="a_CA"))
@@ -193,47 +184,9 @@ print(c("MODCF (%)"=p1,"PATMOS-x GEWEX (%)"=p2,"WorldClim Precip (mm)"=p3,"Eleva
 
 dev.off()
 
+###  Spatial Autocorrelation
 
 
-### Seasonality plots
-seas=stack("data/MCD09_deriv/seas_conc.tif")
-gain(seas)=.1
-names(seas)=c("conc","theta")
-
-levelplot(seas[[1]],col.regions=rainbow(100),cuts=100)
-levelplot(seas[[2]],col.regions=rainbow(100),cuts=100)
-
-## Generate color vector
-cellStats(seas,range)
-concs=seq(0,40,len=100)
-thetas=seq(0,360,len=360)
-col=expand.grid(conc=concs,theta=thetas)
-col=cbind.data.frame(col,t(col2rgb(as.character(cut(col$theta,breaks=1000,labels=rainbow(1000))))))
-col=cbind.data.frame(col,t(rgb2hsv(r=col$red,g=col$green,b=col$blue,maxColorValue=255)))
-col$id=as.integer(1:nrow(col))
-col$x=col$conc*cos((pi/180)*-col$theta)
-col$y=col$conc*sin((pi/180)*-col$theta)
-## adjust saturation and value to bring low concentration values down
-cbreak=10
-col$s=as.numeric(as.character(cut(col$conc,breaks=c(0,seq(1,cbreak,len=51),seq(cbreak+1,max(concs),len=50)),labels=c(0,seq(0.01,1,.01)))))
-col$v=as.numeric(as.character(cut(col$conc,breaks=c(0,seq(1,cbreak,len=51),seq(cbreak+1,max(concs),len=50)),labels=c(0,seq(0.01,1,.01)))))
-col$s[is.na(col$s)]=0;col$v[is.na(col$v)]=0
-col$val=hsv(h=col$h,s=col$s,v=col$v)
-
-
-
-## create new raster referencing this color table
-tcol=as(cast(col,conc~theta,value="id",df=F,fill=NA),"matrix")
-dimnames(tcol)=NULL
-seas2=calc(seas,fun=function(x,na.rm=T){
-if(any(is.na(x))) return(NA)
-tcol[which.min(abs(concs-x[1])),which.min(abs(thetas-x[2]))]
- },dataType="INT2U",file="data/MCD09_deriv/seas_vis.tif",na.rm=T,overwrite=T)
-## assign the color table
-seas2@legend@colortable=c(col$val)#,rep("#030303",(2^16)-nrow(col)))
-
-rcols=unique(values(seas2))
-col$exists=col$id%in%rcols
 
 
 
@@ -245,7 +198,12 @@ l1=xyplot(conc~theta,col=col$val[col$exists],data=col[col$exists,],pch=16,cex=1,
             x=list(labels=c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"),
                    at=seq(15,360,30))),
           xlab="Month",ylab="Concentration (%)")
-
+l1b=xyplot(conc~theta,col=col$rgbcol,data=col,pch=16,cex=1,
+          scales=list(
+            x=list(labels=c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"),
+                   at=seq(15,360,30))),
+          xlab="Month",ylab="Concentration (%)")
+c(l1,l1b)
 
 l2=levelplot(x~x*y,colours=seasl$col,data=seasl,pch=16,cex=1,
             panel = function(x, y, colours, subscripts, ...) {

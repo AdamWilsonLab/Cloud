@@ -1,14 +1,63 @@
 source("analysis/setup.R")
 
-cf_mean=raster("/Users/adamw/Downloads/clouds/mcd09tif_g3/MCD09_01.tif")
+#cf_mean=raster("/Users/adamw/Downloads/clouds/mcd09tif_g3/MCD09_01.tif")
+cf_mean=raster("data/MCD09_deriv/MCD09_meanannual.tif")
 r="Venezuela"
-tcld=crop(cf_mean,regs[[r]])
+tcld=cf_mean#crop(cf_mean,regs[[r]])
 #tmap=crop(raster("/mnt/data/jetzlab/Data/environ/global/worldclim/bio_12.bil"),tcld)
 #projection(tmap)="+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
 #td=stack(tmap,tcld)
 
 
 x=as.matrix(tcld)
+
+
+#### Use xcorr2 to get spatial autocorrelation of complete image
+## http://octave.sourceforge.net/signal/function/xcorr2.html
+
+library(RcppOctave)
+o_eval("pkg load signal")
+
+#system.time(x2<<-.O$xcorr2(x,"coeff"))
+x2=.O$xcorr2(x,"coeff")
+
+save(x2,file="data/out/meanannualxcorr2.Rdata")
+
+## get distances from center point
+center=c(round(nrow(x2)/2),round(ncol(x2)/2))
+dist=tcld
+dist[,]=NA
+dist[center[1],center[2]]=1
+dist=distance(dist)
+
+levelplot(x2)
+
+str(x2)
+
+plot(x2[round(nrow(x2)/2),round(ncol(x2)/2):ncol(x2)],type="l",ylab="Autocorrelation",xlab="Distance (pixels)")
+
+
+
+
+##############################
+### Old Junk
+
+library(fftwtools)
+f = fftw2d(x);
+f = f*Conj(f);
+f = fftw2d(f,inverse=T,HermConj=0);
+
+convolve(f,f,type="open")
+a = conv2 (a.^2, ones (size (b)));
+b = sumsq (b(:));
+c(:,:) = c(:,:) ./ sqrt (a(:,:) * b);
+
+#f = fftshift(f);
+#f = Re(f);
+#f = f/max(max(f));
+#f=data.frame(f=f,id=1:length(f))
+#rownames(f) = 1:nrow(f)
+image(Re(f))
 
 ## from http://www.johnloomis.org/ece563/notes/freq/autoself/autoself.htm
 library(waved)
