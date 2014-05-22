@@ -12,11 +12,24 @@ tcld=crop(cf_mean,regs[[r]])
 
 x=as.matrix(tcld)
 
+## create padded version
+xpad=as.matrix(extend(tcld, extent(c(-39,90,-20,30)), value=0))
 
 library(fields)
 
-td=vgram.matrix(x, R=100, dx = 1,dy = 1 )
-plot(td$d.full, td$vgram.full, xlab="separation distance")
+td2=vgram.matrix(x, R=50, dx = 2,dy = 2)
+
+system.time(td4<<-vgram.matrix(x, R=200, dx = 4,dy = 4))
+
+save(td,file="data/out/variogram.Rdata")
+
+####
+load("data/out/variogram.Rdata")
+
+plot(td4$d, td4$vgram, xlab="Distance")
+plot(td4$d.full, td4$vgram.full, xlab="Distance")
+
+plot(td)
 
 head(td)
 
@@ -33,6 +46,10 @@ x2=.O$xcorr2(x,"coeff")
 
 save(x2,file="data/out/meanannualxcorr2.Rdata")
 
+
+load("data/out/meanannualxcorr2.Rdata")
+x2=t(x2)
+
 ## get distances from center point
 center=c(round(nrow(x2)/2),round(ncol(x2)/2))
 dist=tcld
@@ -40,6 +57,8 @@ dist[,]=NA
 dist[center[1],center[2]]=1
 dist=distance(dist)
 
+levelplot(tcld)
+levelplot(dist)
 levelplot(x2)
 
 str(x2)
@@ -49,73 +68,59 @@ plot(x2[round(nrow(x2)/2),round(ncol(x2)/2):ncol(x2)],type="l",ylab="Autocorrela
 
 
 
-##############################
-### Old Junk
-
-library(fftwtools)
-f = fftw2d(x);
-f = f*Conj(f);
-f = fftw2d(f,inverse=T,HermConj=0);
-
-convolve(f,f,type="open")
-a = conv2 (a.^2, ones (size (b)));
-b = sumsq (b(:));
-c(:,:) = c(:,:) ./ sqrt (a(:,:) * b);
-
-#f = fftshift(f);
-#f = Re(f);
-#f = f/max(max(f));
-#f=data.frame(f=f,id=1:length(f))
-#rownames(f) = 1:nrow(f)
-image(Re(f))
 
 ## from http://www.johnloomis.org/ece563/notes/freq/autoself/autoself.htm
-library(waved)
+#library(waved)
 
-f = fft(x);
-f = f*Conj(f);
-f = fft(f,inverse=T);
-#f = fftshift(f);
-f = Re(f);
-f = f/max(max(f));
-f=data.frame(f=f,id=1:length(f))
-#rownames(f) = 1:nrow(f)
-
-f2=unique(f)
-f2=data.frame(id=1:length(f),r=f)
-str(f)
-
+fftshift2=function(x){
+  ## http://stackoverflow.com/questions/5735720/effcient-way-to-do-fft-shift-in-matlab-without-using-fftshift-function
+   sz = ceiling(dim(x))/2
+  x = x[
+    c(sz[1]:(sz[1]*2), 1:(sz[1]-1)),
+    c(sz[2]:(sz[2]*2), 1:(sz[2])-1)]
+}
 # https://stat.ethz.ch/pipermail/r-help/2008-May/161083.html
-x2=Re(fft(fft(x)* fft(x), inverse=TRUE))
-image(x2)
+
+acorr=function(x){
+  ## convert to matrix
+  xm=as.matrix(x)
+#  xm=x-mean(x)#xpad-mean(xpad)
+  fftx=fft(xm)
+  fftx2=Re(fft(fftx* Conj(fftx), inverse=TRUE))
+  acor1=fftshift2(fftx2)
+  acor2=acor1/max(acor1)
+  res=x
+  values(res)=as.vector(acor2)
+  return(res)
+}
+
+a1=acorr(tcld)
+
+## get distances from center point
+center=c(round(nrow(a1)/2),round(ncol(a1)/2))
+dist=raster(a1)
+dist[,]=NA
+dist[center[1],center[2]]=1
+dist=distance(dist)/1000
+
+td=data.frame(cor=values(a1),dist=values(dist))
+
+plot(cor~dist,data=td)
+
+image.plot(a1)
+
+levelplot(tcld)
+levelplot(dist)
+levelplot(x2)
+
+
+image.plot(a1)
+image.plot(x2)
+
 hist(x2)
 str(x2)
 
-library(fftw)
-xcorr=function(x){
-  fftx=fftw2d(x)
-  fftx2 = Re(fftw2d(fftx  * Conj(fftx),inverse=1))
-  #im=Im(fftx2)
-  #fftx2= Re(fftshift(fftx))
-  return(ret)
-}
-str(fftx2)
-hist(fftx2)
-image(fftx2)
 
-plot(fftx2[1,],type="l")
-
-plot(f~id,data=f[sample(10000),])
-
-n=nrow(x)*ncol(x)
-x_pad = x#[x zeros(size(x))];
-X     = fft(x_pad);
-X_psd = abs(X)^2;
-r_xx = fft(X_psd,inverse=T);
-nfft = 2^nextn(2*n-1);
-r = fft( fft(r_xx,nfft)* Conj(fft(r_xx,nfft)),inverse=TRUE );
-# rearrange and keep values corresponding to lags: -(len-1):+(len-1)
-r = [r(end-len+2:end) ; r(1:len)];
 
 
 
