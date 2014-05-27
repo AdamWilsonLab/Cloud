@@ -1,20 +1,33 @@
 source("analysis/setup.R")
 
-tropics=extent(c(-180,180,-25,25))
+tropics=extent(c(20,25,0,5))
+
 
 
 cf_mean=raster("data/MCD09_deriv/MCD09_meanannual.tif")
+map=raster("/mnt/data/jetzlab/Data/environ/global/worldclim/bio_12.bil")
 
+## mask cloud values where MAP is missing
+#cf_mean=mask(cf_mean,map)
+
+## define tropics and crop to tropics
+tropics=extent(c(-180,180,-23.4378,23.4378))
 tcld=crop(cf_mean,tropics)
+tmap=crop(map,tcld)
 
-tmap=crop(raster("/mnt/data/jetzlab/Data/environ/global/worldclim/bio_12.bil"),tcld)
 projection(tmap)="+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+system.time(a1<<-acorr(tcld,filename="data/MCD09_deriv/ac_tropics_mac.tif",gain=1000,overwrite=T,dataType='INT2S'))
+system.time(a2<<-acorr(tmap,filename="data/MCD09_deriv/ac_tropics_map.tif",gain=1000,overwrite=T,dataType='INT2S'))
+## get distances for each shift to facilitate plotting of the correlogram
+td1=acorr_dist(tcld)
 
-system.time(a1<<-acorr(tcld,fmean="mean"))
-system.time(a2<<-acorr(tmap,fmean="mean"))
+system.time(g1<<-acorr(cf_mean,filename="data/MCD09_deriv/ac_global_mac.tif",gain=1000,overwrite=T,dataType='INT2S'))
+system.time(g2<<-acorr(map,file="data/MCD09_deriv/ac_global_map.tif",gain=1000,overwrite=T,dataType='INT2S'))
 
 ## get distances for each shift to facilitate plotting of the correlogram
-d1=acorr_dist(tcld)
+gd1=acorr_dist(cf_mean)
+
+
 ## get directions for each shift to facilitate plotting of the correlogram
 #d2=acorr_dir(tcld)
 

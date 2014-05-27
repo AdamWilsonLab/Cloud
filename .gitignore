@@ -3,8 +3,9 @@
 .RData
 manuscript/SupplementaryMaterials/cache
 manuscript/SupplementaryMaterials/figure
-data/MCD09
-data/MCD09_deriv  
+data/MCD09/*
+data/MCD09_deriv/*
+*.tif
 
 
 ## tex files
