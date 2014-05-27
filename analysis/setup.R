@@ -16,11 +16,16 @@ library(maptools)
 library(rgdal)
 library(coda)
 
+## install rasterAutocorr
+#library(devtools) 
+#install_github("adammwilson/rasterAutocorr")
+library(rasterAutocorr)
+
 ## register parallel backend
 library(doMC)
 registerDoMC(12)
 
-rasterOptions(progress="text")
+rasterOptions(progress="text",maxmemory=1e9)
 
 
 ## color ramps

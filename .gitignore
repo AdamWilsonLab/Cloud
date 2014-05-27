@@ -4,6 +4,8 @@
 manuscript/SupplementaryMaterials/cache
 manuscript/SupplementaryMaterials/figure
 data/MCD09
+data/MCD09_deriv  
+
 
 ## tex files
 *.bbl
@@ -12,3 +14,7 @@ data/MCD09
 *.tex
 *.log
 *.synctex.gz
+
+## octave stuff
+core
+octave-workspace
