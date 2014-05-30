@@ -69,6 +69,7 @@ var seas=ee.Image("GME/images/04040405428907908306-00317830000645337584")
 
 // Elevation
 var dem=ee.Image('CGIAR/SRTM90_V4')//GME/images/04040405428907908306-08319720230328335274')
+//
 var slope=ee.Algorithms.Terrain(dem).select("slope").focal_max(2000,"circle","meters")
 
 //centerMap(-90.79994, 44.21912, 2);
@@ -128,7 +129,12 @@ var mask_base=cf_06.gte(0).not()
 var mask_alb=alb_mean.gte(180).and(alb_sd.gte(50)).and(slope.lte(0))//.clip(maskbox) // 150:50:0  .and(alb_sd.lte(200))
 // Identify water pixels with high albedo and high variability and buffer by 2km 
 var mask_water=alb_mean.gte(80).and(alb_sd.gte(10)).and(water.eq(1))//.clip(maskbox)
-var mask=mask_base.where(mask_alb,1).where(mask_water,2).where(mask_water.and(mask_alb),3).focal_max(2000,"circle","meters").int8()
+var mask=mask_base.where(mask_alb,1)
+                  .where(mask_water,2)
+                  .where(mask_water.and(mask_alb),3)
+                  .focal_max(2000,"circle","meters")
+                  .clip(maskbox)
+                  .int8()
 
   var palette2="0000ff,00ff00,ff0000"
 addToMap(annual,{min: 0, max: 100,palette:palette}, 'Mean Annual',0);
@@ -158,7 +164,7 @@ if(exportDrive){
     {'maxPixels':1000000000,
     'driveFolder':driveFolder,
     'crs': 'EPSG:4326',
-    'crs_transform': '[0.0083333333, 0, -180, 0, -0.0083333333, -90]',
-    'dimensions':'[ 21600, 43200]'
+    'crs_transform': '[0.0083333333, 0, -180, 0, -0.0083333333,90]',
+    'dimensions':'[43200,21600]'
   });
 }
