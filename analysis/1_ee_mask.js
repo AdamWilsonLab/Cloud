@@ -71,6 +71,8 @@ var seas=ee.Image("GME/images/04040405428907908306-00317830000645337584")
 var dem=ee.Image('CGIAR/SRTM90_V4')//GME/images/04040405428907908306-08319720230328335274')
 //
 var slope=ee.Algorithms.Terrain(dem).select("slope").focal_max(2000,"circle","meters")
+// load maximum slope slope_mx_GMTED2010_md
+//var slope=ee.Image('GME/images/04040405428907908306-11428276147442013580').focal_max(2000,"circle","meters")
 
 //centerMap(-90.79994, 44.21912, 2);
   var palette="08306b,0d57a1,2878b8,4997c9,72b2d7,a2cbe2,c7dcef,deebf7,f7fbff"
@@ -144,6 +146,7 @@ addToMap(inter,{min: 0, max: 40,palette:palette2}, 'Interannual Variability',0);
 addToMap(watermask,{min: 0, max: 1,palette:"0000ff"}, 'Water',0);
 
 addToMap(seas,{}, 'Seasonality',1);
+addToMap(slope,{}, 'Slope',1);
 
 
 //add the mask  .mask(mask.eq(0))
@@ -164,7 +167,7 @@ if(exportDrive){
     {'maxPixels':1000000000,
     'driveFolder':driveFolder,
     'crs': 'EPSG:4326',
-    'crs_transform': '[0.0083333333, 0, -180, 0, -0.0083333333,90]',
-    'dimensions':'[43200,21600]'
+    'crs_transform': '[0.0083333333, 0, -180, 0, -0.0083333333,38]',
+    'dimensions':'[43200,9120]'
   });
 }
