@@ -4,10 +4,11 @@
 var verbose=true       // print info about collections along the way (slows things down)
 var drawmap=true       // add image to map
 var exportDrive=true  // add exports to task window
+var DownloadURL=false  // add exports to task window
 
 //  Specify destination and run name
 var driveFolder="EarthEngineOutput";
-var run="g1"
+var run="GlobalSRTM"
 
 // Get current date as string for file metadata
 var currentdate = new Date();
@@ -135,7 +136,7 @@ var mask=mask_base.where(mask_alb,1)
                   .where(mask_water,2)
                   .where(mask_water.and(mask_alb),3)
                   .focal_max(2000,"circle","meters")
-                  .clip(maskbox)
+//                  .clip(maskbox)
                   .int8()
 
   var palette2="0000ff,00ff00,ff0000"
@@ -160,14 +161,31 @@ addToMap(slope,{min:0,max:10},"Slope",0)
 
 if(exportDrive){
   //define export filename
-  var filename='mask'+'_'+date;
+  var filename='mask_'+run+'_'+date;
   if(verbose){  print('Exporting to: '+filename)}
 
   exportImage(mask,filename,
     {'maxPixels':1000000000,
     'driveFolder':driveFolder,
     'crs': 'EPSG:4326',
-    'crs_transform': '[0.0083333333, 0, -180, 0, -0.0083333333,38]',
-    'dimensions':'[43200,9120]'
+//    'crs_transform': '[0.0083333333, 0, -180, 0, -0.0083333333,]',
+//    'dimensions':'[43200,21600]'
+    'crs_transform': '[0.0083333333, 0, -180, 0, -0.0083333333,75]',
+    'dimensions':'[43200,16800]'
+//    'crs_transform': '[0.0083333333, 0, -180, 0, -0.0083333333,90]',
+//    'dimensions':'[43200,21600]'
   });
+}
+
+if(DownloadURL){
+
+var url=mask.getDownloadURL(
+    {'maxPixels':1000000000,
+    'crs': 'EPSG:4326',
+//    'crs_transform': '[0.0083333333, 0, 54, 0, -0.0083333333,39]',
+//    'dimensions':'[840,840]'
+    'crs_transform': '[0.0083333333, 0, -180, 0, -0.0083333333,90]',
+    'dimensions':'[43200,21600]'
+  });
+  print(url)
 }
