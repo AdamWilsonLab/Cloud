@@ -10,6 +10,7 @@ data/MCD09_deriv/*
 
 ## tex files
 *.bbl
+*.blg
 *.html
 *.toc
 *.tex
