@@ -2,12 +2,6 @@
 ###  calculate monthly means of terra and aqua
 source('analysis/setup.R')
 
-library(raster)
-library(foreach)
-library(multicore)
-library(doMC)
-registerDoMC(20)
-
 beginCluster(20)
 
 ### assemble list of files to process
@@ -55,15 +49,31 @@ overwrite=T
 
 
 
+
 #################################################################################
-###### convert to 8-bit compressed file, add colors and other details
+###### Apply albedo mask and fill in missing data, convert to 8-bit compressed file, add colors and other details
 
 
 f2=list.files(paste(datadir,"/mcd09ctif",sep=""),pattern=paste(".*MCD09_.*_[0-9].[.]tif$",sep=""),full=T)
 
+## download albedo mask data from earth engine
+download=F
+if(download) system(paste("google docs get mask_GlobalSRTM_slopeLTE1_2014064_* ",datadir,"/mcd09ee_mask",sep=""))
+mask=list.files(paste0(datadir,"/mcd09ee_mask"),pattern="*.tif$",full=T)
+## process 
+
 
 foreach(i=1:length(f2), .options.multicore=list(preschedule=FALSE)) %dopar% {
     file=f2[i]
+    ## create temporary files for masking high albedo artifacts and fill in resulting missing data 
+    tfile1=sub("[.]tif","_masked.tif",file)
+    tfile2=sub("[.]tif","_filled.tif",file)
+    tfile3=sub("[.]tif","_filledmasked.tif",file)
+    system(paste0("pksetmask -i ",file," -m ",mask," --operator='>' --msknodata 0 --nodata 65535 -o ",tfile1))
+    system(paste0("gdal_fillnodata.py -md 100 -si 2 ",tfile1," ",tfile2))
+    system(paste0("pksetmask -i ",tfile2," -m ",file," --operator='<' --msknodata 20000 --nodata 65535 -o ",tfile3))
+    
+    ### create vrt to translate scale to 8-bit
     outfilevrt=sub("[.]tif",".vrt",file)
     outfile=paste("data/mcd09tif/",basename(file),sep="")
     ## rescale to 0-100 using a VRT
@@ -88,7 +98,8 @@ foreach(i=1:length(f2), .options.multicore=list(preschedule=FALSE)) %dopar% {
         paste("TIFFTAG_DATETIME='2014'",sep=""),
         "TIFFTAG_ARTIST='Adam M. Wilson (adam.wilson@yale.edu)'")
     system(paste("gdal_translate -a_nodata 255 -ot Byte  -co COMPRESS=LZW -co PREDICTOR=2 ",paste("-mo ",tags,sep="",collapse=" ")," ",outfilevrt," ",outfile))
-
+    ## clean up
+    file.remove(tfile,tfile2)
 }
 
 
