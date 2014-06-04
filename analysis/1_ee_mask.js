@@ -8,7 +8,7 @@ var DownloadURL=false  // add exports to task window
 
 //  Specify destination and run name
 var driveFolder="EarthEngineOutput";
-var run="GlobalSRTM"
+var run="GlobalSRTM_slopeLTE2minalbedo30"
 
 // Get current date as string for file metadata
 var currentdate = new Date();
@@ -70,8 +70,14 @@ var seas=ee.Image("GME/images/04040405428907908306-00317830000645337584")
 
 // Elevation
 var dem=ee.Image('CGIAR/SRTM90_V4')//GME/images/04040405428907908306-08319720230328335274')
-//
-var slope=ee.Algorithms.Terrain(dem).select("slope").focal_max(2000,"circle","meters")
+
+print(dem.getInfo())//
+var slope=ee.Algorithms
+                      .Terrain(dem)
+                      .select("slope")
+                      .focal_median(500,"square","meters")
+                      .reproject('EPSG:4326',[0.00083333333, 0, -180, 0, -0.00083333333,60]);
+                    
 // load maximum slope slope_mx_GMTED2010_md
 //var slope=ee.Image('GME/images/04040405428907908306-11428276147442013580').focal_max(2000,"circle","meters")
 
@@ -114,28 +120,22 @@ addToMap(alb_max,{min: arange[0], max: arange[1],palette:apalette}, 'Albedo_max'
 addToMap(alb_range,{min: arange[0], max: arange[1],palette:apalette}, 'Albedo_range',0);
 
 
-// build overall mask to eliminate hotspots
-
-// limit masking to problematic tropical-subtropical regions
-//var subbox1=ee.Feature(ee.Geometry.Polygon([[-180,-38],[-180,38],[180,38],[180,-38],[-180,-38]]))
-
-// regions to process land mask
-//var subbox1=ee.Feature(ee.Geometry.Polygon([[112,-10],[112,-38],[154,-38],[154,-10]])) //australia
-//var subbox2=ee.Feature(ee.Geometry.Polygon([[-72,-18],[-67.86,-26.8],[-68,-32.2],[-61,-32.2],[-61,-18]]))
-
+// build mask to eliminate hotspots
 //region to process water mask
-var maskbox=ee.Feature(ee.Geometry.Polygon([[-150,-38],[-150,38],[150,38],[150,-38],[-150,-38]]))
+var geodesic = ee.Geometry.Rectangle(-180, -60, 180, 60);
+var maskbox = ee.Geometry(geodesic, null, false);
 
 //start with image of cloud frequency to define the grid 
 var mask_base=cf_06.gte(0).not()
 // Identify areas with high albedo and high variability of albedo (SD) 
-var mask_alb=alb_mean.gte(180).and(alb_sd.gte(50)).and(slope.lte(0))//.clip(maskbox) // 150:50:0  .and(alb_sd.lte(200))
+var mask_alb=alb_min.gte(180).and(alb_sd.gte(50)).and(slope.lte(2))//.clip(maskbox) // 150:50:0  .and(alb_sd.lte(200))
 // Identify water pixels with high albedo and high variability and buffer by 2km 
-var mask_water=alb_mean.gte(80).and(alb_sd.gte(10)).and(water.eq(1))//.clip(maskbox)
+var mask_water=alb_min.gte(25).and(alb_sd.gte(10)).and(water.eq(1))//.clip(maskbox)
+// Combine the masks
 var mask=mask_base.where(mask_alb,1)
                   .where(mask_water,2)
                   .where(mask_water.and(mask_alb),3)
-                  .focal_max(2000,"circle","meters")
+                  .focal_max(3000,"circle","meters")
 //                  .clip(maskbox)
                   .int8()
 
@@ -147,14 +147,13 @@ addToMap(inter,{min: 0, max: 40,palette:palette2}, 'Interannual Variability',0);
 addToMap(watermask,{min: 0, max: 1,palette:"0000ff"}, 'Water',0);
 
 addToMap(seas,{}, 'Seasonality',1);
-addToMap(slope,{}, 'Slope',1);
-
 
 //add the mask  .mask(mask.eq(0))
 addToMap(mask.mask(mask.gte(1)),{min:1,max:3,palette:"ff0000,00ff00,0000ff"},"mask",0)
-//addToMap(mask_alb.mask(mask_alb.eq(1)),{min:.25,max:1.5,palette:"000000,ff0000"},"maskalb",0)
-addToMap(dem,{min:0,max:20000},"DEM",0)
-addToMap(slope,{min:0,max:10},"Slope",0)
+addToMap(mask_alb.mask(mask_alb.eq(1)),{min:.25,max:1.5,palette:"000000,ff0000"},"maskalb",0)
+addToMap(mask_water.mask(mask_water.eq(1)),{min:.25,max:1.5,palette:"000000,ff0000"},"maskwater",0)
+addToMap(dem,{min:0,max:500},"DEM",0)
+addToMap(slope,{min:0,max:5,palette:"ff0000,000000"},"Slope",0)
 
 //print(mask.getInfo())
 //print(annual.getInfo())
@@ -168,10 +167,10 @@ if(exportDrive){
     {'maxPixels':1000000000,
     'driveFolder':driveFolder,
     'crs': 'EPSG:4326',
-//    'crs_transform': '[0.0083333333, 0, -180, 0, -0.0083333333,]',
+//    'crs_transform': '[0.0083333333, 0, -180, 0, -0.0083333333,90]',
 //    'dimensions':'[43200,21600]'
-    'crs_transform': '[0.0083333333, 0, -180, 0, -0.0083333333,75]',
-    'dimensions':'[43200,16800]'
+    'crs_transform': '[0.0083333333, 0, -180, 0, -0.0083333333,60]',
+    'dimensions':'[43200,14400]'
 //    'crs_transform': '[0.0083333333, 0, -180, 0, -0.0083333333,90]',
 //    'dimensions':'[43200,21600]'
   });
