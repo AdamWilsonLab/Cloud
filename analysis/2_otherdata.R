@@ -22,3 +22,4 @@ hcoast <- gIntersection(hcoast, CP, byid=F)
 hcoast<-as(hcoast,"SpatialLinesDataFrame")
 hcoast@data=data.frame(ID=1)
 writeOGR(hcoast,"data/gshhs/","coast",driver="ESRI Shapefile",overwrite=T)
+
