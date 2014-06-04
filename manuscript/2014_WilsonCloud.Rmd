@@ -1,0 +1,13 @@
+High-resolution Global Cloud Climatology
+========================================================
+
+
+```{r}
+summary(cars)
+```
+
+You can also embed plots  [@wilson_systematic_2014], for example:
+
+```{r fig.width=7, fig.height=6,fig.cap="Test Caption"}
+plot(cars)
+```
