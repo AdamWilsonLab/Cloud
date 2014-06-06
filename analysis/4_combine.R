@@ -61,7 +61,7 @@ download=F
 if(download) system(paste("google docs get mask_GlobalSRTM_slopeLTE2minalbedo30_2014064_* ",datadir,"/mcd09ee_mask",sep=""))
 mask=list.files(paste0(datadir,"/mcd09ee_mask"),pattern="*0.tif$",full=T)
 ## process 
-mask2=sub("[.]tif","_2.tif",mask)
+#mask2=sub("[.]tif","_2.tif",mask)
 #mask3=sub("[.]tif","_3.vrt",mask)
 
 
@@ -83,7 +83,11 @@ foreach(i=1:length(f2), .options.multicore=list(preschedule=FALSE)) %dopar% {
                   " --operator='<' --msknodata 65535 --nodata 1 ",
                   "-o ",tmask))
     system(paste0("gdal_edit.py -a_nodata 65535 ",tmask))
-    system(paste0("gdal_fillnodata.py -nomask -mask ",tmask," -md 100 -si 0 ",file," ",tfile2))
+#    system(paste0("gdal_fillnodata.py -nomask -mask ",tmask," -md 100 -si 0 ",file," ",tfile2))
+#    system(paste0("pkcrop -i ",tmask," -i ",file," -o ",tfile2))
+    
+    system(paste0("pkfillnodata -m ",tmask," -d 100 -it 2 -i ",file," -o ",tfile2))
+    
     system(paste0("gdal_edit.py -a_nodata 65535 ",tfile2))
     
     ### create vrt to translate scale to 8-bit
