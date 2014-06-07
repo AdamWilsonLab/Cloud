@@ -60,63 +60,42 @@ f2=list.files(paste(datadir,"/mcd09ctif",sep=""),pattern=paste(".*MCD09_.*_[0-9]
 download=F
 if(download) system(paste("google docs get mask_GlobalSRTM_slopeLTE2minalbedo30_2014064_* ",datadir,"/mcd09ee_mask",sep=""))
 mask=list.files(paste0(datadir,"/mcd09ee_mask"),pattern="*0.tif$",full=T)
-## process 
-#mask2=sub("[.]tif","_2.tif",mask)
-#mask3=sub("[.]tif","_3.vrt",mask)
-
-
-#system(paste0("pkreclass -nodata -128 -c 0 -r 1 -c 1 -r 0 -c 2 -r 0 -c 3 -r 0 -i ",mask," -ot Byte -co COMPRESS=LZW -co PREDICTOR=2 -o ",mask2))
-#system(paste0("gdalbuildvrt -te -180 -90 180 90 ",mask3," ",mask2))
-#system(paste0("gdal_translate -of vrt -projwin -180 90 180 -90 ",mask2," ",mask3))
-#    system(paste0("pksetmask -i ",tfile2," -m ",file," --operator='=' --msknodata 65535 --nodata -128 -o ",tfile3))
-#system(paste0("gdal_edit.py -a_nodata 65535 ",tfile1))
 
 foreach(i=1:length(f2), .options.multicore=list(preschedule=FALSE)) %dopar% {
     file=f2[i]
-    ## create temporary files for masking high albedo artifacts and fill in resulting missing data 
-    tmask=sub("[.]tif","_mask.tif",file)
-    tfile2=sub("[.]tif","_filled.tif",file)
-    system(paste0("pksetmask -i ",file,
-                  " -m ",mask,
-                  " --operator='>' --msknodata 0 --nodata 0 ",
-                  " -m ",file,
-                  " --operator='<' --msknodata 65535 --nodata 1 ",
-                  "-o ",tmask))
-    system(paste0("gdal_edit.py -a_nodata 65535 ",tmask))
-#    system(paste0("gdal_fillnodata.py -nomask -mask ",tmask," -md 100 -si 0 ",file," ",tfile2))
-#    system(paste0("pkcrop -i ",tmask," -i ",file," -o ",tfile2))
-    
-    system(paste0("pkfillnodata -m ",tmask," -d 100 -it 2 -i ",file," -o ",tfile2))
-    
-    system(paste0("gdal_edit.py -a_nodata 65535 ",tfile2))
-    
+    ## Initialze the grass session  
+    initGRASS(gisBase="/usr/lib/grass70/", home=tempdir(), location=basename(file), mapset="PERMANENT", override = T)
+    execGRASS("g.proj", flags="c",epsg=4326)
+    ## import the data
+    execGRASS("r.in.gdal", flags="overwrite",input=file,output="image")
+    execGRASS("r.in.gdal", flags="overwrite",input=mask,output="mask")
+    execGRASS("g.region", rast="image")
+    ## Create a new copy of the image with masked values and divide by 100 to facilitate 8-bit export
+    execGRASS("r.mapcalc",flags="overwrite",expression="image2 =  if(isnull(mask),image/100,if(mask>0&mask<100,null(),image/100))")
+      
+    #execGRASS("g.region",flags="p", w='112',e='138',s='-34',n='-16')
+    #execGRASS("r.external.out", directory=dirname(output),extension="tif",format="GTiff")
+    execGRASS("r.fillnulls", flags=c("overwrite"), input="image2",output="filled",method="bicubic")
+    ## rescale to 0-100
+    execGRASS("r.colors",map="filled",rules="data/out/grasscols.txt")
+
     ### create vrt to translate scale to 8-bit
-    outfilevrt=sub("[.]tif",".vrt",file)
     outfile=paste("data/MCD09/",basename(file),sep="")
-    ## rescale to 0-100 using a VRT
-    system(paste("gdal_translate  -scale 0 10000 0 100 -of VRT ",tfile2," ",outfilevrt)) 
-    ## add color table for 8-bit data
-    vrt=scan(outfilevrt,what="char")
-    hd=c("<ColorInterp>Palette</ColorInterp>","<ColorTable>")
-    ft="</ColorTable>"
-    colR=colorRampPalette(c("#08306b","#0d57a1","#2878b8","#4997c9","#72b2d7","#a2cbe2","#c7dcef","#deebf7","#f7fbff"))
-    cols=data.frame(t(col2rgb(colR(105))))
-    ct=paste("<Entry c1=\"",cols$red,"\" c2=\"",cols$green,"\" c3=\"",cols$blue,"\" c4=\"255\"/>")
-    cti=grep("ColorInterp",vrt)  # get index of current color table
-    vrt2=c(vrt[1:(cti-1)],hd,ct,ft,vrt[(cti+1):length(vrt)])
-    ## update missing data flag following http://lists.osgeo.org/pipermail/gdal-dev/2010-February/023541.html
-    csi=grep("<ComplexSource>",vrt2)  # get index of current color table
-    vrt2=c(vrt2[1:csi],"<NODATA>327</NODATA>",vrt2[(csi+1):length(vrt2)])
-    write.table(vrt2,file=outfilevrt,col.names=F,row.names=F,quote=F)              
     tags=c(paste("TIFFTAG_IMAGEDESCRIPTION='Monthly Cloud Frequency for 2000-2013 extracted from C5 MODIS M*D09GA PGE11 internal cloud mask algorithm (embedded in state_1km bit 10).",
         "The daily cloud mask time series were summarized to mean cloud frequency (CF) by calculating the proportion of cloudy days. ",
         "Band Descriptions: 1) Mean Monthly Cloud Frequency'"),
         "TIFFTAG_DOCUMENTNAME='Collection 5 Cloud Frequency'",
         paste("TIFFTAG_DATETIME='2014'",sep=""),
         "TIFFTAG_ARTIST='Adam M. Wilson (adam.wilson@yale.edu)'")
-    system(paste("gdal_translate -a_nodata 255 -ot Byte  -co COMPRESS=LZW -co PREDICTOR=2 ",paste("-mo ",tags,sep="",collapse=" ")," ",outfilevrt," ",outfile))
+    ## write out the file    
+    execGRASS("r.out.gdal", flags=c("f","overwrite"), input="filled",output=output,type="Byte",
+              createopt="\"COMPRESS=LZW,PREDICTOR=2\"",
+              metaopt=paste0(c("\"",paste(tags,collapse=","),"\""),collapse=""),nodata=255)
+    
     ## clean up
-    file.remove(tfile,tfile2,outfilevrt)
+    unlink_.gislock()
+    system(paste0("rm -rf ",tempdir(),"/",basename(file)))
+    
 }
 
 
