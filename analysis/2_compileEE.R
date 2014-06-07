@@ -15,7 +15,7 @@ datadir="/mnt/data2/projects/cloud/"
 
 ### Download files from google drive
 ## This only works if google-cli is installed and has already been authenticated 
-download=T
+download=F
 if(download) system(paste("google docs get 2014043_g3_* ",datadir,"/mcd09ee",sep=""))
 
 
