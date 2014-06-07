@@ -8,7 +8,7 @@ var DownloadURL=false  // add exports to task window
 
 //  Specify destination and run name
 var driveFolder="EarthEngineOutput";
-var run="1eef38a2"
+var run="70c9fc96a9"
 
 // Get current date as string for file metadata
 var currentdate = new Date();
@@ -76,7 +76,7 @@ print(dem.getInfo())//
 var slope=ee.Algorithms
                       .Terrain(dem)
                       .select("slope")
-                      .focal_median(2000,"square","meters")
+                      .focal_median(1000,"square","meters")
                       .reproject('EPSG:4326',[0.00083333333, 0, -180, 0, -0.00083333333,60]);
                     
 // load maximum slope slope_mx_GMTED2010_md
