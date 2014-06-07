@@ -8,7 +8,7 @@ var DownloadURL=false  // add exports to task window
 
 //  Specify destination and run name
 var driveFolder="EarthEngineOutput";
-var run="GlobalSRTM"
+var run="1eef38a2"
 
 // Get current date as string for file metadata
 var currentdate = new Date();
@@ -76,7 +76,7 @@ print(dem.getInfo())//
 var slope=ee.Algorithms
                       .Terrain(dem)
                       .select("slope")
-                      .focal_median(500,"square","meters")
+                      .focal_median(2000,"square","meters")
                       .reproject('EPSG:4326',[0.00083333333, 0, -180, 0, -0.00083333333,60]);
                     
 // load maximum slope slope_mx_GMTED2010_md
@@ -130,7 +130,7 @@ var maskbox = ee.Geometry(geodesic, null, false);
 //start with image of cloud frequency to define the grid 
 var mask_base=cf_06.gte(0).not()
 // Identify areas with high albedo and high variability of albedo (SD) 
-var mask_alb=alb_min.gte(130).and(alb_cov.gte(10)).and(slope.lte(1)).and(water.eq(0))//.clip(maskbox) // 150:50:0  .and(alb_sd.lte(200))
+var mask_alb=alb_min.gte(80).and(alb_cov.gte(10)).and(slope.lte(0)).and(water.eq(0))//.clip(maskbox) // 150:50:0  .and(alb_sd.lte(200))
 // Identify water pixels with high albedo and high variability and buffer by 2km 
 var mask_water=alb_min.gte(25).and(alb_cov.gte(30)).and(water.eq(1))//.clip(maskbox)
 var mask_brightwater=alb_min.gte(75).and(water.eq(1))//.clip(maskbox)
