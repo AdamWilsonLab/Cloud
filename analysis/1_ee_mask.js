@@ -8,7 +8,7 @@ var DownloadURL=false  // add exports to task window
 
 //  Specify destination and run name
 var driveFolder="EarthEngineOutput";
-var run="GlobalSRTM_slopeLTE2minalbedo30"
+var run="1eef38a2"
 
 // Get current date as string for file metadata
 var currentdate = new Date();
@@ -64,6 +64,7 @@ var alb_sd=alb.reduce(ee.call("Reducer.sampleStdDev"))
 var alb_min=alb.min();
 var alb_max=alb.max();
 var alb_range=alb_max.subtract(alb_min)
+var alb_cov=alb_sd.divide(alb_mean).multiply(100)
 
 //seasonality
 var seas=ee.Image("GME/images/04040405428907908306-00317830000645337584")
@@ -75,7 +76,7 @@ print(dem.getInfo())//
 var slope=ee.Algorithms
                       .Terrain(dem)
                       .select("slope")
-                      .focal_median(500,"square","meters")
+                      .focal_median(2000,"square","meters")
                       .reproject('EPSG:4326',[0.00083333333, 0, -180, 0, -0.00083333333,60]);
                     
 // load maximum slope slope_mx_GMTED2010_md
@@ -84,40 +85,41 @@ var slope=ee.Algorithms
 //centerMap(-90.79994, 44.21912, 2);
   var palette="08306b,0d57a1,2878b8,4997c9,72b2d7,a2cbe2,c7dcef,deebf7,f7fbff"
   
-addToMap(cf_01,{min: 0, max: 100,palette:palette}, 'January',0);
-addToMap(cf_02,{min: 0, max: 100,palette:palette}, 'February',0);
-addToMap(cf_03,{min: 0, max: 100,palette:palette}, 'March',0);
-addToMap(cf_04,{min: 0, max: 100,palette:palette}, 'April',0);
-addToMap(cf_05,{min: 0, max: 100,palette:palette}, 'May',0);
-addToMap(cf_06,{min: 0, max: 100,palette:palette}, 'June',0);
-addToMap(cf_07,{min: 0, max: 100,palette:palette}, 'July',0);
-addToMap(cf_08,{min: 0, max: 100,palette:palette}, 'August',0);
-addToMap(cf_09,{min: 0, max: 100,palette:palette}, 'September',0);
-addToMap(cf_10,{min: 0, max: 100,palette:palette}, 'October',0);
-addToMap(cf_11,{min: 0, max: 100,palette:palette}, 'November',0);
-addToMap(cf_12,{min: 0, max: 100,palette:palette}, 'December',0);
+//addToMap(cf_01,{min: 0, max: 100,palette:palette}, 'January',0);
+//addToMap(cf_02,{min: 0, max: 100,palette:palette}, 'February',0);
+//addToMap(cf_03,{min: 0, max: 100,palette:palette}, 'March',0);
+//addToMap(cf_04,{min: 0, max: 100,palette:palette}, 'April',0);
+//addToMap(cf_05,{min: 0, max: 100,palette:palette}, 'May',0);
+//addToMap(cf_06,{min: 0, max: 100,palette:palette}, 'June',0);
+//addToMap(cf_07,{min: 0, max: 100,palette:palette}, 'July',0);
+//addToMap(cf_08,{min: 0, max: 100,palette:palette}, 'August',0);
+//addToMap(cf_09,{min: 0, max: 100,palette:palette}, 'September',0);
+//addToMap(cf_10,{min: 0, max: 100,palette:palette}, 'October',0);
+//addToMap(cf_11,{min: 0, max: 100,palette:palette}, 'November',0);
+//addToMap(cf_12,{min: 0, max: 100,palette:palette}, 'December',0);
 
 
 // add albedo to map
 var apalette="000000,ffffff"
 var arange=[0,700]
-addToMap(alb_01,{min: arange[0], max: arange[1],palette:apalette}, 'Albedo_01',0);
-addToMap(alb_02,{min: arange[0], max: arange[1],palette:apalette}, 'Albedo_02',0);
-addToMap(alb_03,{min: arange[0], max: arange[1],palette:apalette}, 'Albedo_03',0);
-addToMap(alb_04,{min: arange[0], max: arange[1],palette:apalette}, 'Albedo_04',0);
-addToMap(alb_05,{min: arange[0], max: arange[1],palette:apalette}, 'Albedo_05',0);
-addToMap(alb_06,{min: arange[0], max: arange[1],palette:apalette}, 'Albedo_06',0);
-addToMap(alb_07,{min: arange[0], max: arange[1],palette:apalette}, 'Albedo_07',0);
-addToMap(alb_08,{min: arange[0], max: arange[1],palette:apalette}, 'Albedo_08',0);
-addToMap(alb_09,{min: arange[0], max: arange[1],palette:apalette}, 'Albedo_09',0);
-addToMap(alb_10,{min: arange[0], max: arange[1],palette:apalette}, 'Albedo_10',0);
-addToMap(alb_11,{min: arange[0], max: arange[1],palette:apalette}, 'Albedo_11',0);
-addToMap(alb_12,{min: arange[0], max: arange[1],palette:apalette}, 'Albedo_12',0);
+//addToMap(alb_01,{min: arange[0], max: arange[1],palette:apalette}, 'Albedo_01',0);
+//addToMap(alb_02,{min: arange[0], max: arange[1],palette:apalette}, 'Albedo_02',0);
+//addToMap(alb_03,{min: arange[0], max: arange[1],palette:apalette}, 'Albedo_03',0);
+//addToMap(alb_04,{min: arange[0], max: arange[1],palette:apalette}, 'Albedo_04',0);
+//addToMap(alb_05,{min: arange[0], max: arange[1],palette:apalette}, 'Albedo_05',0);
+//addToMap(alb_06,{min: arange[0], max: arange[1],palette:apalette}, 'Albedo_06',0);
+//addToMap(alb_07,{min: arange[0], max: arange[1],palette:apalette}, 'Albedo_07',0);
+//addToMap(alb_08,{min: arange[0], max: arange[1],palette:apalette}, 'Albedo_08',0);
+//addToMap(alb_09,{min: arange[0], max: arange[1],palette:apalette}, 'Albedo_09',0);
+//addToMap(alb_10,{min: arange[0], max: arange[1],palette:apalette}, 'Albedo_10',0);
+//addToMap(alb_11,{min: arange[0], max: arange[1],palette:apalette}, 'Albedo_11',0);
+//addToMap(alb_12,{min: arange[0], max: arange[1],palette:apalette}, 'Albedo_12',0);
 addToMap(alb_mean,{min: arange[0], max: arange[1],palette:apalette}, 'Albedo_mean',0);
 addToMap(alb_sd,{min: 0, max: 100,palette:apalette}, 'Albedo_sd',0);
 addToMap(alb_min,{min: arange[0], max: arange[1],palette:apalette}, 'Albedo_min',0);
 addToMap(alb_max,{min: arange[0], max: arange[1],palette:apalette}, 'Albedo_max',0);
 addToMap(alb_range,{min: arange[0], max: arange[1],palette:apalette}, 'Albedo_range',0);
+addToMap(alb_cov,{min: 0, max: 50,palette:apalette}, 'Albedo_CoV',0);
 
 
 // build mask to eliminate hotspots
@@ -128,12 +130,14 @@ var maskbox = ee.Geometry(geodesic, null, false);
 //start with image of cloud frequency to define the grid 
 var mask_base=cf_06.gte(0).not()
 // Identify areas with high albedo and high variability of albedo (SD) 
-var mask_alb=alb_min.gte(180).and(alb_sd.gte(50)).and(slope.lte(2))//.clip(maskbox) // 150:50:0  .and(alb_sd.lte(200))
+var mask_alb=alb_min.gte(80).and(alb_cov.gte(10)).and(slope.lte(0)).and(water.eq(0))//.clip(maskbox) // 150:50:0  .and(alb_sd.lte(200))
 // Identify water pixels with high albedo and high variability and buffer by 2km 
-var mask_water=alb_min.gte(25).and(alb_sd.gte(10)).and(water.eq(1))//.clip(maskbox)
+var mask_water=alb_min.gte(25).and(alb_cov.gte(30)).and(water.eq(1))//.clip(maskbox)
+var mask_brightwater=alb_min.gte(75).and(water.eq(1))//.clip(maskbox)
+
 // Combine the masks
 var mask=mask_base.where(mask_alb,1)
-                  .where(mask_water,2)
+                  .where(mask_water.or(mask_brightwater),2)
                   .where(mask_water.and(mask_alb),3)
                   .focal_max(3000,"circle","meters")
 //                  .clip(maskbox)
@@ -149,7 +153,7 @@ addToMap(watermask,{min: 0, max: 1,palette:"0000ff"}, 'Water',0);
 addToMap(seas,{}, 'Seasonality',1);
 
 //add the mask  .mask(mask.eq(0))
-addToMap(mask.mask(mask.gte(1)),{min:1,max:3,palette:"ff0000,00ff00,0000ff"},"mask",0)
+addToMap(mask.mask(mask.gte(1)),{min:1,max:3,palette:"ff0000,00ff00,0000ff"},"mask",1)
 addToMap(mask_alb.mask(mask_alb.eq(1)),{min:.25,max:1.5,palette:"000000,ff0000"},"maskalb",0)
 addToMap(mask_water.mask(mask_water.eq(1)),{min:.25,max:1.5,palette:"000000,ff0000"},"maskwater",0)
 addToMap(dem,{min:0,max:500},"DEM",0)
