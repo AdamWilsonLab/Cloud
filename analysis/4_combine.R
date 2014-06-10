@@ -58,26 +58,32 @@ f2=list.files(paste(datadir,"/mcd09ctif",sep=""),pattern=paste(".*MCD09_.*_[0-9]
 
 ## download albedo mask data from earth engine
 download=F
-if(download) system(paste("google docs get mask_GlobalSRTM_slopeLTE2minalbedo30_2014064_* ",datadir,"/mcd09ee_mask",sep=""))
-mask=list.files(paste0(datadir,"/mcd09ee_mask"),pattern="*0.tif$",full=T)
+hash="c5400b5cad"
+if(download) system(paste("google docs get mask_",hash,"_2014066* ",datadir,"/mcd09ee_mask",sep=""))
+mask=list.files(paste0(datadir,"/mcd09ee_mask"),pattern=hash,full=T)
 
-foreach(i=1:length(f2), .options.multicore=list(preschedule=FALSE)) %dopar% {
+i=1
+
+foreach(i=1:length(f2), .options.multicore=list(preschedule=FALSE),.packages=c("spgrass6")) %dopar% {
     file=f2[i]
     ## Initialze the grass session  
-    initGRASS(gisBase="/usr/lib/grass70/", home=tempdir(), location=basename(file), mapset="PERMANENT", override = T)
+    loc=sub("[.]tif","",basename(file))
+    initGRASS(gisBase="/usr/lib/grass70/", home="data/tmp/grass/",gisDbase="data/tmp/grass/", location=loc, mapset="PERMANENT", override = T)
     execGRASS("g.proj", flags="c",epsg=4326)
     ## import the data
     execGRASS("r.in.gdal", flags="overwrite",input=file,output="image")
     execGRASS("r.in.gdal", flags="overwrite",input=mask,output="mask")
-    execGRASS("g.region", rast="image")
+    ## set region to size of mask to speed things up
+    execGRASS("g.region", rast="mask")
     ## Create a new copy of the image with masked values and divide by 100 to facilitate 8-bit export
-    execGRASS("r.mapcalc",flags="overwrite",expression="image2 =  if(isnull(mask),image/100,if(mask>0&mask<100,null(),image/100))")
-      
-    #execGRASS("g.region",flags="p", w='112',e='138',s='-34',n='-16')
-    #execGRASS("r.external.out", directory=dirname(output),extension="tif",format="GTiff")
+    execGRASS("r.mapcalc",flags="overwrite",expression="image2 =  if(isnull(mask),image/100,if(mask>0&mask<100,null(),image/100))")  
     execGRASS("r.fillnulls", flags=c("overwrite"), input="image2",output="filled",method="bicubic")
+    ## switch region back to full raster and 'patch' the original image
+    execGRASS("g.region",flags="p", w='-180',e='180',s='-90',n='90',rast="image")
+    execGRASS("r.patch", flags=c("overwrite"), input="image,filled",output="output")
+    
     ## rescale to 0-100
-    execGRASS("r.colors",map="filled",rules="data/out/grasscols.txt")
+    execGRASS("r.colors",map="output",rules="data/out/grasscols.txt")
 
     ### create vrt to translate scale to 8-bit
     outfile=paste("data/MCD09/",basename(file),sep="")
@@ -88,13 +94,13 @@ foreach(i=1:length(f2), .options.multicore=list(preschedule=FALSE)) %dopar% {
         paste("TIFFTAG_DATETIME='2014'",sep=""),
         "TIFFTAG_ARTIST='Adam M. Wilson (adam.wilson@yale.edu)'")
     ## write out the file    
-    execGRASS("r.out.gdal", flags=c("f","overwrite"), input="filled",output=output,type="Byte",
+    execGRASS("r.out.gdal", flags=c("f","overwrite"), input="output",output=outfile,type="Byte",
               createopt="\"COMPRESS=LZW,PREDICTOR=2\"",
               metaopt=paste0(c("\"",paste(tags,collapse=","),"\""),collapse=""),nodata=255)
     
     ## clean up
     unlink_.gislock()
-    system(paste0("rm -rf ",tempdir(),"/",basename(file)))
+    system(paste0("rm -rf data/tmp/grass/",loc))
     
 }
 
