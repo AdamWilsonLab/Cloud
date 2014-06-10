@@ -166,6 +166,11 @@ cldm$biomec=st$biomec[match(cldm$StaID,st$id)]
 cldm$realm=st$relam[match(cldm$StaID,st$id)]
 cldm$biome=st$biome[match(cldm$StaID,st$id)]
 
+cldm$seas=ifelse(cldm$month%in%c(12,1,2),"DJF",
+                 ifelse(cldm$month%in%3:4,"MAM",
+                        ifelse(cldm$month%in%5:8,"JJA",
+                               ifelse(cldm$month%in%9:11,"SON",NA))))
+
 
 ## write out the tables
 write.csv(cld,file="data/validation/cld.csv",row.names=F)

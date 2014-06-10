@@ -29,9 +29,9 @@
 
 \maketitle
 
-\appendix
+%\appendix
 
-%\tableofcontents
+\tableofcontents
 
 % Make the figures have SM before number
 \makeatletter 
@@ -47,7 +47,7 @@
 ## some setup
 library(knitr)
 opts_knit$set(progress = TRUE, verbose = TRUE,root.dir="../../",cache=T)
-opts_chunk$set(comment=NA, eval=T,results="hide",echo=F,message=F,fig.width=7, fig.height=6,cache=T)
+opts_chunk$set(comment=NA, eval=T,results="hide",echo=F,message=F,fig.width=8, fig.height=8,cache=T,dpi=150,fig.align='center')
 
 bigdata="/mnt/data/personal/adamw/projects/cloud/"
 print(getwd())
@@ -56,7 +56,9 @@ print(getwd())
 
 <<loaddata>>=
 ## Run the setup script
+
 source("analysis/setup.R")
+source(list.files("R",full=T))
 
 ## plotting parameters
 n=100
@@ -82,10 +84,13 @@ bgr=function(x,n=100,br=0,c1=c("darkblue","blue","grey"),c2=c("grey","red","purp
 
 \section{Background}
 
+Table \ref{tab:climatologies} describes the existing satellite-derived cloud climatologies along with their spatial and temporal grain and extent.
+
 \begin{table}[h]
-\begin{tabular}{p{.12\textwidth}|p{.3\textwidth}|p{.05\textwidth}|p{.05\textwidth}|p{.1\textwidth}|p{.1\textwidth}|p{.12\textwidth}}
-\rot{Name} & \rot{Description} & \rot{Spatial Domain} & \rot{Spatial Resolution} & \rot{Temporal Domain} & \rot{Temporal Resolution} & \rot{Reference}   \\ \hline
-%Name & Description & Spatial Domain & Spatial Resolution & Temporal Domain & Temporal Resolution & Reference   \\ \hline
+\begin{tabular}{p{.1\textwidth}|p{.2\textwidth}|p{.1\textwidth}|p{.1\textwidth}|p{.1\textwidth}|p{.11\textwidth}|p{.12\textwidth}}
+%\rot{Name} & \rot{Description} & \rot{Spatial Domain} & \rot{Spatial Resolution} & \rot{Temporal Domain} & \rot{Temporal Resolution} & \rot{Reference}   \\ \hline
+\hline 
+\textbf{Name} & \textbf{Description} & \textbf{Spatial Domain} & \textbf{Spatial Grain} & \textbf{Temporal Domain} & \textbf{Temporal Grain} & \textbf{Reference}   \\ \hline \hline
 
 GEWEX / ICCP & Compiled from 12 satellite products for comparison study & Global & 1$^o$ ($\approx$110km) & 1983-2009   & Monthly & \cite{Stubenrauch2013} \\ \hline
 
@@ -101,6 +106,7 @@ MODIS Cloud Climatology & Derived from thresholded RGB images from MODIS data.	&
 
 \end{tabular}
 \caption{Existing satellite-derived cloud-related products with their spatial and temporal grain and extent.}
+\label{tab:climatologies}
 \end{table}
 
 \section{Methods}
@@ -121,7 +127,7 @@ These data are referred to below as the MODIS cloud frequency (MODCF) dataset.
 The MODIS orbit results in systematic gaps in the daily global coverage near the equator \citep{Gregg2007} that results in nearly longitudinal artifacts  (15$^o$ for Terra and 345$^o$ for Aqua) in the long-term cloud frequencies.  To remove these features, we used the Variational Stationary Noise Remover \citep[VSNR,][available at \url{http://www.math.univ-toulouse.fr/~weiss/Codes/VSNR/VNSR_VariationalStationaryNoiseRemover.html}]{Fehrenbach2012; Fehrenbach2013}, a Bayesian image restoration technique implemented in Matlab.  The VSNR is well suited to remove these artifacts because it allows specification of the shape and scale of known artefacts.  We explored various filter shapes and evaluated longitudinal profiles before and after correction and selected parameters that minimized the artifacts (see Figure \ref{fig:Sahara}).   We used a gabor filter with y=200, x=5, and $\theta$=15 for Terra and $\theta$=-15 for Aqua.
 
 
-<<Sahara,dev='png',fig.cap="Comparison of January cloud frequency over the Southwestern Sahara from A) uncorrected Terra and B) corrected Terra, C) Uncorrected Aqua, and D) Corrected Aqua.  Note the banding in the uncorrected data resulting from variable observation frequency due to orbital artefacts of the MODIS Satellite.",dpi=150,fig.width=8,fig.height=8,fig.align='center',out.width='\textwidth'>>=
+<<Sahara,dev='png',fig.cap="Comparison of January cloud frequency over the Southwestern Sahara from A) uncorrected Terra and B) corrected Terra, C) Uncorrected Aqua, and D) Corrected Aqua.  Note the banding in the uncorrected data resulting from variable observation frequency due to orbital artefacts of the MODIS Satellite.",fig.width=6, fig.height=6>>=
 ## pick regions to illustrate
 dt=stack("data/out/SaharaBiasCorrectionExample.tif")
 names(dt)=c("A)Uncorrected_Terra ","B)Corrected_Terra","C)Uncorrected_Aqua","D)Corrected_Aqua")
@@ -140,6 +146,7 @@ levelplot(dt,col.regions=bcols(100),at=seq(0,75,len=101),
 Let $m$ index months ($m\in1:12$) and $y$ index years ($y\in2000:2014$).  The timeseries of monthly cloud frequencies $CF_{m,y}$  (proportion of days with cloud flag equal to 1) was calculated separately from the daily MOD09GA and MYD09GA.  These were then summarized to the `climatological' cloud frequency mean and standard deviation: $\mu_m=$mean$(CF_{m,y})$ and $\sigma_m=$SD$(CF_{m,y})$.  The inter-annual variability was then calculated as mean($\sigma_m$) and intra-annual variability (seasonality) as SD$(\mu_m)$.
 
 \subsubsection{Seasonal Concentration}
+We also quantified the seasonality of cloud frequencies following Markham \citey{Markham1970} and considered mean monthly cloud frequencies to represent vector quantities with both magnatude (cloud frequency) and direction (month).  The sum of the twelve vectors then represents a vector incapsulating both the direction (month) and seasonal concentration (magnitude) of the cloud frequency for each pixel.  Dividing the magnatude by the mean annual cloud frequency results in an index ranging from 0 (equal cloud cover throughout the year) to 100 (all observed clouds occurred in a single month).   
 
 \section{Validation}
 
@@ -159,21 +166,11 @@ cldm$cldsd_all[cldm$cldn_all<20]=NA
 cldm$cld[cldm$cldn<10]=NA
 cldm$cldsd[cldm$cldn<10]=NA
 
-cldm$seas=ifelse(cldm$month%in%c(12,1,2),"DJF",
-                 ifelse(cldm$month%in%3:4,"MAM",
-                        ifelse(cldm$month%in%5:8,"JJA",
-                               ifelse(cldm$month%in%9:11,"SON",NA))))
 cldm$seas=factor(cldm$seas,levels=c("DJF","MAM","JJA","SON"),ordered=T)
 
 ## compute seasonal means
 cldml=melt(cldm,id.vars=c("StaID","lat","lon","lulcc","biome","seas"),measure.vars=c("cld_all","cldsd_all","cldn_all","cld","cldsd","cldn","mod09","mod09sd"))
 clds=cast(cldml,StaID+lat+lon+lulcc+biome+seas~variable,value="value",fun=mean,na.rm=T)
-
-
-fsum=
-
-cldr=(cldml,seas~variable,value="value",fun=fsum,na.rm=T)
-
 
 # get residuals of simple linear model
 cldm$resid=NA
@@ -199,7 +196,11 @@ size=as.numeric(
            scan("http://e4ftl01.cr.usgs.gov/MOLT/MOD09GA.005/2000.04.30/",what="char"),
            value=T)))
 ## extract all filesizes in MB (all the HDFs) and sum them and covert to TB for the length of the full record
-tsize=sum(size)/1024/1024*as.numeric(as.Date("2014-03-31")-as.Date("2000-02-24"))*2
+if(!file.exists("data/out/SizeOfMOD09GAArchive.Rdata")){
+      tsize=sum(size)/1024/1024*as.numeric(as.Date("2014-03-31")-as.Date("2000-02-24"))*2
+      save(tsize,file="data/out/SizeOfMOD09GAArchive.Rdata")
+}
+load("data/out/SizeOfMOD09GAArchive.Rdata")
 
 ## get HPD intervals
 hpd_resid=HPDinterval(as.mcmc(cldm$resid))#,c(0.025,0.25,0.5,0.75,0.975),na.rm=T)
@@ -217,7 +218,7 @@ The monthly CF were validated using a global observational dataset of synoptic w
 The monthly MODCF (including data from 2000-2013) were compared to station observations using linear models over the full station record (1970-2009) and the MODIS era (2000-2009) to assess accuracy and relevance of the 14-year satellite-derived data for estimating long-term monthly climatologies.  For the full record comparison, the station dataset was filtered to include only stations with at least 20 observations per month for at least 20 years, which retained \Sexpr{nstation_all} stations.  Several countries (notably the USA, Canada, and New Zealand) converted from human cloud observations to automated laser ceilometers over the past decade leading to a decline in the number of observations over 1997-2009 \citep{Eastman2012}. For the MODIS era comparison, we included only stations with at least 20 observations per month for the full 10-year period (2000-2009), so the number of stations available was reduced to \Sexpr{nstation_mod}. 
 
 
-<<monthscatter,fig.cap="Mean monthly cloud amount over 1970-2009 from 5388 global stations versus mean 2000-2009 MOD09 cloud frequency by month.  Coefficient of determination is shown in each panel.  Colors represent the number of monthly station observations within each grid cell of the scatterplot.">>=
+<<monthscatter,fig.cap="Mean monthly cloud amount over 1970-2009 from 5388 global stations versus mean 2000-2009 MOD09 cloud frequency by month.  Coefficient of determination is shown in each panel.  Colors represent the number of monthly station observations within each grid cell of the scatterplot.",fig.width=6, fig.height=6>>=
 hmcols=colorRampPalette(c("grey","blue","red","purple"))
 #hmcols=colorRampPalette(c(grey(.8),grey(.3),grey(.2)))
 tr=c(0,20)
@@ -243,7 +244,7 @@ xyplot(cld~mod09|month2,data=cldm,panel=function(x,y,subscripts){
 @
 
 
-<<mapresidmonth,dev="png",fig.cap="Histogram and spatial distribution of residuals from linear model between station and satellite cloud amount at station locations.  Negative (positive) values indicate locations where MODCF was less than (greater than) expected given the global relationship between MODCF and station observations.">>=
+<<mapresidmonth,dev="png",fig.cap="Histogram and spatial distribution of residuals from linear model between station and satellite cloud amount at station locations.  Negative (positive) values indicate locations where MODCF was less than (greater than) expected given the global relationship between MODCF and station observations.",fig.width=6, fig.height=6>>=
 colat=bgr(cldm$resid)
 phist=histogram(cldm$resid,breaks=colat$at,border=NA,col=colat$col,xlim=c(-30,30),type="count",xlab="MODCF Residuals")#,seq(0,1,len=6),na.rm=T)
 pmap=xyplot(lat~lon|month2,data=cldm,groups=cut(cldm$resid,rev(colat$at)),
@@ -257,10 +258,30 @@ print(pmap,position=c(0,0,1,.78))
 @
 
 
+<<validtable,results="asis">>=
+
+t1=cldm %.% group_by(month) %.% summarise(
+  mean=mean(mod09,na.rm=T),
+  n=lm_summary(mod09,cld,"n"),
+  R2=lm_summary(mod09,cld,"rs"),
+  RMSE=lm_summary(mod09,cld,"rmse"))
+t2=cldm %.% group_by(seas) %.% summarise(
+  mean=mean(mod09,na.rm=T),
+  n=lm_summary(mod09,cld,"n"),
+  R2=lm_summary(mod09,cld,"rs"),
+  RMSE=lm_summary(mod09,cld,"rmse"))
+colnames(t1)[1]="Time";colnames(t2)[1]="Time"
+  
+## combine to a single table
+vtable=rbind.data.frame(t1,t2)
+print(xtable(vtable,digits=2,caption="Summary of validation data by month and season"),"latex")
+  
+@
+
 \subsubsection{Seasonal Validation}
 In addition to monthly validation we also performed the same validation on the seasonal (DFJ,MAM,JJA,SON) mean values for MODCF and the station observations.
 
-<<seasscatter>>=
+<<seasscatter,fig.width=4, fig.height=4>>=
 tr2=c(0,26)
 xyplot(cld~mod09|seas,data=cldm,panel=function(x,y,subscripts){
   n=75
@@ -281,7 +302,7 @@ xyplot(cld~mod09|seas,data=cldm,panel=function(x,y,subscripts){
               legend= list(right = list(fun = colkey)))+ layer(panel.abline(0,1,col="grey",lwd=2),under=T)
 @
 
-<<seasmapresid,dev="png">>=
+<<seasmapresid,dev="png",fig.width=6, fig.height=6>>=
 clds$resid=NA
 # get residuals of simple linear model
 clds$resid[!is.na(clds$cld_all)&!is.na(clds$mod09)]=residuals(lm(mod09~cld_all,data=clds[!is.na(clds$cld_all)&!is.na(clds$mod09),]))
@@ -338,7 +359,7 @@ library(texreg)
 setMethod("extract", signature = className("lm", "stats"),definition = extract.lm)
 @
 
-To assess the accuracy of the MODCF product in estimating multi-decadal cloud frequencies, we used linear models between the 2000-2014 satellite climatologies and station observations divided into two periods including the full station record (1970-2009) and the MODIS-era subset (2000-2009).     
+To assess the accuracy of the MODCF product in estimating multi-decadal cloud frequencies, we used linear models between the satellite climatologies (derived using data collected 2000-2014) and station observations divided into two periods: 1) the full station record (1970-2009) and 2) a subset including only the MODIS-era (2000-2009).     
 
 <<modcomparetable,results="asis">>=
 ### Compare two time periods
@@ -347,7 +368,7 @@ lm_mod=lm(cld~mod09,data=cldm[!is.na(cldm$cld)&cldm$cldn==10,])
 
 mods=list("1970-2009"=lm_all1,"2000-2009"=lm_mod)
 
-extract(mods)
+#extract(mods)
 #screenreg(mods,digits=2,single.row=T,custom.model.names=names(mods),custom.coef.names = c("Intercept", "MODCF"))
 
 texreg(mods,custom.model.names = names(mods),custom.coef.names = c("Intercept", "MODCF"),
@@ -355,7 +376,45 @@ texreg(mods,custom.model.names = names(mods),custom.coef.names = c("Intercept", 
 @
 
 
-The MODCF is able to explain \Sexp{round(summary(lm_mod)$r.squared,1)}\% of the variability in the observed station data across all months over 2000-2009, and \Sexp{round(summary(lm_all1)$r.squared,1)}\% of the variability over the full record (1970-2009, \ref{tab:modcomparetable}).  The relationship is consistent when separated by month, with R$^2$ values ranging from 0.69 (May and June) to 0.82 (September and October, Figure 2).  The station observations tend to record less cloud than MODCF below 20\% (especially during the boreal summer, Figure 2).  This feature is driven primarily by lower cloud frequency observed at high latitude stations (note band of negative values at high latitudes in Figure 3).   MODIS CF tends to be higher than station observations in Central Asia and India  and lower in the Sahel through much of the year.
+The MODCF is able to explain \Sexpr{round(summary(lm_mod)$r.squared,2)}\% of the variability in the observed station data across all months over 2000-2009, and \Sexpr{round(summary(lm_all1)$r.squared,2)}\% of the variability over the full record (1970-2009, \ref{tab:modcomparetable}).  The relationship is consistent when separated by month, with R$^2$ values ranging from 0.69 (May and June) to 0.82 (September and October, Figure 2).  The station observations tend to record less cloud than MODCF below 20\% (especially during the boreal summer, Figure 2).  This feature is driven primarily by lower cloud frequency observed at high latitude stations (note band of negative values at high latitudes in Figure 3).   MODIS CF tends to be higher than station observations in Central Asia and India  and lower in the Sahel through much of the year.
+
+
+
+\section{Biome Summaries}
+To illustrate and contrast the spatial variability in cloud frequency within and between Earth’s ecoregions, we summarized MODCF within each of the up to 14 biomes in each geographic 'realm' delineated by the "Terrestrial Ecoregions of the World" dataset (Olson et al. 2001).  
+
+
+
+<<BiomeTable,results="asis">>=
+bs=read.csv(file="data/sum/biomesummary.csv")
+bs$monthname=factor(month.name[as.numeric(as.character(bs$month))],ordered=T,levels=month.name)
+bs$realm=factor(bs$realm,ordered=T,levels=c("Antarctic","Australasia","Oceania","Afrotropics","IndoMalay", "Neotropics","Palearctic","Nearctic" ))
+bs$meansd=paste(round(bs$mean,1)," (",round(bs$sd,1),")",sep="")
+
+bcode=unique(bs[,c("code","realm","biome")])
+
+print(xtable(bcode,caption="Biome and realm codes used in Table \\ref{tab:BiomeTable2}.",label="tab:BiomeTable"),type="latex",include.rownames=F,row.names=F,
+      tabular.environment='longtable',floating=F,caption.placement='top')
+
+@
+
+\begin{landscape}
+<<BiomeTable2,results="asis">>=
+bst=cast(bs,code~monthname,value="meansd")
+colnames(bst)[1]="Code"
+print(xtable(bst,caption="Mean (SD) monthly cloud frequency summarized by biome and geographic realm. See Table \\ref{tab:BiomeTable} for  Code descriptions.",label = "tab:BiomeTable2"),type="latex",include.rownames=F,row.names=F,tabular.environment='longtable',floating=F,size="footnotesize",caption.placement='top')
+@
+\end{landscape}
+
+\section{Limitations  and Caveats}
+
+The MOD09 cloud algorithm was designed to minimize confusion over snow and ice by taking the surface air temperature into account, however there are possibly inflated cloud frequency over snow-covered areas which are not well represented in our validation data set.  
+Like many cloud masks, the MOD09 detection algorithm has a binary response (cloudy/not cloudy) and does not retain an estimate of confidence in cloud state (i.e. probability that the pixel was actually cloudy given the tests).   
+The other MODIS cloud mask (MOD35) converts the continuous probabilities into four bins (‘certainly clear,’ ‘probably clear,’ ‘probably cloudy,’ and ‘confidently cloudy’), and is available at the satellite swath-level (which would avoid any sampling problems introduced by the orbital parameters and the MODLAND selection criteria). 
+However, due to spatially heterogeneous application of cloud tests (even in the recently reprocessed Collection 6), the MOD35 mask is unsuitable for generating spatially consistent maps of cloud frequencies at 1-km resolution \citep{Wilson2013}.  
+Liu and Liu \cite{Liu2013} introduced an interesting alternative method of estimating cloud cover based on multi-year timeseries of MOD09 surface reflectance, which is promising but currently based on the frequency of clouds between 8-day MODLAND composites and thus cannot estimate the true daily cloud frequency (e.g. a cloudy observation in a single 8-day MODLAND window indicates 8 cloudy days, but a clear observation could indicated 1-7 clear days).
+Other approaches have been developed to estimate continuous probabilities rather than binned classifications (e.g. Heidinger et al. 2012), but these have not been applied to MODIS data.  
+However, there the human-observed station data used for validation have known biases at the low and high cloud amounts (ELABORATE and cite).  There is evidence  of a negative bias in MODCF due to increased frequency of observations at high latitudes and the MODLAND algorithm (Figure \ref{fig:latbiasboxplot}).  
 
 
 \subsection{Latitudinal Effects}
@@ -425,33 +484,7 @@ print(xtable(lulct,caption="Table of RMSE's (count) by season (column) and Land 
 % @
 
 
-\section{Biome Summaries}
-To illustrate and contrast the spatial variability in cloud frequency within and between Earth’s ecoregions, we summarized MODCF within each of the up to 14 biomes in each geographic 'realm' delineated by the "Terrestrial Ecoregions of the World" dataset (Olson et al. 2001).  
-
-
-
-<<BiomeTable,results="asis">>=
-bs=read.csv(file="data/sum/biomesummary.csv")
-bs$monthname=factor(month.name[as.numeric(as.character(bs$month))],ordered=T,levels=month.name)
-bs$realm=factor(bs$realm,ordered=T,levels=c("Antarctic","Australasia","Oceania","Afrotropics","IndoMalay", "Neotropics","Palearctic","Nearctic" ))
-bs$meansd=paste(round(bs$mean,1)," (",round(bs$sd,1),")",sep="")
-
-bcode=unique(bs[,c("code","realm","biome")])
-
-print(xtable(bcode,caption="Biome and realm codes used in Table \\ref{tab:BiomeTable2}.",label="tab:BiomeTable"),type="latex",include.rownames=F,row.names=F,
-      tabular.environment='longtable',floating=F,caption.placement='top')
-
-@
-
-\begin{landscape}
-<<BiomeTable2,results="asis">>=
-bst=cast(bs,code~monthname,value="meansd")
-colnames(bst)[1]="Code"
-print(xtable(bst,caption="Mean (SD) monthly cloud frequency summarized by biome and geographic realm. See Table \\ref{tab:BiomeTable} for  Code descriptions.",label = "tab:BiomeTable2"),type="latex",include.rownames=F,row.names=F,tabular.environment='longtable',floating=F,size="footnotesize",caption.placement='top')
-@
-\end{landscape}
-
-%\section{Regional Comparisons}
+\section{Regional Comparisons}
 
 % <<RegionCompare>>=
 % ## Compare with worldclim and NPP
@@ -499,10 +532,8 @@ print(xtable(bst,caption="Mean (SD) monthly cloud frequency summarized by biome 
 % @
 
 
-\singlespacing
 \bibliographystyle{apalike}
 \bibliography{../biblio/MODCF}
-\doublespacing
 
 
 \end{document}
