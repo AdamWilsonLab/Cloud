@@ -68,7 +68,10 @@ foreach(i=1:length(f2), .options.multicore=list(preschedule=FALSE),.packages=c("
     file=f2[i]
     ## Initialze the grass session  
     loc=sub("[.]tif","",basename(file))
-    initGRASS(gisBase="/usr/lib/grass70/", home="data/tmp/grass/",gisDbase="data/tmp/grass/", location=loc, mapset="PERMANENT", override = T)
+    tf=paste("data/tmp/grass/grass_", Sys.getpid(),"/", sep="")  
+    if(!file.exists(tf)) dir.create(tf,recursive=T)
+    ## create output directory if needed
+    initGRASS(gisBase="/usr/lib/grass70/", home=tf,gisDbase=tf, location=loc, mapset="PERMANENT", override = T,pid=Sys.getpid())
     execGRASS("g.proj", flags="c",epsg=4326)
     ## import the data
     execGRASS("r.in.gdal", flags="overwrite",input=file,output="image")
@@ -100,7 +103,7 @@ foreach(i=1:length(f2), .options.multicore=list(preschedule=FALSE),.packages=c("
     
     ## clean up
     unlink_.gislock()
-    system(paste0("rm -rf data/tmp/grass/",loc))
+    system(paste0("rm -rf ",tf))
     
 }
 
@@ -183,8 +186,6 @@ if(!file.exists(fuvals)){
 ## read in unique colors
 uvals=read.csv(fuvals)
 
-## Set polar rotation for polar plot of color values
-prot=-180
 
 ## Generate color table
 summary(uvals)
@@ -248,56 +249,8 @@ system(paste("gdal_translate -co COMPRESS=LZW -a_nodata 65534 -co PREDICTOR=2 -o
 system(paste("gdal_translate -a_nodata 255 -expand rgba -co COMPRESS=LZW -co PREDICTOR=2 -of GTIFF -ot Byte ",seasvrt,"  data/MCD09_deriv/seas_rgb.tif")) 
 
 
-pCirc=function(r,n=100) {
-  angs=seq(0,360,len=100)
-  #lapply(r,function(r) {
-      cbind(
-      y=r*cos((pi/180)*(-angs)),
-      x=r*sin((pi/180)*(-angs))
-      )
-  #})
-}
-
-mangle=(-seq(30,360,30)+prot+15)*(pi/180)
-rmons=c(1:3,9:12)
-lmons=4:8
-mon=c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec") # month names
-ladj=65
-lims=c(-75,75)
-
-png(width=1000,height=1000,pointsize=32,file="manuscript/figures/SeasKey_%0d.png")
-### Create the color key
-xyplot(conc~theta,col=col$val[col$exists],data=col[col$exists,],pch=16,cex=1,
-       scales=list(
-         x=list(labels=c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"),
-                at=seq(15,360,30))),
-       xlab="Month",ylab="Concentration (%)")
-
-xyplot(y~x,col=col$val[col$exists],data=col[col$exists,],pch=16,cex=1.5,
-       xlab="",ylab="",scales=list(draw=F),ylim=lims,xlim=lims,asp=1,
-       par.settings = list(axis.line = list(col = "transparent")))+
-  layer(panel.polygon(pCirc(r=20,n=100),border="grey"))+
-  layer(panel.polygon(pCirc(r=40,n=100),border="grey"))+
-  layer(panel.polygon(pCirc(r=60,n=100),border="grey"))+
-  layer(panel.segments(0,0,60*cos(mangle-(15*pi/180)),60*sin(mangle-(15*pi/180)),col="grey"))+ #draw angles
-  layer(panel.text(x=ladj*cos(mangle[lmons]),y=ladj*sin(mangle[lmons]),mon[lmons],pos=4,cex=3,offset=0,srt=(mangle[lmons])*180/pi))+ #add left months))
-  layer(panel.text(x=ladj*cos(mangle[rmons]),y=ladj*sin(mangle[rmons]),mon[rmons],pos=2,cex=3,offset=0,srt=((mangle[rmons])*180/pi)-180))+ # add right months
-  layer(panel.text(x=-2,y=c(-20,-40,-60),c(20,40,60),pos=4,cex=3)) #add scale text
-
-dev.off()
 
 
-## standard graphics plotting
-#plot(col$x,col$y,xaxt="n",yaxt="n",xlab="",ylab="",col=col$val,pch=16,cex=1.5,new=F,asp=1,bty="n",xlim=c(-16,16),ylim=c(-40,40))
-#plot(col$x[col$exists],col$y[col$exists],xaxt="n",yaxt="n",xlab="",ylab="",col=col$val[col$exists],pch=16,cex=2,new=F,asp=1,bty="n",xlim=c(-16,16),ylim=c(-45,45))
-#n=10; circ=seq(0,30,n) #define the circle diameters
-#symbols(rep(0,length(circ)),rep(0,length(circ)),circles=circ,add=T,fg="grey",lwd=2,inches=F) #draw circles
-#segments(0,0,30*cos(mangle),30*sin(mangle),col="grey") #draw angles
-#text(x=-2,y=-circ[2:n],circ[2:n],pos=4,cex=1.5) #add scale text
-#mon=c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec") # month names
-#ladj=35
-#for(i in c(1:3,9:12)) text(x=ladj*cos(-mangle[i]),y=ladj*sin(-mangle[i]),mon[i],pos=4,cex=1.8,offset=0,srt=-mangle[i]*180/pi) #add left months
-#for(i in 4:8) text(x=ladj*cos(-mangle[i]),y=ladj*sin(-mangle[i]),mon[i],pos=2,cex=1.8,offset=0,srt=(-mangle[i]*180/pi)-180) # add right months
 
 ########################################################################################
 #### stuff below here is old junk.....       

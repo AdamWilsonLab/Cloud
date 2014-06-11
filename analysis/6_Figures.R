@@ -3,13 +3,8 @@ source("analysis/setup.R")
 
 
 ### Load data
-cf_mean=raster("data/MCD09_deriv/MCD09_meanannual.tif")
-
-## Figures
-n=100
-at=seq(0,100,length=n)
-colr=colorRampPalette(c("black","green","red"))
-cols=colr(n)
+cf_mean=readAll(raster("data/MCD09_deriv/MCD09_meanannual.tif"))
+cf_visseas=readAll(raster("data/MCD09_deriv/seas_visct.tif"))
 
 ## set plotting parameters
 my.theme = trellis.par.get()
@@ -24,18 +19,19 @@ my.theme = trellis.par.get()
 my.theme$strip.background=list(col="transparent")
 trellis.par.set(my.theme)
 
-res=1e5
+res=1e6
 greg=list(ylim=c(-60,84),xlim=c(-180,180))
     
 ## Figure 1: 4-panel summaries
 #- Annual average
-levelplot(cf_mean,col.regions=colR(n),cuts=99,at=seq(0,100,len=100),colorkey=list(space="right",adj=1),
+n=100
+levelplot(cf_mean,col.regions=colR(n),cuts=99,at=seq(0,100,len=n),colorkey=list(space="right",adj=1),
           panel=panel.levelplot.raster,margin=F,maxpixels=res,ylab="",xlab="",useRaster=T,ylim=greg$ylim)+
     layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col="white"),under=T)+
     layer(sp.lines(hcoast,lwd=.2,),under=F)
 
 ## Mean annual with validation stations
-levelplot(cf_mean,col.regions=colr(n),cuts=99,at=seq(0,100,len=100),colorkey=list(title="Cloud Frequency (%)",space="bottom",adj=1),
+levelplot(cf_mean,col.regions=colR(n),cuts=99,at=seq(0,100,len=n),colorkey=list(title="Cloud Frequency (%)",space="bottom",adj=1),
   margin=F,maxpixels=res,ylab="",xlab="",useRaster=T,ylim=greg$ylim)+
     layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col="black"),under=T)+
     layer(panel.xyplot(lon,lat,pch=16,cex=.3,col="black"),data=data.frame(coordinates(st)))+
@@ -83,6 +79,91 @@ bgr=function(x,n=100,br=0,c1=c("darkblue","blue","grey"),c2=c("grey","red","purp
     gr=colorRampPalette(c2)
     return(list(at=at,col=c(bg(sum(at<br)),gr(sum(at>=br)))))
 }
+
+
+
+
+col=read.csv("data/MCD09_deriv/coltable.csv",stringsAsFactors=F)
+
+
+
+pCirc=function(r,n=100) {
+  angs=seq(0,360,len=100)
+  #lapply(r,function(r) {
+  cbind(
+    y=r*cos((pi/180)*(-angs)),
+    x=r*sin((pi/180)*(-angs))
+  )
+  #})
+}
+
+
+mangle=(-seq(30,360,30)+prot+15)*(pi/180)
+rmons=c(1:3,9:12)
+lmons=4:8
+mon=c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec") # month names
+ladj=65
+lims=c(-80,80)
+
+png(width=1000,height=1000,pointsize=32,file="manuscript/figures/SeasKey_%0d.png")
+### Create the color key
+xyplot(conc~theta,col=col$val[col$exists],data=col[col$exists,],pch=16,cex=1,
+       scales=list(
+         x=list(labels=c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"),
+                at=seq(15,360,30))),
+       xlab="Month",ylab="Concentration (%)")
+dev.off()
+
+####################################
+## Seasonality plot
+
+## color key
+k1=xyplot(y~x,col=col$val[col$exists],data=col[col$exists,],pch=16,cex=1.2,
+       xlab="",ylab="",scales=list(draw=F),ylim=lims,xlim=lims,asp=1,
+#          main="Seasonal Cloud Concentration"
+       par.settings = list(axis.line = list(col = "transparent")))+
+  layer(panel.polygon(pCirc(r=20,n=100),border="grey"))+
+  layer(panel.polygon(pCirc(r=40,n=100),border="grey"))+
+  layer(panel.polygon(pCirc(r=60,n=100),border="grey"))+
+  layer(panel.segments(0,0,60*cos(mangle-(15*pi/180)),60*sin(mangle-(15*pi/180)),col="grey"))+ #draw angles
+  layer(panel.text(x=ladj*cos(mangle[lmons]),y=ladj*sin(mangle[lmons]),mon[lmons],pos=4,cex=1,offset=0,srt=(mangle[lmons])*180/pi))+ #add left months))
+  layer(panel.text(x=ladj*cos(mangle[rmons]),y=ladj*sin(mangle[rmons]),mon[rmons],pos=2,cex=1,offset=0,srt=((mangle[rmons])*180/pi)-180))+ # add right months
+  layer(panel.text(x=-2,y=c(-20,-40,-60),c(20,40,60),pos=4,cex=1,col=c("white","black","black"))) #add scale text
+
+
+g1=levelplot(cf_visseas,col.regions=cf_visseas@legend@colortable,cuts=length(cf_visseas@legend@colortable),at=0:length(cf_visseas@legend@colortable),
+             colorkey=F,panel=panel.levelplot.raster,margin=F,maxpixels=res,ylab="",xlab="",useRaster=T,ylim=c(-60,70),
+             scales=list(cex=1,y=list(at=c(-40,0,40))))+
+  layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col="black"),under=T)+
+  layer(sp.polygons(as(regs[["CFR2"]],'SpatialPolygons'),col="red",lwd=1.5),under=F)+
+  layer(sp.polygons(as(regs[["Indonesia"]],'SpatialPolygons'),col="red",lwd=1.5),under=F)+
+  layer(sp.lines(coast,col="white",lwd=.5),under=F)
+
+## regional plots
+
+r_cfr=levelplot(crop(cf_visseas,regs[["CFR2"]]),col.regions=cf_visseas@legend@colortable,cuts=length(cf_visseas@legend@colortable),at=0:length(cf_visseas@legend@colortable),
+             colorkey=F,panel=panel.levelplot.raster,margin=F,maxpixels=res,ylab="",xlab="",useRaster=T,scales=list(cex=1,y=list(at=c(-34,-30,-26))),asp=1)+
+  layer(sp.lines(coast,col="white",lwd=.5),under=F)
+r_ind=levelplot(crop(cf_visseas,regs[["Indonesia"]]),col.regions=cf_visseas@legend@colortable,cuts=length(cf_visseas@legend@colortable),at=0:length(cf_visseas@legend@colortable),
+                colorkey=F,panel=panel.levelplot.raster,margin=F,maxpixels=res,ylab="",xlab="",useRaster=T,scales=list(cex=1,y=list(at=c(-10,0,10))),asp=1)+
+  layer(sp.lines(coast,col="white",lwd=.5),under=F)
+
+
+## draw it
+png(width=2400,height=1600,res=200,pointsize=12,type="cairo-png",file="manuscript/figures/Seasonality.png")
+print(g1,position=c(0,.5,.65,1),more=T) #global
+print(k1,position=c(.65,.5,1,1),more=T) #legend
+print(r_cfr,position=c(0,0,.48,.5),more=T)
+print(r_ind,position=c(.46,0,1,.5),more=F)
+## add panel labels
+gp=gpar(fontsize=18, col="black",fontface="bold")
+grid.text("A",x=0.05,y=.995,just=c("left","top"),gp=gp)
+grid.text("B",x=0.65,y=.995,just=c("left","top"),gp=gp)
+grid.text("C",x=0.05,y=.5,just=c("left","top"),gp=gp)
+grid.text("D",x=0.51,y=.5,just=c("left","top"),gp=gp)
+dev.off()
+
+
 
 ###################
 ### Presentation/Poster

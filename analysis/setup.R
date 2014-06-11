@@ -26,7 +26,7 @@ library(rasterAutocorr)
 library(doMC)
 registerDoMC(12)
 
-rasterOptions(progress="text",maxmemory=1e9)
+rasterOptions(progress="text",maxmemory=1e12)
 
 
 # temporary files will be written here:
@@ -36,6 +36,10 @@ datadir="/mnt/data2/projects/cloud/"
 colR=colorRampPalette(c("#08306b","#0d57a1","#2878b8","#4997c9","#72b2d7","#a2cbe2","#c7dcef","#deebf7","#f7fbff"))
 bgr=colorRampPalette(c("#0000ff","#00ff00","#ff0000"))
 bgyrp=colorRampPalette(c("blue","darkgreen","goldenrod","red","purple"))
+
+## Set polar rotation for polar plot of color values
+## used in seasonal concentration plots
+prot=-180
 
 
 ## create 8-bit color table file for grass
@@ -92,11 +96,17 @@ regs=list(
   Hawaii=extent(c(-156.5,-154,18.75,20.5)),
   Boliva=extent(c(-71,-63,-20,-15)),
   Venezuela=extent(c(-69,-59,0,7)),
-  CFR=extent(c(17.75,22.5,-34.8,-32.6)),
+  Venezuela2=extent(c(-72.5,-61,5,11)),
+  Indonesia=extent(c(93.2,140,-14,12)),
+  CFR=extent(c(17.5,29,-35,-29)),
+  CFR2=extent(c(15,33,-35,-25)),
   Madagascar=extent(c(46,52,-17,-12))
 )
 
+fratio=function(ext) abs(ext@xmax-ext@xmin)/abs(ext@ymax-ext@ymin)
 
+fratio(regs[["CFR2"]])
+fratio(regs[["Indonesia"]])
 
 
 ## udpate paths because initGRASS gets it wrong for grass70...
