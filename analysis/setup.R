@@ -15,6 +15,7 @@ require(knitcitations)
 library(maptools)
 library(rgdal)
 library(coda)
+library(spgrass6)
 
 ## install rasterAutocorr
 #library(devtools) 
@@ -28,11 +29,18 @@ registerDoMC(12)
 rasterOptions(progress="text",maxmemory=1e9)
 
 
+# temporary files will be written here:
+datadir="/mnt/data2/projects/cloud/"
+
 ## color ramps
 colR=colorRampPalette(c("#08306b","#0d57a1","#2878b8","#4997c9","#72b2d7","#a2cbe2","#c7dcef","#deebf7","#f7fbff"))
 bgr=colorRampPalette(c("#0000ff","#00ff00","#ff0000"))
 bgyrp=colorRampPalette(c("blue","darkgreen","goldenrod","red","purple"))
 
+
+## create 8-bit color table file for grass
+cols=data.frame(id=0:104,col=apply(t(col2rgb(colR(105))),1,function(x) paste(x,collapse=":")))
+write.table(cols,"data/out/grasscols.txt",col.names=F,row.names=F,quote=F)
 
 ## read in coast line
 coast=readOGR("data/gshhs/","coast")
@@ -87,4 +95,22 @@ regs=list(
   CFR=extent(c(17.75,22.5,-34.8,-32.6)),
   Madagascar=extent(c(46,52,-17,-12))
 )
+
+
+
+
+## udpate paths because initGRASS gets it wrong for grass70...
+ePATH <- Sys.getenv("PATH")
+Sys.setenv(PATH = paste(Sys.getenv("GISBASE"), "/bin:", 
+                        Sys.getenv("GISBASE"), "/scripts", ifelse(nchar(ePATH) == 
+                                                                    0, "", ":"), ePATH, sep = ""))
+eLDPATH <- Sys.getenv("LD_LIBRARY_PATH")
+Sys.setenv(LD_LIBRARY_PATH = paste(Sys.getenv("GISBASE"), 
+                                   "/lib:", ifelse(nchar(eLDPATH) == 0, "", ":"), 
+                                   eLDPATH, sep = ""))
+ePyPATH <- Sys.getenv("PYTHONPATH")
+GrPyPATH <- paste(Sys.getenv("GISBASE"), "etc", "python", 
+                  sep = "/")
+Sys.setenv(PYTHONPATH = paste(GrPyPATH, ePyPATH, 
+                              sep = ":"))
 

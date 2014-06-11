@@ -2,12 +2,6 @@
 ###  calculate monthly means of terra and aqua
 source('analysis/setup.R')
 
-library(raster)
-library(foreach)
-library(multicore)
-library(doMC)
-registerDoMC(20)
-
 beginCluster(20)
 
 ### assemble list of files to process
@@ -55,40 +49,59 @@ overwrite=T
 
 
 
+
 #################################################################################
-###### convert to 8-bit compressed file, add colors and other details
+###### Apply albedo mask and fill in missing data, convert to 8-bit compressed file, add colors and other details
 
 
 f2=list.files(paste(datadir,"/mcd09ctif",sep=""),pattern=paste(".*MCD09_.*_[0-9].[.]tif$",sep=""),full=T)
 
+## download albedo mask data from earth engine
+download=F
+hash="c5400b5cad"
+if(download) system(paste("google docs get mask_",hash,"_2014066* ",datadir,"/mcd09ee_mask",sep=""))
+mask=list.files(paste0(datadir,"/mcd09ee_mask"),pattern=hash,full=T)
 
-foreach(i=1:length(f2), .options.multicore=list(preschedule=FALSE)) %dopar% {
+i=1
+
+foreach(i=1:length(f2), .options.multicore=list(preschedule=FALSE),.packages=c("spgrass6")) %dopar% {
     file=f2[i]
-    outfilevrt=sub("[.]tif",".vrt",file)
-    outfile=paste("data/mcd09tif/",basename(file),sep="")
-    ## rescale to 0-100 using a VRT
-    system(paste("gdal_translate  -scale 0 10000 0 100 -of VRT ",file," ",outfilevrt)) 
-    ## add color table for 8-bit data
-    vrt=scan(outfilevrt,what="char")
-    hd=c("<ColorInterp>Palette</ColorInterp>","<ColorTable>")
-    ft="</ColorTable>"
-    colR=colorRampPalette(c("#08306b","#0d57a1","#2878b8","#4997c9","#72b2d7","#a2cbe2","#c7dcef","#deebf7","#f7fbff"))
-    cols=data.frame(t(col2rgb(colR(105))))
-    ct=paste("<Entry c1=\"",cols$red,"\" c2=\"",cols$green,"\" c3=\"",cols$blue,"\" c4=\"255\"/>")
-    cti=grep("ColorInterp",vrt)  # get index of current color table
-    vrt2=c(vrt[1:(cti-1)],hd,ct,ft,vrt[(cti+1):length(vrt)])
-    ## update missing data flag following http://lists.osgeo.org/pipermail/gdal-dev/2010-February/023541.html
-    csi=grep("<ComplexSource>",vrt2)  # get index of current color table
-    vrt2=c(vrt2[1:csi],"<NODATA>327</NODATA>",vrt2[(csi+1):length(vrt2)])
-    write.table(vrt2,file=outfilevrt,col.names=F,row.names=F,quote=F)              
+    ## Initialze the grass session  
+    loc=sub("[.]tif","",basename(file))
+    initGRASS(gisBase="/usr/lib/grass70/", home="data/tmp/grass/",gisDbase="data/tmp/grass/", location=loc, mapset="PERMANENT", override = T)
+    execGRASS("g.proj", flags="c",epsg=4326)
+    ## import the data
+    execGRASS("r.in.gdal", flags="overwrite",input=file,output="image")
+    execGRASS("r.in.gdal", flags="overwrite",input=mask,output="mask")
+    ## set region to size of mask to speed things up
+    execGRASS("g.region", rast="mask")
+    ## Create a new copy of the image with masked values and divide by 100 to facilitate 8-bit export
+    execGRASS("r.mapcalc",flags="overwrite",expression="image2 =  if(isnull(mask),image/100,if(mask>0&mask<100,null(),image/100))")  
+    execGRASS("r.fillnulls", flags=c("overwrite"), input="image2",output="filled",method="bicubic")
+    ## switch region back to full raster and 'patch' the original image
+    execGRASS("g.region",flags="p", w='-180',e='180',s='-90',n='90',rast="image")
+    execGRASS("r.patch", flags=c("overwrite"), input="image,filled",output="output")
+    
+    ## rescale to 0-100
+    execGRASS("r.colors",map="output",rules="data/out/grasscols.txt")
+
+    ### create vrt to translate scale to 8-bit
+    outfile=paste("data/MCD09/",basename(file),sep="")
     tags=c(paste("TIFFTAG_IMAGEDESCRIPTION='Monthly Cloud Frequency for 2000-2013 extracted from C5 MODIS M*D09GA PGE11 internal cloud mask algorithm (embedded in state_1km bit 10).",
         "The daily cloud mask time series were summarized to mean cloud frequency (CF) by calculating the proportion of cloudy days. ",
         "Band Descriptions: 1) Mean Monthly Cloud Frequency'"),
         "TIFFTAG_DOCUMENTNAME='Collection 5 Cloud Frequency'",
         paste("TIFFTAG_DATETIME='2014'",sep=""),
         "TIFFTAG_ARTIST='Adam M. Wilson (adam.wilson@yale.edu)'")
-    system(paste("gdal_translate -a_nodata 255 -ot Byte  -co COMPRESS=LZW -co PREDICTOR=2 ",paste("-mo ",tags,sep="",collapse=" ")," ",outfilevrt," ",outfile))
-
+    ## write out the file    
+    execGRASS("r.out.gdal", flags=c("f","overwrite"), input="output",output=outfile,type="Byte",
+              createopt="\"COMPRESS=LZW,PREDICTOR=2\"",
+              metaopt=paste0(c("\"",paste(tags,collapse=","),"\""),collapse=""),nodata=255)
+    
+    ## clean up
+    unlink_.gislock()
+    system(paste0("rm -rf data/tmp/grass/",loc))
+    
 }
 
 

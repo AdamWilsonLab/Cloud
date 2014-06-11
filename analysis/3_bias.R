@@ -1,16 +1,5 @@
 ###  Script to compile the monthly cloud data from earth engine into a netcdf file for further processing
 
-library(rasterVis)
-library(multicore)
-library(doMC)
-library(foreach)
-library(rgdal)
-registerDoMC(12)
-
-
-# temporary files will be written here:
-datadir="/mnt/data2/projects/cloud/"
-
 ## Specify path to VSNR souce code and add it to RcppOctave path
 library(RcppOctave)
 mpath="/mnt/data/personal/adamw/projects/environmental-layers/climate/research/cloud/MOD09/vsnr/"
