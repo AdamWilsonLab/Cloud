@@ -8,7 +8,7 @@ library(reshape)
 library(caTools)
 library(rgeos)
 library(raster)
-library(plyr)
+library(dplyr)
 library(knitr)
 require(knitcitations)
 ## read in global coasts for nice plotting
