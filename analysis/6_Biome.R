@@ -1,17 +1,6 @@
 ### Produce summary of cloud frequency by biome
 
-setwd("~/acrobates/adamw/projects/cloud/")
-
-
-## libraries
-library(rasterVis)
-library(latticeExtra)
-library(xtable)
-library(texreg)
-library(reshape)
-library(caTools)
-library(rgeos)
-library(raster)
+source("analysis/setup.R")
 
 
 ## Create a simplified version of the TEOW biome dataset
