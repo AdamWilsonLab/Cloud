@@ -2,9 +2,6 @@ source("analysis/setup.R")
 
 #tropics=extent(c(20,25,0,5))
 
-cf_mean=raster("data/MCD09_deriv/MCD09_meanannual.tif")
-map=raster("/mnt/data/jetzlab/Data/environ/global/worldclim/bio_12.bil")
-
 ## mask cloud values where MAP is missing
 #cf_mean=mask(cf_mean,map)
 
@@ -12,112 +9,95 @@ map=raster("/mnt/data/jetzlab/Data/environ/global/worldclim/bio_12.bil")
 tropics=extent(c(-180,180,-23.4378,23.4378))
 global=extent(c(-180,180,-60,60))
 
+
+prods=list(
+  mac=raster("data/MCD09_deriv/MCD09_meanannual.tif"),
+  map=raster("/mnt/data/jetzlab/Data/environ/global/worldclim/bio_12.bil"),
+  dem=raster("/mnt/data/jetzlab/Data/environ/global/worldclim/alt.bil"),
+  patmos=raster("data/src/gewex/CA_PATMOSX_NOAA.nc",varname="a_CA"))
+
+
+region=regs[["Venezuela2"]]
+regionname="Venezuela"
+
+
+
+## loop through products and write out autocorrelation data
+foreach(i=1:4) %dopar% {
+
+tprod=names(prods[i])
+  
 ## set file names
-map_global="data/autocorr/global_map.tif"
-mac_global="data/autocorr/global_mac.tif"
-fac_global_mac="data/autocorr/ac_global_mac.tif"
-fac_global_map="data/autocorr/ac_global_map.tif"
-f_global_dist="data/autocorr/ac_global_dist.tif"
+treg=paste0("data/autocorr/data_",tprod,"_",regionname,".tif")
+tac=paste0("data/autocorr/ac_",tprod,"_",regionname,".tif")
+tdist=paste0("data/autocorr/dist_",tprod,"_",regionname,".tif")
 
-map_tropic="data/autocorr/tropics_map.tif"
-mac_tropic="data/autocorr/tropics_mac.tif"
-fac_trop_mac="data/autocorr/ac_tropics_mac.tif"
-fac_trop_map="data/autocorr/ac_tropics_map.tif"
-f_trop_dist="data/autocorr/ac_tropics_dist.tif"
+## create subset
+#if(!file.exists(treg)) 
+reg=crop(prods[[i]],region,filename=treg,overwrite=T,dataType='INT1S',NAflag=-128)
 
-## create subsets
-if(!file.exists(mac_global)) gcld=crop(cf_mean,global,filename=mac_global,overwrite=T,dataType='INT1S',NAflag=-128)
-if(!file.exists(map_global)) crop(map,gcld,filename=map_global,overwrite=T,dataType='INT1S',NAflag=-128)
-
-if(!file.exists(mac_tropic)) tcld=crop(cf_mean,tropics,filename=mac_tropic,overwrite=T,dataType='INT1S',NAflag=-128)
-if(!file.exists(map_tropic)) crop(map,tcld,filename=map_tropic,overwrite=T,dataType='INT1S',NAflag=-128)
-
-## read them in
-gcld=raster(mac_global)
-gmap=raster(map_global)
-
-tcld=raster(mac_tropic)
-tmap=raster(map_tropic)
-
-projection(tmap)="+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
-projection(gmap)="+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
-
+## mask ocean
+#tcld=raster(mac_tropic)
+#tmap=raster(map_tropic)
+#tcld[is.na(tmap)]=NA
+#tpatmos=raster(mac_tropic_patmos)
 
 ## run the autocorrelation function and write out the output raster (and time it!)
 # tropics
-system.time(acorr(tcld,filename=fac_tropics_mac,gain=100,overwrite=T,dataType='INT1S',NAflag=-128))
-system.time(acorr(tmap,filename=fac_tropics_map,gain=100,overwrite=T,dataType='INT1S',NAflag=-128))
+system.time(ac<<-acorr(reg,filename=tac,gain=100,overwrite=T,dataType='INT1S',NAflag=-128))
+dist=acorr_dist(reg)
 
-## global
-xm=as.matrix(tcld)
-tmean=mean(xm,na.rm=T)
-xm=xm-tmean
-## fill missing values with mean
-xm[is.na(xm)]=tmean
-## should we pad the image here?
-## create padded version
-#xpad=as.matrix(extend(tcld, extent(c(-39,90,-20,30)), value=0))
-## take the fft of the matrix
-
-object.size(x)
-Rprof(tf <- "rprof.log", memory.profiling=TRUE)
-fftx=fft(xm)
-Rprof(NULL)
-summaryRprof(tf)
-system.time(fftx<<-fft(x))
-
-system.time(g1<<-acorr(gcld,filename=fac_global_mac,gain=100,overwrite=T,dataType='INT1S',NAflag=-128))
-
-system.time(g2<<-acorr(gmap,file=fac_global_map,gain=100,overwrite=T,dataType='INT1S',NAflag=-128))
-
-## get distances for each shift to facilitate plotting of the correlogram
-system(paste("gdal_proximity.py ",fac_global_mac," ",f_global_dist," -co COMPRESS=LZW -co PREDICTOR=2 -ot Int16",
-             " -values 1000 -distunits GEO -nodata -32768"))
-system(paste("gdal_proximity.py ",fac_trop_mac," ",f_trop_dist," -co COMPRESS=LZW -co PREDICTOR=2 -ot Int16",
-             " -values 1000 -distunits GEO -nodata -32768"))
+#system(paste("gdal_proximity.py ",fac_trop_patmos," ",patmos_trop_dist," -co COMPRESS=LZW -co PREDICTOR=2 -ot Int16",
+#             " -values 1000 -distunits GEO -nodata -32768"))
 
 
 #########################################
 ## build the table of values to construct the correlograms
-ac_tropics_map=raster(fac_tropics_map)
-ac_tropics_mac=raster(fac_tropics_mac)
-tropics_dist=raster(f_trop_dist)
-
-ac_global_map=raster(fac_global_map)
-ac_global_mac=raster(fac_global_mac)
-global_dist=raster(f_global_dist)
+ac=raster(tac)
 
 ## summarize into tables
-ftd=data.frame(mac=values(ac_tropics_mac),map=values(ac_tropics_map),dist=values(tropics_dist),type="Tropics")
+ftd=rbind.data.frame(
+  data.frame(values=values(ac),dist=values(dist),type=tprod,region=regionname)
+)
+ftd$dist=round(ftd$dist)
+ftd <- filter(ftd, dist <= 10000)
 
-ftd <- filter(ftd, dist <= 5000)
-
-ftd2 <- group_by(ftd, dist)
+ftd2 <- group_by(ftd, dist,type,region)
 ftd2 <- summarise(ftd2,
-                 mac_min = min(mac, na.rm = TRUE),
-                  mac_max = max(mac, na.rm = TRUE),
-                  mac_sd = sd(mac, na.rm = TRUE),
-                  mac_mean = mean(mac, na.rm = TRUE),
-                  map_min = min(map, na.rm = TRUE),
-                  map_max = max(map, na.rm = TRUE),
-                  map_sd = sd(map, na.rm = TRUE),
-                  map_mean = mean(map, na.rm = TRUE),
-                  type="tropics")
+                  min = min(values, na.rm = TRUE),
+                  max = max(values, na.rm = TRUE),
+                  sd = sd(values, na.rm = TRUE),
+                  mean = mean(values, na.rm = TRUE)
+)
 
-ftdl=melt(ftd2,id.vars=c("dist"))
+write.csv(ftd2,paste0("data/autocorr/table_",tprod,"_",regionname,".csv"),row.names=F)
+print(paste("Finished ",tprod," for ",regionname))
+
+}  ## end loop over products
+
+
+## compile all regions and products into a single table
+
+ftd3=do.call(rbind.data.frame,lapply(list.files("data/autocorr/",pattern="table",full=T),function(f) read.csv(f)))
+
+ftdl=melt(ftd3,id.vars=c("dist","type","region"))
 ftdl[,c("var","met")]=do.call(rbind,strsplit(as.character(ftdl$variable),"_"))
 
 
-xyplot(mac_mean~dist,data=ftd2,panel=function(x,y,subscripts){
-  td=ftd2[subscripts,]
-  panel.segments(td$dist,td$mac_min,td$dist,td$mac_max,lwd=.5)
-  panel.xyplot(td$dist,td$mac_mean,pch=16)  
-  panel.segments(td$dist,td$map_min,td$dist,td$map_max,lwd=.5,col="green")
-  panel.xyplot(td$dist,td$map_mean,pch=16)  
-  },xlim=c(-10,5000),ylim=c(0,104))
+## plot it...
+xyplot(mean~dist,data=ftd3,group=type,auto.key=F,
+  panel=function(x,y,subscripts){
+    td=ftd3[subscripts,]
+    for(i in unique(td$type)){
+    td2=td[td$type==i,]
+    #  td$dist=log(td$dist+1)
+    panel.xyplot(td2$dist,td2$mean,pch=16)  
+    panel.segments(td2$dist,td2$min,td2$dist,td2$max,lwd=.5)
+  }},
+subscripts=T,xlim=c(-5,250),ylim=c(-30,104),scales=list(x=list(log=F)))
 
 
-## plot the autocorrlation and distance
+  ## plot the autocorrlation and distance
 plot(stack(tmap,tcld),ylab="Y",xlab="X",main="Original Raster")
 levelplot(stack(ac_tropics_mac,ac_tropics_map),ylab="Shift in Y",xlab="Shift in X",main="Autocorrelation",xlim=c(-4000,4000))
 plot(d1,ylab="Shift in Y",xlab="Shift in X",main="Distance from center in units of original raster")
