@@ -2,7 +2,7 @@
 ###  calculate monthly means of terra and aqua
 source('analysis/setup.R')
 
-#beginCluster(20)
+beginCluster(20)
 
 ### assemble list of files to process
 df=data.frame(path=list.files(paste(datadir,"/mcd09ctif",sep=""),full=T,pattern="M[Y|O].*[0-9]*[mean|sd].*tif$"),stringsAsFactors=F)
@@ -69,102 +69,81 @@ mhist=mhist[mhist[,2]>0,]
 mhist$p=100*mhist$V2/sum(mhist$V2)
 100*sum(mhist$V2[mhist$V1>0])/sum(mhist$V2)
 
-i=1
+i=6
 
-foreach(i=1:length(f2), .options.multicore=list(preschedule=FALSE),.packages=c("spgrass6")) %dopar% {
+
+foreach(i=1:length(f2), .options.multicore=list(preschedule=FALSE)) %dopar% {
     file=f2[i]
-    ## Initialze the grass session  
-    loc=sub("[.]tif","",basename(file))
-    tf=paste("data/tmp/grass/grass_", Sys.getpid(),"/", sep="")  
-    if(!file.exists(tf)) dir.create(tf,recursive=T)
-    
-    
+    ## temporary files    
     tfile1=sub("[.]tif","_masked.tif",file)
-    tfile2=sub("[.]tif","_filled.tif",file)
-    tfile3=sub("[.]tif","_filledmasked.tif",file)
-    system(paste0("pksetmask -i ",file," -m ",mask," --operator='>' --msknodata 0 --nodata 32767 -o ",tfile1))
-    #temporarily crop for testing
-    system(paste0("gdal_translate -projwin  110 -16 155 -40 ",tfile1," ",tfile2))
+    tfile1a=sub("[.]tif","_Wborder.tif",file)
+    tfile1a2=sub("[.]tif","_Wborder2.tif",file)
+    tfile1a3=sub("[.]tif","_Wborder3.tif",file)
+    tfile1a4=sub("[.]tif","_Wborder4.tif",file)
+    tfile1a5=sub("[.]tif","_Wborder5.tif",file)
     
+    tfile1b=sub("[.]tif","_Eborder.tif",file)
     
-    system(paste0("pkfilter -f smoothnodata -dx 11 -dy 11 -nodata 32767  -i ",tfile1," -o ",tfile2))
-    system(paste0("pkfilter -f smoothnodata -dx 21 -dy 21 -nodata 32767  -i ",tfile2," -o ",tfile2))
-    system(paste0("pkfilter -f smoothnodata -dx 101 -dy 101 -nodata 32767  -i ",tfile2," -o ",tfile2))
-    
-    system(paste0("gdal_fillnodata.py -md 30 -si 2 ",tfile2," ",tfile3))
-#    system(paste0("pksetmask -i ",tfile2," -m ",file," --operator='<' --msknodata 20000 --nodata 65535 -o ",tfile3))
-
-      
-    ## replace masked values with 32767
-#    system(paste0("pksetmask -i ",file," -m ",mask," --operator='>' --msknodata 0 --nodata 32767 -o ",tfile1))
-    ## fill them in with pkfilter
-    
-    
-#    tmask=sub("[.]tif","_mask.tif",file)
-#    system(paste0("pksetmask -i ",file,
-#                    " -m ",mask,
-#                    " --operator='>' --msknodata 0 --nodata 0 ",
-#                    " -m ",file,
-#                    " --operator='<' --msknodata 65535 --nodata 1 ",
-#                    "-o ",tmask))
-#    system(paste0("gdal_edit.py -a_nodata 65535 ",tmask))
-#    system(paste0("gdal_fillnodata.py -nomask -mask ",tmask," -md 1000 -si 0 ",file," ",tfile3))
-#    system(paste0("gdal_edit.py -a_nodata 65535 ",tfile2))
-#    
-    
-    
-    
-    ## create output directory if needed
-    initGRASS(gisBase="/usr/lib/grass70/", home=tf,gisDbase=tf, location=loc, mapset="PERMANENT", override = T,pid=Sys.getpid())
-    execGRASS("g.proj", flags="c",epsg=4326)
-    ## import the data
-    execGRASS("r.in.gdal", flags="overwrite",input=file,output="image")
-    execGRASS("r.in.gdal", flags="overwrite",input=mask,output="mask")
-    ## set region to size of mask to speed things up
-    execGRASS("g.region", rast="mask")
-    execGRASS("g.region",flags="p", w='110',e='155',s='-40',n='-16',rast="image")
-    
-    ## Create a new copy of the image with masked values
-    execGRASS("r.mask",flags="overwrite",raster="image",maskcats="0 thru 10000")  
-    
-    execGRASS("r.mapcalc",flags="overwrite",expression="image2 =  if(isnull(mask),image,if(mask>0&mask<100,null(),image))")  
-    execGRASS("r.fillnulls", flags=c("overwrite"), input="image2",output="filled",method="bicubic")
-    execGRASS("r.mask", flags=c("r"))
-    
-    ## switch region back to full raster and 'patch' the original image
-    execGRASS("g.region",flags="p", w='-180',e='180',s='-90',n='90',rast="image")
-    execGRASS("r.patch", flags=c("overwrite"), input="image,filled",output="output")
-    
-    ## rescale to 0-100
-    execGRASS("r.colors",map="output",rules="data/out/grasscols.txt")
-
-    ### create vrt to translate scale to 8-bit
+    tfile2=sub("[.]tif","_filledrough.tif",file)
+    tfile3=sub("[.]tif","_filledsmoothed.tif",file)
+    tfile4=sub("[.]tif","_filled.tif",file)
+    outfilevrt=sub("[.]tif",".vrt",file)
     outfile=paste("data/MCD09/",basename(file),sep="")
+    ## mask the image    
+    system(paste0("pksetmask -i ",file," -m ",mask," --operator='>' --msknodata 0 --nodata 32767 -o ",tfile1))
+    ## Subset edges out for special treatment to avoid errors in gdal_fillnodata
+    system(paste0("gdal_translate -a_nodata 65535 -srcwin 43198 0 2 21600 ",file," ",tfile1a))
+    #system(paste0("gdal_translate -srcwin 0 0 2 21600 ",file," ",tfile1b))
+    ## replace any missing values (65535) with 32767 for filling
+    system(paste0("pkfilter -f min -dx=2 -dy=1 -i ",tfile1a,"  ",tfile1," -o ",tfile1a2))
+    system(paste0("pkfilter -f mean -dx=5 -dy=5 -i ",tfile1a,"  ",tfile1," -o ",tfile1a3))
+    system(paste0("gdal_translate -srcwin 3 0 2 21600 ",tfile1a3," ",tfile1a4))
+    system(paste0("pksetmask -i ",tfile1a4," -m ",tfile1a2," --operator='=' --msknodata 65535 --nodata 65535 -o ",tfile1a5))
+    system(paste0("gdal_edit.py -a_nodata 65535 ",tfile1a4))
+    
+    ## merge this back into the masked file
+    system(paste0("gdalwarp ",tfile1a4," ",tfile1))    
+    ## fill no data
+    system(paste0("gdal_fillnodata.py -md 1000 ",tfile1," ",tfile2))
+    #system(paste0("pkfillnodata -co 'BIGTIFF=TRUE' -co 'COMPRESS=LZW' -d 1000 -i ",file," -m ",tfile1," -o ",tfile2))
+    
+    ## smooth the filled data
+    system(paste0("pkfilter -f smooth -dx 11 -dy 11 -nodata 32767  -i ",tfile2," -o ",tfile3))
+    ## used the smoothed data rather than the original, would prefer to use the -si option on gdal_fillnodata, but it's broken
+    system(paste0("gdal_merge.py -o ",tfile4," -co COMPRESS=LZW -co PREDICTOR=2 -n 32767 -init 32767 ",tfile3," ",tfile1))    
+
+    system(paste("gdal_translate  -scale 0 10000 0 100 -of VRT ",tfile4," ",outfilevrt)) 
+    ## add color table for 8-bit data
+    vrt=scan(outfilevrt,what="char")
+    hd=c("<ColorInterp>Palette</ColorInterp>","<ColorTable>")
+    ft="</ColorTable>"
+    colR=colorRampPalette(c("#08306b","#0d57a1","#2878b8","#4997c9","#72b2d7","#a2cbe2","#c7dcef","#deebf7","#f7fbff"))
+    cols=data.frame(t(col2rgb(colR(105))))
+    ct=paste("<Entry c1=\"",cols$red,"\" c2=\"",cols$green,"\" c3=\"",cols$blue,"\" c4=\"255\"/>")
+    cti=grep("ColorInterp",vrt)  # get index of current color table
+    vrt2=c(vrt[1:(cti-1)],hd,ct,ft,vrt[(cti+1):length(vrt)])
+    ## update missing data flag following http://lists.osgeo.org/pipermail/gdal-dev/2010-February/023541.html
+    csi=grep("<ComplexSource>",vrt2)  # get index of current color table
+    vrt2=c(vrt2[1:csi],"<NODATA>327</NODATA>",vrt2[(csi+1):length(vrt2)])
+    write.table(vrt2,file=outfilevrt,col.names=F,row.names=F,quote=F)              
     tags=c(paste("TIFFTAG_IMAGEDESCRIPTION='Monthly Cloud Frequency for 2000-2013 extracted from C5 MODIS M*D09GA PGE11 internal cloud mask algorithm (embedded in state_1km bit 10).",
-        "The daily cloud mask time series were summarized to mean cloud frequency (CF) by calculating the proportion of cloudy days. ",
-        "Band Descriptions: 1) Mean Monthly Cloud Frequency'"),
-        "TIFFTAG_DOCUMENTNAME='Collection 5 Cloud Frequency'",
-        paste("TIFFTAG_DATETIME='2014'",sep=""),
-        "TIFFTAG_ARTIST='Adam M. Wilson (adam.wilson@yale.edu)'")
-    ## write out the file    
-    execGRASS("r.out.gdal", flags=c("f","overwrite"), input="output",output=outfile,type="UInt16",
-              createopt="\"COMPRESS=LZW,PREDICTOR=2\"",
-              metaopt=paste0(c("\"",paste(tags,collapse=","),"\""),collapse=""),nodata=65535)
-    
-    ## clean up
-    unlink_.gislock()
-    system(paste0("rm -rf ",tf))
-    
+                 "The daily cloud mask time series were summarized to mean cloud frequency (CF) by calculating the proportion of cloudy days.'"),
+           "TIFFTAG_DOCUMENTNAME='Collection 5 Cloud Frequency'",
+           paste("TIFFTAG_DATETIME='2014'",sep=""),
+           "TIFFTAG_ARTIST='Adam M. Wilson (adam.wilson@yale.edu)'")
+    system(paste("gdal_translate -a_nodata 255 -ot Byte  -co COMPRESS=LZW -co PREDICTOR=2 ",paste("-mo ",tags,sep="",collapse=" ")," ",outfilevrt," ",outfile))
+    ## clean up  - keep the 16 bit filled version for additional calculations
+    file.remove(tfile1,tfile1a,tfile1a,tfile1a2,tfile1a3,tfile1a4,tfile1a5,tfile2,tfile3)
 }
 
 
 ################
 ### calculate inter vs. intra annual variability
-f3=list.files(paste(datadir,"/mcd09ctif/",sep=""),pattern=paste(".*MCD09_mean_[0-9].[.]tif$",sep=""),full=T)
-f3sd=list.files(paste(datadir,"/mcd09ctif/",sep=""),pattern=paste(".*MCD09_sd_[0-9].[.]tif$",sep=""),full=T)
+f3=list.files(paste(datadir,"/mcd09ctif/",sep=""),pattern=paste(".*MCD09_mean_[0-9].*filled[.]tif$",sep=""),full=T)
+f3sd=list.files(paste(datadir,"/mcd09ctif/",sep=""),pattern=paste(".*MCD09_sd_[0-9].*filled[.]tif$",sep=""),full=T)
 
-dmean=stack(as.list(f3))
-dsd=stack(as.list(f3sd))
+dmean=stack(as.list(f3));NAvalue(dmean)=65535
+dsd=stack(as.list(f3sd));NAvalue(dsd)=65535
 
 
 ## Function to calculate standard deviation and round it to nearest integer
@@ -183,7 +162,6 @@ dinter=clusterR(dsd,Rmean,na.rm=T,file="data/MCD09_deriv/inter.tif",options=c("C
 
 ## Overall annual mean
 dmeanannual=clusterR(dmean,Rmean,na.rm=T,file="data/MCD09_deriv/meanannual.tif",options=c("COMPRESS=LZW","PREDICTOR=2"),overwrite=T,dataType='INT1U',NAflag=255)
-
 
 #################################################
 ### Calculate Markham's Seasonality
