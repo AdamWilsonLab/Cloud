@@ -2,7 +2,7 @@
 ###  calculate monthly means of terra and aqua
 source('analysis/setup.R')
 
-beginCluster(20)
+#beginCluster(20)
 
 ### assemble list of files to process
 df=data.frame(path=list.files(paste(datadir,"/mcd09ctif",sep=""),full=T,pattern="M[Y|O].*[0-9]*[mean|sd].*tif$"),stringsAsFactors=F)
@@ -53,14 +53,21 @@ overwrite=T
 #################################################################################
 ###### Apply albedo mask and fill in missing data, convert to 8-bit compressed file, add colors and other details
 
-
 f2=list.files(paste(datadir,"/mcd09ctif",sep=""),pattern=paste(".*MCD09_.*_[0-9].[.]tif$",sep=""),full=T)
 
 ## download albedo mask data from earth engine
 download=F
 hash="c5400b5cad"
 if(download) system(paste("google docs get mask_",hash,"_2014066* ",datadir,"/mcd09ee_mask",sep=""))
-mask=list.files(paste0(datadir,"/mcd09ee_mask"),pattern=hash,full=T)
+mask=list.files(paste0(datadir,"/mcd09ee_mask"),pattern=paste0(".*",hash,".*tif$"),full=T)
+
+## calculate what % of pixels were masked
+system(paste0("gdalinfo -stats ",mask))
+system(paste0("pkinfo  -src_min -128  -src_max 3   -hist -i ",mask," > data/out/mask_histogram.txt" ))
+mhist=read.table("data/out/mask_histogram.txt")
+mhist=mhist[mhist[,2]>0,]
+mhist$p=100*mhist$V2/sum(mhist$V2)
+100*sum(mhist$V2[mhist$V1>0])/sum(mhist$V2)
 
 i=1
 
@@ -70,6 +77,43 @@ foreach(i=1:length(f2), .options.multicore=list(preschedule=FALSE),.packages=c("
     loc=sub("[.]tif","",basename(file))
     tf=paste("data/tmp/grass/grass_", Sys.getpid(),"/", sep="")  
     if(!file.exists(tf)) dir.create(tf,recursive=T)
+    
+    
+    tfile1=sub("[.]tif","_masked.tif",file)
+    tfile2=sub("[.]tif","_filled.tif",file)
+    tfile3=sub("[.]tif","_filledmasked.tif",file)
+    system(paste0("pksetmask -i ",file," -m ",mask," --operator='>' --msknodata 0 --nodata 32767 -o ",tfile1))
+    #temporarily crop for testing
+    system(paste0("gdal_translate -projwin  110 -16 155 -40 ",tfile1," ",tfile2))
+    
+    
+    system(paste0("pkfilter -f smoothnodata -dx 11 -dy 11 -nodata 32767  -i ",tfile1," -o ",tfile2))
+    system(paste0("pkfilter -f smoothnodata -dx 21 -dy 21 -nodata 32767  -i ",tfile2," -o ",tfile2))
+    system(paste0("pkfilter -f smoothnodata -dx 101 -dy 101 -nodata 32767  -i ",tfile2," -o ",tfile2))
+    
+    system(paste0("gdal_fillnodata.py -md 30 -si 2 ",tfile2," ",tfile3))
+#    system(paste0("pksetmask -i ",tfile2," -m ",file," --operator='<' --msknodata 20000 --nodata 65535 -o ",tfile3))
+
+      
+    ## replace masked values with 32767
+#    system(paste0("pksetmask -i ",file," -m ",mask," --operator='>' --msknodata 0 --nodata 32767 -o ",tfile1))
+    ## fill them in with pkfilter
+    
+    
+#    tmask=sub("[.]tif","_mask.tif",file)
+#    system(paste0("pksetmask -i ",file,
+#                    " -m ",mask,
+#                    " --operator='>' --msknodata 0 --nodata 0 ",
+#                    " -m ",file,
+#                    " --operator='<' --msknodata 65535 --nodata 1 ",
+#                    "-o ",tmask))
+#    system(paste0("gdal_edit.py -a_nodata 65535 ",tmask))
+#    system(paste0("gdal_fillnodata.py -nomask -mask ",tmask," -md 1000 -si 0 ",file," ",tfile3))
+#    system(paste0("gdal_edit.py -a_nodata 65535 ",tfile2))
+#    
+    
+    
+    
     ## create output directory if needed
     initGRASS(gisBase="/usr/lib/grass70/", home=tf,gisDbase=tf, location=loc, mapset="PERMANENT", override = T,pid=Sys.getpid())
     execGRASS("g.proj", flags="c",epsg=4326)
@@ -78,9 +122,15 @@ foreach(i=1:length(f2), .options.multicore=list(preschedule=FALSE),.packages=c("
     execGRASS("r.in.gdal", flags="overwrite",input=mask,output="mask")
     ## set region to size of mask to speed things up
     execGRASS("g.region", rast="mask")
-    ## Create a new copy of the image with masked values and divide by 100 to facilitate 8-bit export
-    execGRASS("r.mapcalc",flags="overwrite",expression="image2 =  if(isnull(mask),image/100,if(mask>0&mask<100,null(),image/100))")  
+    execGRASS("g.region",flags="p", w='110',e='155',s='-40',n='-16',rast="image")
+    
+    ## Create a new copy of the image with masked values
+    execGRASS("r.mask",flags="overwrite",raster="image",maskcats="0 thru 10000")  
+    
+    execGRASS("r.mapcalc",flags="overwrite",expression="image2 =  if(isnull(mask),image,if(mask>0&mask<100,null(),image))")  
     execGRASS("r.fillnulls", flags=c("overwrite"), input="image2",output="filled",method="bicubic")
+    execGRASS("r.mask", flags=c("r"))
+    
     ## switch region back to full raster and 'patch' the original image
     execGRASS("g.region",flags="p", w='-180',e='180',s='-90',n='90',rast="image")
     execGRASS("r.patch", flags=c("overwrite"), input="image,filled",output="output")
@@ -97,9 +147,9 @@ foreach(i=1:length(f2), .options.multicore=list(preschedule=FALSE),.packages=c("
         paste("TIFFTAG_DATETIME='2014'",sep=""),
         "TIFFTAG_ARTIST='Adam M. Wilson (adam.wilson@yale.edu)'")
     ## write out the file    
-    execGRASS("r.out.gdal", flags=c("f","overwrite"), input="output",output=outfile,type="Byte",
+    execGRASS("r.out.gdal", flags=c("f","overwrite"), input="output",output=outfile,type="UInt16",
               createopt="\"COMPRESS=LZW,PREDICTOR=2\"",
-              metaopt=paste0(c("\"",paste(tags,collapse=","),"\""),collapse=""),nodata=255)
+              metaopt=paste0(c("\"",paste(tags,collapse=","),"\""),collapse=""),nodata=65535)
     
     ## clean up
     unlink_.gislock()
