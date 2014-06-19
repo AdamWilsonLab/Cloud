@@ -8,7 +8,7 @@ library(reshape2)
 library(caTools)
 library(rgeos)
 library(raster)
-library(dplyr)
+library(plyr)
 library(knitr)
 require(knitcitations)
 ## read in global coasts for nice plotting
@@ -24,9 +24,12 @@ library(rasterAutocorr)
 
 ## register parallel backend
 library(doMC)
-registerDoMC(12)
+registerDoMC(18)
 
 rasterOptions(progress="text",maxmemory=1e12)
+
+## increase the amount of memory for gdal to speed up processing
+Sys.setenv(GDAL_CACHEMAX=5000,CPL_LOG_ERRORS="ON")
 
 
 # temporary files will be written here:
@@ -36,6 +39,14 @@ datadir="/mnt/data2/projects/cloud/"
 colR=colorRampPalette(c("#08306b","#0d57a1","#2878b8","#4997c9","#72b2d7","#a2cbe2","#c7dcef","#deebf7","#f7fbff"))
 bgr=colorRampPalette(c("#0000ff","#00ff00","#ff0000"))
 bgyrp=colorRampPalette(c("blue","darkgreen","goldenrod","red","purple"))
+
+bgr=function(x,n=100,br=0,c1=c("darkblue","blue","grey"),c2=c("grey","red","purple")){
+  at=unique(c(seq(min(x,na.rm=T),max(x,na.rm=T),len=n)))
+  bg=colorRampPalette(c1)
+  gr=colorRampPalette(c2)
+  return(list(at=at,col=c(bg(sum(at<br)),gr(sum(at>=br)))))
+}
+
 
 ## Set polar rotation for polar plot of color values
 ## used in seasonal concentration plots
