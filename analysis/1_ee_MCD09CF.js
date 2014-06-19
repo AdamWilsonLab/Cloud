@@ -11,7 +11,7 @@
 
 //  Specify destination and run name
 var driveFolder="ee_mcd09cf";
-var run="g4"
+var run="g4coarse"
 
 // limit overall date range  (only dates in this range will be included)
 var datestart=new Date("2000-01-01")  // default time zone is UTC
@@ -25,20 +25,25 @@ var monthstop=12
 var mcols = ['MOD09GA','MYD09GA'];
 
 // specify what happens
-var verbose=true       // print info about collections along the way (slows things down)
+var verbose=false       // print info about collections along the way (slows things down)
 var drawmap=true       // add image to map
 var test1=true         // report on all images requested via dates above, but only add image below to map
-var exportDrive=!test1  // add exports to task window
+var exportDrive=false //!test1  // add exports to task window
+var exportMeans=false   // if exportDrive, export the mean monthly files
+var exportTrend=false    // if exportDrive, export the trend analysis
 
 // set testing sensor and month, these only apply if test1==t above
 var testsensor='MOD09GA'
-var testmonth=1
+var testmonth=6
 
 // define regions
 var globe = '[[-180, -89.95], [-180, 89.95], [180, 89.95], [180, -89.95]]';  
+var nearglobe = '[[-180, -60], [-180, 85], [180, 85], [180, -60]]';  
 var sahara = '[[-18, 0], [-18, 30], [15, 30], [15, 0]]';  
+var amazon = '[[-87,11], [-87, -14], [-49, -14], [-49, 11]]';  
+
 // choose region to export (if exportDrive==true)
-var region = globe
+var region = amazon
 
 
 /////////////////////////////////////////////////////////////////////////////
@@ -225,18 +230,19 @@ var MCD09_nObs = MCD09all.filter(ee.Filter.calendarRange(tmonth,tmonth,"month"))
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 //  Process monthly cloud trends
-print(MCD09m.getInfo());
+//print(MCD09m.getInfo());
 var trend = MCD09m.formaTrend();
-var trendP = trend.
-  select(['long-trend']).
-  mask(trend.select(['long-tstat']).lte(ee.Image(0.01))).
-  divide(MCD09_mean).
-  multiply(ee.Image(100));
-  
-if(verbose) print(trend.getInfo())
+
+var trendP = trend.addBands(
+    trend.select(['long-trend'],['long-trend-percent']).
+    divide(MCD09_mean))
+    
+var trendP2=trendP.multiply(ee.Image(100)).int16();
+
+if(verbose) print(trendP2.getInfo())
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
-// Build a single 8-bit image with all bands
+// Build a single 16-bit image with all bands
 // mask by nobs (only keep pixels where nobs > 0.75)
 var MCD09=MCD09_mean.
           addBands(MCD09_sd).
@@ -247,6 +253,8 @@ var MCD09=MCD09_mean.
           int16();
 
 if(exportDrive){
+
+ if(exportMeans){
   //define export filename
   var filename=date+'_'+run+'_'+yearstart+yearstop+'_'+mcol+'_'+tmonth;
   if(verbose){  print('Exporting to: '+filename)}
@@ -258,6 +266,19 @@ if(exportDrive){
     'scale': '926.625433055833',
     'region': region
   });
+} 
+  if(exportTrend){
+    var tfilename=date+'_trend_'+run+'_'+yearstart+yearstop+'_'+mcol+'_'+tmonth;
+ 
+  exportImage(trendP2,tfilename,
+    {'maxPixels':1000000000,
+    'driveFolder':driveFolder,
+    'crs': 'SR-ORG:6974', //4326
+    'scale': '926.625433055833',
+    'region': region
+  });
+
+  }  
 }
 
 if(test1) break;  // if running testing, dont complete the loop
@@ -271,8 +292,10 @@ if(drawmap) {
 //  var palette="000000,FFFFFF";
 
   addToMap(MCD09.select([0]),{min:0,max:10000,palette:palette}, "mean",1);
-  addToMap(MCD09.select([1]),{min:0,max:5000,palette:palette}, "sd",0);
-  addToMap(MCD09.select([2]),{min:0,max:15000,palette:palette}, "nObs",0);
-  addToMap(MCD09.select([3]),{min:0,max:10000,palette:palette}, "pObs",0);
-  addToMap(trendP, {min:-50, max:50, palette:palette}, 'trend',1);
+  //addToMap(MCD09.select([1]),{min:0,max:5000,palette:palette}, "sd",0);
+  //addToMap(MCD09.select([2]),{min:0,max:15000,palette:palette}, "nObs",0);
+  //addToMap(MCD09.select([3]),{min:0,max:10000,palette:palette}, "pObs",0);
+  addToMap(trendP.select(['long-trend']), {min:-30, max:30, palette:palette}, 'long-trend',1);
+  addToMap(trendP.select(['long-trend-percent']), {min:-10, max:10, palette:palette}, 'long-trend-percent',0);
+
 }
