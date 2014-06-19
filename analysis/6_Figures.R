@@ -1,10 +1,7 @@
 ### Figures and tables for MOD09 Cloud Manuscript
 source("analysis/setup.R")
+source("analysis/6_LoadData.R")
 
-
-### Load data
-cf_mean=readAll(raster("data/MCD09_deriv/MCD09_meanannual.tif"))
-cf_visseas=readAll(raster("data/MCD09_deriv/seas_visct.tif"))
 
 ## set plotting parameters
 my.theme = trellis.par.get()
@@ -19,7 +16,7 @@ my.theme = trellis.par.get()
 my.theme$strip.background=list(col="transparent")
 trellis.par.set(my.theme)
 
-res=1e6
+res=1e5
 greg=list(ylim=c(-60,84),xlim=c(-180,180))
     
 ## Figure 1: 4-panel summaries
