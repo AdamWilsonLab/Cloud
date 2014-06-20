@@ -1,20 +1,18 @@
 ### Figures and tables for MOD09 Cloud Manuscript
 source("analysis/setup.R")
-source("analysis/6_LoadData.R")
 
 
-## set plotting parameters
-my.theme = trellis.par.get()
-my.theme$strip.background=list(col="transparent")
-trellis.par.set(my.theme)
-
-pdf("manuscript/figures/Figures.pdf",width=11,height=8.5,pointsize=14)
-#png("manuscript/figures/CF_Figures_%03d.png",width=5000,height=4000,res=600,pointsize=42,bg="white")
+### Load data
+cf_mean=readAll(raster("data/MCD09_deriv/MCD09_meanannual.tif"))
+seas=readAll(raster("data/MCD09_deriv/seas_visct.tif"))
+inter=readAll(raster("data/MCD09_deriv/inter.tif"))
+intra=readAll(raster("data/MCD09_deriv/intra.tif"))
 
 ## set plotting parameters
 my.theme = trellis.par.get()
 my.theme$strip.background=list(col="transparent")
 trellis.par.set(my.theme)
+
 
 res=1e5
 greg=list(ylim=c(-60,84),xlim=c(-180,180))
@@ -22,60 +20,67 @@ greg=list(ylim=c(-60,84),xlim=c(-180,180))
 ## Figure 1: 4-panel summaries
 #- Annual average
 n=100
-levelplot(cf_mean,col.regions=colR(n),cuts=99,at=seq(0,100,len=n),colorkey=list(space="right",adj=1),
+p_mean=levelplot(cf_mean,col.regions=colR(n),cuts=99,at=seq(0,100,len=n),colorkey=list(space="right",height=.75),
           panel=panel.levelplot.raster,margin=F,maxpixels=res,ylab="",xlab="",useRaster=T,ylim=greg$ylim)+
-    layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col="white"),under=T)+
-    layer(sp.lines(hcoast,lwd=.2,),under=F)
+#    layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col="white"),under=T)#+
+    layer(sp.lines(coast,lwd=.5,),under=F)
 
 ## Mean annual with validation stations
-levelplot(cf_mean,col.regions=colR(n),cuts=99,at=seq(0,100,len=n),colorkey=list(title="Cloud Frequency (%)",space="bottom",adj=1),
-  margin=F,maxpixels=res,ylab="",xlab="",useRaster=T,ylim=greg$ylim)+
-    layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col="black"),under=T)+
-    layer(panel.xyplot(lon,lat,pch=16,cex=.3,col="black"),data=data.frame(coordinates(st)))+
-  layer(sp.lines(coast,col="black"),under=F)
+#levelplot(cf_mean,col.regions=colR(n),cuts=99,at=seq(0,100,len=n),colorkey=list(title="Cloud Frequency (%)",space="right",adj=1),
+#  margin=F,maxpixels=res,ylab="",xlab="",useRaster=T,ylim=greg$ylim)+
+#    layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col="black"),under=T)+
+#    layer(panel.xyplot(lon,lat,pch=16,cex=.3,col="black"),data=data.frame(coordinates(st)))+
+#  layer(sp.lines(coast,col="black"),under=F)
 
 ## Seasonal Means
-levelplot(mod09s,col.regions=colr(n),cuts=100,at=seq(0,100,len=100),colorkey=list(title="Cloud Frequency (%)", space="bottom",adj=2),
-  margin=F,maxpixels=res,ylab="",xlab="",useRaster=T,ylim=greg$ylim)+
-    layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col="black"),under=T)+
-    layer(sp.lines(coast,col="black"),under=F)
+#levelplot(mod09s,col.regions=colr(n),cuts=100,at=seq(0,100,len=100),colorkey=list(title="Cloud Frequency (%)", space="bottom",adj=2),
+#  margin=F,maxpixels=res,ylab="",xlab="",useRaster=T,ylim=greg$ylim)+
+#    layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col="black"),under=T)+
+#    layer(sp.lines(coast,col="black"),under=F)
 
 
 ## Monthly Means
-levelplot(mod09c,col.regions=colr(n),cuts=100,at=seq(0,100,len=100),colorkey=list(title="Cloud Frequency (%)", space="bottom",adj=1), 
-  margin=F,maxpixels=res,ylab="Latitude",xlab="Longitude",useRaster=T,ylim=greg$ylim)+
-    layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col="black"),under=T)+
-    layer(sp.lines(coast,col="black"),under=F)
+#levelplot(mod09c,col.regions=colr(n),cuts=100,at=seq(0,100,len=100),colorkey=list(title="Cloud Frequency (%)", space="bottom",adj=1), 
+#  margin=F,maxpixels=res,ylab="Latitude",xlab="Longitude",useRaster=T,ylim=greg$ylim)+
+#    layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col="black"),under=T)+
+#    layer(sp.lines(coast,col="black"),under=F)
 
 #- Monthly minimum
 #- Monthly maximum
 #- STDEV or Min-Max
-p_mac=levelplot(mod09a,col.regions=colr(n),cuts=99,at=seq(0,100,length=100),margin=F,
-    ylim=greg$ylim,maxpixels=res/10,colorkey=list(title="Cloud Frequency (%)", space="top",height=.75),xlab="",ylab="",useRaster=T)+
-    layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col="black"),under=T)+
-    layer(sp.lines(coast,col="black"),under=F)
-p_max=levelplot(mod09max,col.regions=colr(n),cuts=99,at=seq(0,100,length=100),margin=F,maxpixels=res/10,
-    ylim=greg$ylim,colorkey=list(space="bottom",height=.75),useRaster=T)+
-    layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col="black"),under=T)+
-    layer(sp.lines(coast,col="black"),under=F)
-p_intra=levelplot(mod09intra,col.regions=colr(n),cuts=99,at=seq(0,40,length=100),margin=F,maxpixels=res/100,
-    ylim=greg$ylim,colorkey=list(space="bottom",height=.75),useRaster=T)+
-    layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col="black"),under=T)+
-    layer(sp.lines(coast,col="black"),under=F)
-p_inter=levelplot(mod09inter,col.regions=colr(n),cuts=99,at=seq(0,15,length=100),margin=F,maxpixels=res/100,
-    ylim=greg$ylim,colorkey=list(title="Cloud Frequency (%)", space="top",height=.75),useRaster=T)+
-    layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col="black"),under=T)+
-    layer(sp.lines(coast,col="black"),under=F)
+#p_mac=levelplot(mod09a,col.regions=colr(n),cuts=99,at=seq(0,100,length=100),margin=F,
+#    ylim=greg$ylim,maxpixels=res/10,colorkey=list(title="Cloud Frequency (%)", space="top",height=.75),xlab="",ylab="",useRaster=T)+
+#    layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col="black"),under=T)+
+#    layer(sp.lines(coast,col="black"),under=F)
+#p_max=levelplot(mod09max,col.regions=colr(n),cuts=99,at=seq(0,100,length=100),margin=F,maxpixels=res/10,
+#    ylim=greg$ylim,colorkey=list(space="bottom",height=.75),useRaster=T)+
+#    layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col="black"),under=T)+
+#    layer(sp.lines(coast,col="black"),under=F)
+p_intra=levelplot(intra,col.regions=bgr(1:55,n,br=8)$col,cuts=99,at=seq(0,55,length=n),margin=F,maxpixels=res,
+                  panel=panel.levelplot.raster,ylim=greg$ylim,colorkey=list(space="right",height=.75),useRaster=T)+
+#    layer(panel.polygon(x=c(-180,-180,180,180),y=c(-61,86,86,-61),col="black"),under=T)#+
+    layer(sp.lines(coast,col="black",lwd=.5),under=F)
 
-p3=c("Mean Cloud Frequency (%)"=p_mac,"Max Cloud Frequency (%)"=p_max,"Interannual Variability (sd)"=p_inter,"Intraannual Variability (sd)"=p_intra,x.same=T,y.same=F,merge.legends=T,layout=c(2,2))
+#cellStats(inter,median)
+p_inter=levelplot(inter,col.regions=bgr(1:30,n,br=11)$col,cuts=99,at=seq(0,30,length=100),margin=F,maxpixels=res,
+                  panel=panel.levelplot.raster,ylim=greg$ylim,colorkey=list(title="Cloud Frequency (%)", space="right",height=.75),useRaster=T)+
+#    layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col="black"),under=T)#+
+    layer(sp.lines(coast,col="black",lwd=.5),under=F)
+
+
+#pdf("manuscript/figures/Figures.pdf",width=11,height=8.5,pointsize=14)
+png("manuscript/figures/CF_Figures_%03d.png",width=2000,height=2500,res=300,pointsize=42,bg="white")
+## set plotting parameters
+my.theme = trellis.par.get()
+my.theme$strip.background=list(col="transparent")
+trellis.par.set(my.theme)
+#p3=c("Mean Cloud Frequency (%)"=p_mac,"Max Cloud Frequency (%)"=p_max,"Interannual Variability (sd)"=p_inter,"Intraannual Variability (sd)"=p_intra,x.same=T,y.same=F,merge.legends=T,layout=c(2,2))
+p3=c("Mean Cloud Frequency (%)"=p_mean,"Interannual Variability (sd)"=p_inter,"Intraannual Variability (sd)"=p_intra,x.same=T,y.same=T,merge.legends=T,layout=c(1,3))
 print(p3)
 
-bgr=function(x,n=100,br=0,c1=c("darkblue","blue","grey"),c2=c("grey","red","purple")){
-    at=unique(c(seq(min(x,na.rm=T),max(x,na.rm=T),len=n)))
-    bg=colorRampPalette(c1)
-    gr=colorRampPalette(c2)
-    return(list(at=at,col=c(bg(sum(at<br)),gr(sum(at>=br)))))
-}
+dev.off()
+
+
 
 
 
@@ -148,16 +153,16 @@ r_ind=levelplot(crop(cf_visseas,regs[["Indonesia"]]),col.regions=cf_visseas@lege
 
 ## draw it
 png(width=2400,height=1600,res=200,pointsize=12,type="cairo-png",file="manuscript/figures/Seasonality.png")
-print(g1,position=c(0,.5,.65,1),more=T) #global
-print(k1,position=c(.65,.5,1,1),more=T) #legend
+print(k1,position=c(0,.5,.35,1),more=T) #legend
+print(g1,position=c(0.35,.5,1,1),more=T) #global
 print(r_cfr,position=c(0,0,.48,.5),more=T)
 print(r_ind,position=c(.46,0,1,.5),more=F)
 ## add panel labels
 gp=gpar(fontsize=18, col="black",fontface="bold")
-grid.text("A",x=0.05,y=.995,just=c("left","top"),gp=gp)
-grid.text("B",x=0.65,y=.995,just=c("left","top"),gp=gp)
-grid.text("C",x=0.05,y=.5,just=c("left","top"),gp=gp)
-grid.text("D",x=0.51,y=.5,just=c("left","top"),gp=gp)
+grid.text("a",x=0.05,y=.995,just=c("left","top"),gp=gp)
+grid.text("b",x=0.35,y=.995,just=c("left","top"),gp=gp)
+grid.text("c",x=0.05,y=.5,just=c("left","top"),gp=gp)
+grid.text("d",x=0.51,y=.5,just=c("left","top"),gp=gp)
 dev.off()
 
 

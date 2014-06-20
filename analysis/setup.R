@@ -33,6 +33,7 @@ Sys.setenv(GDAL_CACHEMAX=5000,CPL_LOG_ERRORS="ON")
 
 
 # temporary files will be written here:
+setwd("/media/data/Cloud")
 datadir="/mnt/data2/projects/cloud/"
 
 ## color ramps
