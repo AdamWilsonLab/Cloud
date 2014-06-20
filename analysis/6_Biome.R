@@ -52,6 +52,8 @@ foreach(m=1:12)%dopar%{
   file.remove(tbiome)
 }    
 
+## add  seasonal mean(sd), intra, inter, seasonc
+
 bs=do.call(rbind.data.frame,lapply(1:12,function(m){
   tm=sprintf("%02d",m)
   tcloudbiome=paste("data/teow/teow_MCD09_mean_",tm,".txt",sep="")
