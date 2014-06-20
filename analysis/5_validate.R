@@ -1,23 +1,15 @@
 ### Script to download and process the NDP-026D station cloud dataset
 ### to validate MODIS cloud frequencies
 
-setwd("/mnt/data/personal/adamw/projects/cloud/")
-
-library(multicore)
-library(doMC)
-library(rasterVis)
-library(rgdal)
-library(reshape)
-library(maptools)
-library(rgeos)
+source("setup.R")
 
 ## Data available here http://cdiac.ornl.gov/epubs/ndp/ndp026d/ndp026d.html
 
 download=F  #download data?
 ## Get station locations
-if(download)   system("wget -N -nd http://cdiac.ornl.gov/ftp/ndp026d/cat01/01_STID -P data/NDP026D/data/")
+if(download)   system("wget -N -nd http://cdiac.ornl.gov/ftp/ndp026d/cat01/01_STID -P data/validation/NDP026D/")
 
-st=read.table("data/NDP026D/data/01_STID",skip=1)
+st=read.table("data/validation/NDP026D/01_STID",skip=1)
 colnames(st)=c("StaID","LAT","LON","ELEV","ny1","fy1","ly1","ny7","fy7","ly7","SDC","b5c")
 st$lat=st$LAT/100
 st$lon=st$LON/100
@@ -31,7 +23,7 @@ st@data[,c("lon","lat")]=coordinates(st)
 
 ## download data
 if(download){
-    system("wget -N -nd ftp://cdiac.ornl.gov/pub/ndp026d/cat67_78/* -A '.tc.Z' -P data/NDP026D/data/")
+    system("wget -N -nd ftp://cdiac.ornl.gov/pub/ndp026d/cat67_78/* -A '.tc.Z' -P data/validation/NDP026D/")
     system("gunzip data/*.Z")
 }
 
@@ -41,7 +33,7 @@ c162=c("StaID","YR","Nobs","Amt","Fq","AWP","NC")
 
 ## use monthly timeseries
 cld=do.call(rbind.data.frame,mclapply(sprintf("%02d",1:12),function(m) {
-  d=read.fwf(list.files("data/NDP026D/data",pattern=paste("MNYDC.",m,".tc$",sep=""),full=T),skip=1,widths=f162)
+  d=read.fwf(list.files("data/validation/NDP026D/",pattern=paste("MNYDC.",m,".tc$",sep=""),full=T),skip=1,widths=f162)
   colnames(d)=c162
   d$month=as.numeric(m)
   print(m)
@@ -58,12 +50,13 @@ cld$Amt=cld$Amt/100
 cld=cld[!is.na(cld$Amt),]
 
 ## table of stations with > 20 observations per month
-cast(cld,StaID~YR,value="Nobs")
+dcast(cld,StaID~YR,value.var="Nobs")
 mtab=ddply(cld,c('StaID','month'),function(df){ data.frame(count=sum(df$Nobs>20,na.rm=T))})
 #mtab2=mtab[table(mtab$count>10)]
 stem(mtab$count)
 
 ## calculate means and sds for full record (1970-2009)
+stem(cld$Nobs)
 Nobsthresh=20 #minimum number of observations to include 
 
 cldm=do.call(rbind.data.frame,by(cld,list(month=as.factor(cld$month),StaID=as.factor(cld$StaID)),function(x){
@@ -82,38 +75,47 @@ cldm=do.call(rbind.data.frame,by(cld,list(month=as.factor(cld$month),StaID=as.fa
 
 
 ## add the EarthEnvCloud data to cld
-mod09_mean=stack(list.files("data/mcd09tif/",pattern="MCD09_mean_[0-9]*[.]tif",full=T))
+mod09_mean=stack(list.files("data/MCD09/",pattern="MCD09_mean_[0-9]*[.]tif",full=T))
 NAvalue(mod09_mean)=255
 names(mod09_mean)=month.name
 
-mod09_sd=stack(list.files("data/mcd09tif/",pattern="MCD09_sd_[0-9]*[.]tif",full=T))
+mod09_sd=stack(list.files("data/MCD09/",pattern="MCD09_sd_[0-9]*[.]tif",full=T))
 NAvalue(mod09_sd)=255
 names(mod09_sd)=month.name
 
 
 ## overlay the data with 32km diameter (16km radius) buffer
 ## buffer size from Dybbroe, et al. (2005) doi:10.1175/JAM-2189.1.
-buf=16000
+buf16=16000
+buf5=5000
 bins=cut(st$lat,10)
 rerun=F
 if(rerun&file.exists("valid.csv")) file.remove("valid.csv")
 
 beginCluster(12)
 
-mod09sta=lapply(levels(bins),function(lb) {
+lapply(levels(bins),function(lb) {
   l=which(bins==lb)
   ## mean
-  td=extract(mod09_mean,st[l,],buffer=buf,fun=mean,na.rm=T,df=T)
-  td$id=st$id[l]
-  td$type="mean"
-  ## std
-  td2=extract(mod09_sd,st[l,],buffer=buf,fun=mean,na.rm=T,df=T)
+  td1=raster::extract(mod09_mean,st[l,],buffer=buf5,fun=mean,na.rm=T,df=T)
+  td1$id=st$id[l]
+  td1$type="MCD09_meanb5"
+  ## mean buffered
+  td2=raster::extract(mod09_mean,st[l,],buffer=buf16,fun=mean,na.rm=T,df=T)
   td2$id=st$id[l]
-  td2$type="sd"
+  td2$type="MCD09_meanb16"
+  ## std
+  td3=raster::extract(mod09_sd,st[l,],buffer=buf5,fun=mean,na.rm=T,df=T)
+  td3$id=st$id[l]
+  td3$type="MCD09_sdb5"
+  ## std buffered
+  td4=raster::extract(mod09_sd,st[l,],buffer=buf16,fun=mean,na.rm=T,df=T)
+  td4$id=st$id[l]
+  td4$type="MCD09_sdb16"
   print(lb)#as.vector(c(l,td[,1:4])))
-  write.table(rbind(td,td2),"valid.csv",append=T,col.names=F,quote=F,sep=",",row.names=F)
-  td
-})#,mc.cores=3)
+  write.table(rbind(td1,td2,td3,td4),"valid.csv",append=T,col.names=F,quote=F,sep=",",row.names=F)
+  return(lb)
+})
 
 endCluster()
 
@@ -122,14 +124,14 @@ mod09st=read.csv("valid.csv",header=F)[,-c(1)]
 colnames(mod09st)=c(names(mod09_mean),"id","type")
 mod09stl=melt(mod09st,id.vars=c("id","type"))
 colnames(mod09stl)[grep("variable",colnames(mod09stl))]="month"
-#mod09stl[,c("year","month")]=do.call(rbind,strsplit(sub("X","",mod09stl$variable),"[.]"))[,1:2]
 mod09stl$value[mod09stl$value<0]=NA
-mod09stl=cast(mod09stl,id+month~type,value="value")
+mod09stl=dcast(mod09stl,id+month~type,value="value")
 
 ## add it to cld
 cldm$monthname=month.name[cldm$month]
-cldm$mod09=mod09stl$mean[match(paste(cldm$StaID,cldm$monthname),paste(mod09stl$id,mod09stl$month))]
-cldm$mod09sd=mod09stl$sd[match(paste(cldm$StaID,cldm$monthname),paste(mod09stl$id,mod09stl$month))]
+cldm$MCD09_meanb16=mod09stl$MCD09_meanb16[match(paste(cldm$StaID,cldm$monthname),paste(mod09stl$id,mod09stl$month))]
+cldm$MCD09_meanb5=mod09stl$MCD09_meanb16[match(paste(cldm$StaID,cldm$monthname),paste(mod09stl$id,mod09stl$month))]
+cldm$MCD09_sdb16=mod09stl$MCD09_sdb16[match(paste(cldm$StaID,cldm$monthname),paste(mod09stl$id,mod09stl$month))]
 
 
 ## LULC
@@ -145,7 +147,7 @@ Mode <- function(x) {
       ux <- na.omit(unique(x))
         ux[which.max(tabulate(match(x, ux)))]
       }
-lulcst=raster::extract(lulc,st,fun=Mode,buffer=buf,df=T)
+lulcst=raster::extract(lulc,st,fun=Mode,buffer=buf16,df=T)
 colnames(lulcst)=c("id","lulc")
 lulcst$StaID=st$id
 ## add it to cld
@@ -154,7 +156,7 @@ cldm$lulcc=IGBP$class[match(cldm$lulc,IGBP$ID)]
 
 
 ### Add biome data
-biome=readOGR("data/teow/","biomes")
+biome=readOGR("data/src/teow/","biomes")
 projection(biome)=projection(st)
 #st$biome=over(st,biome,returnList=F)$BiomeID
 dists=apply(gDistance(st,biome,byid=T),2,which.min)
@@ -177,7 +179,7 @@ write.csv(cld,file="data/validation/cld.csv",row.names=F)
 write.csv(cldm,file="data/validation/cldm.csv",row.names=F)
 writeOGR(st,dsn="data/validation/",layer="stations",driver="ESRI Shapefile",overwrite_layer=T)
 #########################################################################
-
+cldm=read.csv("data/validation/cldm.csv")
 
 ### Extract regional transects
 cids=c(10866,10980,11130,11135,11138,11146,11210,11212,13014)
@@ -189,8 +191,10 @@ ts$cld_allpsd=ts$cld_all+ts$cldsd_all
 ts$cld_allmsd=ts$cld_all-ts$cldsd_all
 ts$mod09msd=ts$mod09-ts$mod09sd
 ts$mod09psd=ts$mod09+ts$mod09sd
+ts$mod09msd=ts$mod09-ts$mod09sd
+ts$mod09psd=ts$mod09+ts$mod09sd
 
-tsl=melt(ts,id.vars=c("month","trans"),measure.vars=c("cld_all","cld_allmsd","cld_allpsd","mod09","mod09psd","mod09msd"))
+tsl=melt(ts,id.vars=c("month","trans"),measure.vars=c("cld_all","cld_allmsd","cld_allpsd","MCD09_meanb5","MCD09_meanb16","MCD09_sdb16"))
 
 #as("SpatialLinesDataFrame")
 xyplot(value~trans|month,groups=variable,data=tsl,type="l",auto.key=T,ylim=c(0,100))

@@ -48,8 +48,6 @@ overwrite=T
     }
 
 
-
-
 #################################################################################
 ###### Apply albedo mask and fill in missing data, convert to 8-bit compressed file, add colors and other details
 
@@ -81,6 +79,7 @@ foreach(i=1:length(f2), .options.multicore=list(preschedule=FALSE)) %dopar% {
     tfile1a3=sub("[.]tif","_Wborder3.tif",file)
     tfile1a4=sub("[.]tif","_Wborder4.tif",file)
     tfile1a5=sub("[.]tif","_Wborder5.tif",file)
+    tfile1a6=sub("[.]tif","_Wborder6.tif",file)
     
     tfile1b=sub("[.]tif","_Eborder.tif",file)
     
@@ -92,17 +91,19 @@ foreach(i=1:length(f2), .options.multicore=list(preschedule=FALSE)) %dopar% {
     ## mask the image    
     system(paste0("pksetmask -i ",file," -m ",mask," --operator='>' --msknodata 0 --nodata 32767 -o ",tfile1))
     ## Subset edges out for special treatment to avoid errors in gdal_fillnodata
-    system(paste0("gdal_translate -a_nodata 65535 -srcwin 43198 0 2 21600 ",file," ",tfile1a))
+    system(paste0("gdal_translate -srcwin 43198 0 2 21600 ",file," ",tfile1a))
+    system(paste0("gdal_translate -a_nodata 65535 -srcwin 43195 0 5 21600 ",file," ",tfile1a2))
+    
     #system(paste0("gdal_translate -srcwin 0 0 2 21600 ",file," ",tfile1b))
     ## replace any missing values (65535) with 32767 for filling
-    system(paste0("pkfilter -f min -dx=2 -dy=1 -i ",tfile1a,"  ",tfile1," -o ",tfile1a2))
-    system(paste0("pkfilter -f mean -dx=5 -dy=5 -i ",tfile1a,"  ",tfile1," -o ",tfile1a3))
-    system(paste0("gdal_translate -srcwin 3 0 2 21600 ",tfile1a3," ",tfile1a4))
-    system(paste0("pksetmask -i ",tfile1a4," -m ",tfile1a2," --operator='=' --msknodata 65535 --nodata 65535 -o ",tfile1a5))
-    system(paste0("gdal_edit.py -a_nodata 65535 ",tfile1a4))
+    system(paste0("pkfilter -f min -dx 3 -dy 1 -i ",tfile1a,"  ",tfile1," -o ",tfile1a3))
+    system(paste0("pkfilter -f mean -dx 5 -dy 1 -i ",tfile1a2,"   -o ",tfile1a4))
+    system(paste0("gdal_translate -srcwin 3 0 2 21600 ",tfile1a4," ",tfile1a5))
+    system(paste0("pksetmask -i ",tfile1a5," -m ",tfile1a3," --operator='>' --msknodata 10000 --nodata 65535 -o ",tfile1a6))
+    system(paste0("gdal_edit.py -a_nodata 65535 ",tfile1a6))
     
     ## merge this back into the masked file
-    system(paste0("gdalwarp ",tfile1a4," ",tfile1))    
+    system(paste0("gdalwarp ",tfile1a6," ",tfile1))    
     ## fill no data
     system(paste0("gdal_fillnodata.py -md 1000 ",tfile1," ",tfile2))
     #system(paste0("pkfillnodata -co 'BIGTIFF=TRUE' -co 'COMPRESS=LZW' -d 1000 -i ",file," -m ",tfile1," -o ",tfile2))
@@ -157,11 +158,11 @@ Rmean=function(x) calc(x,function(x) {
   return(round(mean(x,na.rm=T)/100))
 })
 
-dintra=clusterR(dmean,Rsd,na.rm=T,file="data/MCD09_deriv/intra.tif",options=c("COMPRESS=LZW","PREDICTOR=2"),overwrite=T,dataType='INT1U',NAflag=255)
-dinter=clusterR(dsd,Rmean,na.rm=T,file="data/MCD09_deriv/inter.tif",options=c("COMPRESS=LZW","PREDICTOR=2"),overwrite=T,dataType='INT1U',NAflag=255)
+dintra=clusterR(dmean,Rsd,na.rm=T,file="data/MCD09_deriv/intra.tif",overwrite=T,dataType='INT1U',NAflag=255)
+dinter=clusterR(dsd,Rmean,na.rm=T,file="data/MCD09_deriv/inter.tif",overwrite=T,dataType='INT1U',NAflag=255)
 
 ## Overall annual mean
-dmeanannual=clusterR(dmean,Rmean,na.rm=T,file="data/MCD09_deriv/meanannual.tif",options=c("COMPRESS=LZW","PREDICTOR=2"),overwrite=T,dataType='INT1U',NAflag=255)
+dmeanannual=clusterR(dmean,Rmean,na.rm=T,file="data/MCD09_deriv/meanannual.tif",overwrite=T,dataType='INT1U',NAflag=255)
 
 #################################################
 ### Calculate Markham's Seasonality
@@ -181,9 +182,6 @@ seas=calc(dmean,seasconc ,overwrite=T,
 seas=stack("data/MCD09_deriv/seas_conc.tif")
 gain(seas)=.1
 names(seas)=c("conc","theta")
-
-#r="Venezuela"
-#seas=crop(seas,regs[[r]])
 
 
 ## extract unique values from seas to develop color table
