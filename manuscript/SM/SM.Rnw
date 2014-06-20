@@ -150,65 +150,6 @@ We also quantified the seasonality of cloud frequencies following Markham \citey
 
 \section{Validation}
 
-
-<<Validation_LoadData>>=
-## read in data
-
-cldm=read.csv("data/validation/cldm.csv",row.names=NULL)
-st=readOGR("data/validation","stations")
-## month factors
-cldm$month2=factor(cldm$month,labels=month.name,ordered=T)
-
-### Drop valitation station-months with fewer than 20 years of data for full record or less than 10 years for MODIS-era record
-cldm$cld_all[cldm$cldn_all<20]=NA
-cldm$cldsd_all[cldm$cldn_all<20]=NA
-
-cldm$cld[cldm$cldn<10]=NA
-cldm$cldsd[cldm$cldn<10]=NA
-
-cldm$seas=factor(cldm$seas,levels=c("DJF","MAM","JJA","SON"),ordered=T)
-
-## compute seasonal means
-cldml=melt(cldm,id.vars=c("StaID","lat","lon","lulcc","biome","seas"),measure.vars=c("cld_all","cldsd_all","cldn_all","cld","cldsd","cldn","mod09","mod09sd"))
-clds=dcast(cldml,StaID+lat+lon+lulcc+biome+seas~variable,value.var="value",fun=mean,na.rm=T)
-
-# get residuals of simple linear model
-cldm$resid=NA
-cldm$resid[!is.na(cldm$cld_all)&!is.na(cldm$mod09)]=residuals(lm(mod09~cld_all,data=cldm[!is.na(cldm$cld_all)&!is.na(cldm$mod09),]))
-
-# get residuals of simple linear model
-cldm$difm_all=cldm$mod09-cldm$cld_all
-cldm$difm=cldm$mod09-cldm$cld
-
-@
-
-<<GetVariables>>=
-########################################
-### Some stats 
-## number of stations retained
-nstation_all=length(unique(cldm$StaID[!is.na(cldm$cld_all)]))
-nstation_mod=length(unique(cldm$StaID[!is.na(cldm$cld)]))
-
-# approximate size of M*D09GA archive - get total size for one day from the USGS website
-size=as.numeric(
-  sub("M","",
-      grep("[0-9]*M$",
-           scan("http://e4ftl01.cr.usgs.gov/MOLT/MOD09GA.005/2000.04.30/",what="char"),
-           value=T)))
-## extract all filesizes in MB (all the HDFs) and sum them and covert to TB for the length of the full record
-if(!file.exists("data/out/SizeOfMOD09GAArchive.Rdata")){
-      tsize=sum(size)/1024/1024*as.numeric(as.Date("2014-03-31")-as.Date("2000-02-24"))*2
-      save(tsize,file="data/out/SizeOfMOD09GAArchive.Rdata")
-}
-load("data/out/SizeOfMOD09GAArchive.Rdata")
-
-## get HPD intervals
-hpd_resid=HPDinterval(as.mcmc(cldm$resid))#,c(0.025,0.25,0.5,0.75,0.975),na.rm=T)
-hpd_cld=HPDinterval(as.mcmc(cldm$difm))#,c(0.025,0.25,0.5,0.75,0.975),na.rm=T)
-hpd_cld_all=HPDinterval(as.mcmc(cldm$difm_all))#,c(0.025,0.25,0.5,0.75,0.975),na.rm=T)
-
-@
-
 \subsection{Station Observations}
 
 The monthly CF were validated using a global observational dataset of synoptic weather reports collected at 5388 stations over 1971-2009 \citep{Eastman2012}.  We extracted the mean "total cloud" amount for each month, which represents the mean proportion of the sky that was covered by all types of cloud during the observations in that month.  Comparison of these observations to satellite data must take into account that the sampling radius of these observations (the visible sky) depends on cloud height, cloud thickness, the curvature of the earth, and other factors, but is typically much larger than a single 1km MODIS pixel.  We followed Dybbroe, Karlsson, and Thoss (2005) and took the mean monthly MODCF for a circle with 16km radius around each station location.  Additionally, this converts the temporal MODCF to mean cloud amount within the sample radius to make it comparable to the station observations.
