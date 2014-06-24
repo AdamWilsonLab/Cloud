@@ -173,7 +173,7 @@ dmeanannual=clusterR(dmean,Rmean,na.rm=T,file="data/MCD09_deriv/meanannual.tif",
 
 ## calculate seasonality
 seas=calc(dmean,seasconc ,overwrite=T,
-                    options=c("COMPRESS=LZW","PREDICTOR=2"),
+#                    options=c("COMPRESS=LZW","PREDICTOR=2"),
                     filename="data/MCD09_deriv/seas_conc.tif",NAflag=65535,datatype="INT2U")
 
 

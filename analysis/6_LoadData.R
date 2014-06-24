@@ -2,15 +2,18 @@
 
 
 ### Load data
+print("Loading full raster layers")
 cf_mean=readAll(raster("data/MCD09_deriv/MCD09_meanannual.tif"))
 cf_visseas=readAll(raster("data/MCD09_deriv/seas_visct.tif"))
-
-
+inter=readAll(raster("data/MCD09_deriv/inter.tif"))
+intra=readAll(raster("data/MCD09_deriv/intra.tif"))
+NAvalue(inter)=0
 
 ### Load validation data
-
 cldm=read.csv("data/validation/cldm.csv",row.names=NULL)
 st=readOGR("data/validation","stations")
+st=st[st$era!="No Data",]
+
 ## month factors
 cldm$month2=factor(cldm$month,labels=month.name,ordered=T)
 
@@ -24,16 +27,16 @@ cldm$cldsd[cldm$cldn<10]=NA
 cldm$seas=factor(cldm$seas,levels=c("DJF","MAM","JJA","SON"),ordered=T)
 
 ## compute seasonal means
-cldml=melt(cldm,id.vars=c("StaID","lat","lon","lulcc","biome","seas"),measure.vars=c("cld_all","cldsd_all","cldn_all","cld","cldsd","cldn","mod09","mod09sd"))
+cldml=melt(cldm,id.vars=c("StaID","lat","lon","lulcc","biome","seas"),measure.vars=c("cld_all","cldsd_all","cldn_all","cld","cldsd","cldn","MCD09_meanb16","MCD09_meanb5","MCD09_sdb16"))
 clds=dcast(cldml,StaID+lat+lon+lulcc+biome+seas~variable,value.var="value",fun=mean,na.rm=T)
 
 # get residuals of simple linear model
 cldm$resid=NA
-cldm$resid[!is.na(cldm$cld_all)&!is.na(cldm$mod09)]=residuals(lm(mod09~cld_all,data=cldm[!is.na(cldm$cld_all)&!is.na(cldm$mod09),]))
+cldm$resid[!is.na(cldm$cld_all)&!is.na(cldm$MCD09_meanb16)]=residuals(lm(MCD09_meanb16~cld_all,data=cldm[!is.na(cldm$cld_all)&!is.na(cldm$MCD09_meanb16),]))
 
 # get residuals of simple linear model
-cldm$difm_all=cldm$mod09-cldm$cld_all
-cldm$difm=cldm$mod09-cldm$cld
+cldm$difm_all=cldm$MCD09_meanb16-cldm$cld_all
+cldm$difm=cldm$MCD09_meanb16-cldm$cld
 
 
 
@@ -57,6 +60,6 @@ if(!file.exists("data/out/SizeOfMOD09GAArchive.Rdata")){
 load("data/out/SizeOfMOD09GAArchive.Rdata")
 
 ## get HPD intervals
-hpd_resid=HPDinterval(as.mcmc(cldm$resid))#,c(0.025,0.25,0.5,0.75,0.975),na.rm=T)
-hpd_cld=HPDinterval(as.mcmc(cldm$difm))#,c(0.025,0.25,0.5,0.75,0.975),na.rm=T)
-hpd_cld_all=HPDinterval(as.mcmc(cldm$difm_all))#,c(0.025,0.25,0.5,0.75,0.975),na.rm=T)
+#hpd_resid=HPDinterval(as.mcmc(cldm$resid))#,c(0.025,0.25,0.5,0.75,0.975),na.rm=T)
+#hpd_cld=HPDinterval(as.mcmc(cldm$difm))#,c(0.025,0.25,0.5,0.75,0.975),na.rm=T)
+#hpd_cld_all=HPDinterval(as.mcmc(cldm$difm_all))#,c(0.025,0.25,0.5,0.75,0.975),na.rm=T)
