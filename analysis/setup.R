@@ -8,7 +8,7 @@ library(reshape2)
 library(caTools)
 library(rgeos)
 library(raster)
-library(plyr)
+library(dplyr)
 library(knitr)
 require(knitcitations)
 ## read in global coasts for nice plotting
@@ -108,7 +108,8 @@ regs=list(
   Hawaii=extent(c(-156.5,-154,18.75,20.5)),
   Boliva=extent(c(-71,-63,-20,-15)),
   Venezuela=extent(c(-69,-59,0,7)),
-  Venezuela2=extent(c(-72.5,-61,5,11)),
+  Venezuela2=extent(c(-85,-59,-6,11)),
+  Venezuela3=extent(c(-85,-53,-7,11)),
   Indonesia=extent(c(93.2,140,-14,12)),
   CFR=extent(c(17.5,29,-35,-29)),
   CFR2=extent(c(15,33,-35,-25)),

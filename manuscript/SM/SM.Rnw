@@ -155,13 +155,21 @@ We also quantified the seasonality of cloud frequencies following Markham \citey
 The monthly CF were validated using a global observational dataset of synoptic weather reports collected at 5388 stations over 1971-2009 \citep{Eastman2012}.  We extracted the mean "total cloud" amount for each month, which represents the mean proportion of the sky that was covered by all types of cloud during the observations in that month.  Comparison of these observations to satellite data must take into account that the sampling radius of these observations (the visible sky) depends on cloud height, cloud thickness, the curvature of the earth, and other factors, but is typically much larger than a single 1km MODIS pixel.  We followed Dybbroe, Karlsson, and Thoss (2005) and took the mean monthly MODCF for a circle with 16km radius around each station location.  Additionally, this converts the temporal MODCF to mean cloud amount within the sample radius to make it comparable to the station observations.
 
 %% insert figure showing station locations with indication of modis era or not
+<<stations,fig.cap="Validation stations used in the analysis. Black symbols indicate stations with data available only prior to MODIS observations (1970-2000), while blue symbols indicate stations with sufficient data from 1970 into the MODIS era (through 2009)",dev="png",fig.width=8, fig.height=6>>=
+st$era=as.factor(st$era)
+xyplot(lat~lon,groups=era, data=st@data,asp=.75,ylim=greg$ylim,auto.key=list(space="right"),
+       ylab="Latitude",xlab="Longitude",
+       par.settings=list(superpose.symbol =list(cex=.75,pch=16,col=c("black","blue"))))+
+  layer(sp.lines(coast,col="black",lwd=.1),under=F)
+@
+
 
 \subsubsection{Monthly Validation}
 
 The monthly MODCF (including data from 2000-2013) were compared to station observations using linear models over the full station record (1970-2009) and the MODIS era (2000-2009) to assess accuracy and relevance of the 14-year satellite-derived data for estimating long-term monthly climatologies.  For the full record comparison, the station dataset was filtered to include only stations with at least 20 observations per month for at least 20 years, which retained \Sexpr{nstation_all} stations.  Several countries (notably the USA, Canada, and New Zealand) converted from human cloud observations to automated laser ceilometers over the past decade leading to a decline in the number of observations over 1997-2009 \citep{Eastman2012}. For the MODIS era comparison, we included only stations with at least 20 observations per month for the full 10-year period (2000-2009), so the number of stations available was reduced to \Sexpr{nstation_mod}. 
 
 
-<<monthscatter,fig.cap="Mean monthly cloud amount over 2000-2009 from 5388 global stations versus mean 2000-2014 MOD09 cloud frequency by month.  Coefficient of determination is shown in each panel.  Colors represent the number of station observations within each grid cell of the scatterplot.",fig.width=6, fig.height=6>>=
+<<monthscatter,fig.cap="Mean monthly cloud amount over 2000-2009 from 5388 global stations versus mean 2000-2014 MOD09 cloud frequency by month.  Coefficient of determination is shown in each panel.  Colors represent the number of station observations within each grid cell of the scatterplot.",dev="png",fig.width=6, fig.height=6>>=
 hmcols=colorRampPalette(c("grey","blue","red","purple"))
 #hmcols=colorRampPalette(c(grey(.8),grey(.3),grey(.2)))
 tr=c(0,20)
@@ -203,15 +211,15 @@ print(pmap,position=c(0,0,1,.78))
 
 <<validtable,results="asis">>=
 t1=cldm %.% group_by(month2) %.% summarise(
-  Mean=mean(mod09,na.rm=T),
-  n=lm_summary(mod09,cld,"n"),
-  R2=lm_summary(mod09,cld,"rs"),
-  RMSE=lm_summary(mod09,cld,"rmse"))
+  Mean=mean(MCD09_meanb5,na.rm=T),
+  n=lm_summary(MCD09_meanb5,cld,"n"),
+  R2=lm_summary(MCD09_meanb5,cld,"rs"),
+  RMSE=lm_summary(MCD09_meanb5,cld,"rmse"))
 t2=cldm %.% group_by(seas) %.% summarise(
-  Mean=mean(mod09,na.rm=T),
-  n=lm_summary(mod09,cld,"n"),
-  R2=lm_summary(mod09,cld,"rs"),
-  RMSE=lm_summary(mod09,cld,"rmse"))
+  Mean=mean(MCD09_meanb5,na.rm=T),
+  n=lm_summary(MCD09_meanb5,cld,"n"),
+  R2=lm_summary(MCD09_meanb5,cld,"rs"),
+  RMSE=lm_summary(MCD09_meanb5,cld,"rmse"))
 colnames(t1)[1]="Month/Season";colnames(t2)[1]="Month/Season"
   
 ## combine to a single table
@@ -307,8 +315,8 @@ library(texreg)
 setMethod("extract", signature = className("lm", "stats"),definition = extract.lm)
 
 ### Compare two time periods
-lm_all1=lm(cld_all~mod09,data=cldm)#[!is.na(cldm$cld_all)&cldm$cldn_all>=10,])
-lm_mod=lm(cld~mod09,data=cldm)#[!is.na(cldm$cld)&cldm$cldn>=10,])
+lm_all1=lm(cld_all~MCD09_meanb16,data=cldm)#[!is.na(cldm$cld_all)&cldm$cldn_all>=10,])
+lm_mod=lm(cld~MCD09_meanb16,data=cldm)#[!is.na(cldm$cld)&cldm$cldn>=10,])
 
 mods=list("1970-2009"=lm_all1,"2000-2009"=lm_mod)
 

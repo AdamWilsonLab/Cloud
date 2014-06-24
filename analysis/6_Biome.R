@@ -29,43 +29,53 @@ if(!file.exists("data/teow/biomes.shp")){
 
 ## rasterize the biome dataset
 ## create a copy with a numeric biome code
-biome=readOGR("data/teow/","biomes")
+biome=readOGR("data/src/teow/","biomes")
 bcode=unique(data.frame(icode=biome$icode,code=biome$code,realm=biome$realm,biome=biome$biome))
 
 system(paste("gdal_rasterize -a icode -init 0 -l biomes -ot Byte -te -180 -90 180 90 -tr 0.008333333333333 -0.008333333333333",
               " -co COMPRESS=LZW -co ZLEVEL=9 -co PREDICTOR=2 ",
-              " data/teow/biomes.shp  data/teow/teow.tif"))
+              " data/src/teow/biomes.shp  data/out/teow/teow.tif"))
 
+#########################################
 ### Summarize the cloud data by biome
-foreach(m=1:12)%dopar%{
-  tm=sprintf("%02d",m)
-  tcloud=paste("data/MCD09/MCD09_mean_",tm,".tif",sep="")
-  tbiome=paste("data/teow/teow_MCD09_mean_",tm,".tif",sep="")
-  tcloudbiome=paste("data/teow/teow_MCD09_mean_",tm,".txt",sep="")
-  
+
+## create a list of products to summarize
+bprods=c("data/MCD09_deriv/inter.tif",
+         "data/MCD09_deriv/intra.tif",
+         "data/MCD09_deriv/seas_conc.tif",
+         "data/MCD09_deriv/meannanual.tif",paste("data/MCD09/MCD09_mean_",sprintf("%02d",1:12),".tif",sep=""))
+
+### loop over products and summarize by biome
+foreach(m=bprods)%dopar%{
+  ## set file names
+  tbiome=paste0("data/tmp/teow_",basename(m))
+  tcloudbiome=paste0("data/out/biomesummaries/teow_",sub(".tif",".txt",basename(m)))
+
   ## mask biome raster using missing data in cloud dataset
-  system(paste("pksetmask -i data/teow/teow.tif -m ",tcloud," -ot UInt8 ",
-               "--operator='>' --msknodata 100 --nodata 0  -co COMPRESS=LZW -co PREDICTOR=2 -o ",tbiome))
+  nas=sub("^.*=","",system(paste0("gdalinfo ",m," | grep NoData"),intern=T))  #get NA for image
+  system(paste("pksetmask -i data/out/teow.tif -m ",m," -ot UInt8 ",
+               "--operator='=' --msknodata ",nas," --nodata 0  -co COMPRESS=LZW -co PREDICTOR=2 -o ",tbiome))
   ## calculate biome-level summary metrics
-  system(paste("oft-stat -i ",tcloud," -o ",tcloudbiome," -um ",tbiome," -mm"))
+  system(paste("oft-stat -i ",m," -o ",tcloudbiome," -um ",tbiome," -mm"))
   ## clean up
   file.remove(tbiome)
 }    
 
+
 ## add  seasonal mean(sd), intra, inter, seasonc
 
-bs=do.call(rbind.data.frame,lapply(1:12,function(m){
-  tm=sprintf("%02d",m)
-  tcloudbiome=paste("data/teow/teow_MCD09_mean_",tm,".txt",sep="")
+bs=do.call(rbind.data.frame,lapply(bprods,function(m){
+  tcloudbiome=paste0("data/out/biomesummaries/teow_",sub(".tif",".txt",basename(m)))
+print(tcloudbiome)
   td=read.table(tcloudbiome,col.names=c("icode","n","min","max","mean","sd"))  
   td$meanpsd=td$mean+td$sd
   td$meanmsd=td$mean-td$sd
-  td$month=tm
+  td$product=sub(".tif","",basename(m))
   td=merge(td,bcode,by="icode")
   file.remove(tcloudbiome)
   return(td)
   }))
-write.csv(bs,file="data/sum/biomesummary.csv",row.names=F)
+write.csv(bs,file="data/out/biomesummary.csv",row.names=F)
 
 ###################################################################
 ### summary by biome
@@ -94,6 +104,7 @@ png("manuscript/figures/Biome_Figures.png",width=5500,height=4000,res=600,points
 trellis.par.set(my.theme)
 print(p1)
 dev.off()
+
 
 
 
