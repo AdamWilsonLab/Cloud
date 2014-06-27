@@ -90,7 +90,7 @@ buf16=16000
 buf5=5000
 bins=cut(st$lat,10)
 rerun=F
-if(rerun&file.exists("valid.csv")) file.remove("valid.csv")
+if(rerun&file.exists("data/validation/valid.csv")) file.remove("data/validation/valid.csv")
 
 beginCluster(12)
 
@@ -120,7 +120,7 @@ lapply(levels(bins),function(lb) {
 endCluster()
 
 ## read it back in
-mod09st=read.csv("valid.csv",header=F)[,-c(1)]
+mod09st=read.csv("data/validation/valid.csv",header=F)[,-c(1)]
 colnames(mod09st)=c(names(mod09_mean),"id","type")
 mod09stl=melt(mod09st,id.vars=c("id","type"))
 colnames(mod09stl)[grep("variable",colnames(mod09stl))]="month"
@@ -130,7 +130,7 @@ mod09stl=dcast(mod09stl,id+month~type,value="value")
 ## add it to cld
 cldm$monthname=month.name[cldm$month]
 cldm$MCD09_meanb16=mod09stl$MCD09_meanb16[match(paste(cldm$StaID,cldm$monthname),paste(mod09stl$id,mod09stl$month))]
-cldm$MCD09_meanb5=mod09stl$MCD09_meanb16[match(paste(cldm$StaID,cldm$monthname),paste(mod09stl$id,mod09stl$month))]
+cldm$MCD09_meanb5=mod09stl$MCD09_meanb5[match(paste(cldm$StaID,cldm$monthname),paste(mod09stl$id,mod09stl$month))]
 cldm$MCD09_sdb16=mod09stl$MCD09_sdb16[match(paste(cldm$StaID,cldm$monthname),paste(mod09stl$id,mod09stl$month))]
 
 
@@ -173,6 +173,15 @@ cldm$seas=ifelse(cldm$month%in%c(12,1,2),"DJF",
                         ifelse(cldm$month%in%5:8,"JJA",
                                ifelse(cldm$month%in%9:11,"SON",NA))))
 
+## identify which stations have data in which era (pre or post-MODIS)
+st_era=dcast(cldml[cldml$variable%in%c("cld","cld_all"),],
+             StaID~variable,value.var="value",
+             fun.aggregate=function(x) sum(!is.na(x),na.rm=T))
+st_era$era=ifelse(st_era$cld_all>0&st_era$cld>0,"1970-2009",
+                  ifelse(st_era$cld_all>0&st_era$cld==0,"1970-2000",
+                         ifelse(st_era$cld_all==0&st_era$cld>0,"2000-2009","No Data")))
+st$era=st_era$era[match(st$id,st_era$StaID)]
+st$era[is.na(st$era)]="No Data"
 
 ## write out the tables
 write.csv(cld,file="data/validation/cld.csv",row.names=F)
