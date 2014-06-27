@@ -31,10 +31,18 @@ rasterOptions(progress="text",maxmemory=1e12)
 ## increase the amount of memory for gdal to speed up processing
 Sys.setenv(GDAL_CACHEMAX=5000,CPL_LOG_ERRORS="ON")
 
+## set working directory for different machines
+if( Sys.info()["nodename"]=="repens"){
+  setwd("/Users/adamw/repos/Cloud")
+  # temporary files will be written here:
+  #  datadir="/mnt/data2/projects/cloud/"
+}
 
-# temporary files will be written here:
-setwd("/media/data/Cloud")
-datadir="/mnt/data2/projects/cloud/"
+if( Sys.info()["nodename"]=="litoria"){  
+  setwd("/media/data/Cloud")
+  # temporary files will be written here:
+  datadir="/mnt/data2/projects/cloud/"
+}
 
 ## color ramps
 colR=colorRampPalette(c("#08306b","#0d57a1","#2878b8","#4997c9","#72b2d7","#a2cbe2","#c7dcef","#deebf7","#f7fbff"))
