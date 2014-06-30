@@ -18,6 +18,9 @@ data/MCD09_deriv/*
 *.synctex.gz
 *.aux
 
+*old*
+*unnamed-chunk*
+
 ## octave stuff
 core
 octave-workspace
