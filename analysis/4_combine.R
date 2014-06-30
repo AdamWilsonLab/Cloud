@@ -2,7 +2,7 @@
 ###  calculate monthly means of terra and aqua
 source('analysis/setup.R')
 
-beginCluster(20)
+beginCluster(12)
 
 ### assemble list of files to process
 df=data.frame(path=list.files(paste(datadir,"/mcd09ctif",sep=""),full=T,pattern="M[Y|O].*[0-9]*[mean|sd].*tif$"),stringsAsFactors=F)
@@ -67,7 +67,7 @@ mhist=mhist[mhist[,2]>0,]
 mhist$p=100*mhist$V2/sum(mhist$V2)
 100*sum(mhist$V2[mhist$V1>0])/sum(mhist$V2)
 
-i=6
+i=1
 
 
 foreach(i=1:length(f2), .options.multicore=list(preschedule=FALSE)) %dopar% {
@@ -88,19 +88,19 @@ foreach(i=1:length(f2), .options.multicore=list(preschedule=FALSE)) %dopar% {
     tfile4=sub("[.]tif","_filled.tif",file)
     outfilevrt=sub("[.]tif",".vrt",file)
     outfile=paste("data/MCD09/",basename(file),sep="")
-    ## mask the image    
-    system(paste0("pksetmask -i ",file," -m ",mask," --operator='>' --msknodata 0 --nodata 32767 -o ",tfile1))
+    ## mask the image
+    system(paste0("pksetmask -i ",file," -m ",mask," --operator='>' --msknodata 0 --nodata 32767 -ot UInt16 -o ",tfile1))
     ## Subset edges out for special treatment to avoid errors in gdal_fillnodata
-    system(paste0("gdal_translate -srcwin 43198 0 2 21600 ",file," ",tfile1a))
-    system(paste0("gdal_translate -a_nodata 65535 -srcwin 43195 0 5 21600 ",file," ",tfile1a2))
+    system(paste0("gdal_translate -a_nodata 32767 -ot UInt16 -srcwin 43198 0 2 21600 ",file," ",tfile1a))
+    system(paste0("gdal_translate -a_nodata 32767 -ot UInt16 -srcwin 43195 0 5 21600 ",file," ",tfile1a2))
     
     #system(paste0("gdal_translate -srcwin 0 0 2 21600 ",file," ",tfile1b))
     ## replace any missing values (65535) with 32767 for filling
-    system(paste0("pkfilter -f min -dx 3 -dy 1 -i ",tfile1a,"  ",tfile1," -o ",tfile1a3))
+    system(paste0("pkfilter -f max -dx 3 -dy 1 -i ",tfile1a,"  -o ",tfile1a3)) #",tfile1,"
     system(paste0("pkfilter -f mean -dx 5 -dy 1 -i ",tfile1a2,"   -o ",tfile1a4))
     system(paste0("gdal_translate -srcwin 3 0 2 21600 ",tfile1a4," ",tfile1a5))
-    system(paste0("pksetmask -i ",tfile1a5," -m ",tfile1a3," --operator='>' --msknodata 10000 --nodata 65535 -o ",tfile1a6))
-    system(paste0("gdal_edit.py -a_nodata 65535 ",tfile1a6))
+    system(paste0("pksetmask -i ",tfile1a5," -m ",tfile1a3," --operator='>' --msknodata 10000 --nodata 32767 -o ",tfile1a6))
+    system(paste0("gdal_edit.py -a_nodata 32767 ",tfile1a6))
     
     ## merge this back into the masked file
     system(paste0("gdalwarp ",tfile1a6," ",tfile1))    
@@ -112,57 +112,68 @@ foreach(i=1:length(f2), .options.multicore=list(preschedule=FALSE)) %dopar% {
     system(paste0("pkfilter -f smooth -dx 11 -dy 11 -nodata 32767  -i ",tfile2," -o ",tfile3))
     ## used the smoothed data rather than the original, would prefer to use the -si option on gdal_fillnodata, but it's broken
     system(paste0("gdal_merge.py -o ",tfile4," -co COMPRESS=LZW -co PREDICTOR=2 -n 32767 -init 32767 ",tfile3," ",tfile1))    
-
-    system(paste("gdal_translate  -scale 0 10000 0 100 -of VRT ",tfile4," ",outfilevrt)) 
+#-scale 0 10000 0 100 
+    system(paste("gdal_translate  -of VRT ",tfile4," ",outfilevrt)) 
     ## add color table for 8-bit data
     vrt=scan(outfilevrt,what="char")
     hd=c("<ColorInterp>Palette</ColorInterp>","<ColorTable>")
     ft="</ColorTable>"
     colR=colorRampPalette(c("#08306b","#0d57a1","#2878b8","#4997c9","#72b2d7","#a2cbe2","#c7dcef","#deebf7","#f7fbff"))
-    cols=data.frame(t(col2rgb(colR(105))))
-    ct=paste("<Entry c1=\"",cols$red,"\" c2=\"",cols$green,"\" c3=\"",cols$blue,"\" c4=\"255\"/>")
+    cols=data.frame(t(col2rgb(colR(10005))))
+    ct=paste("<Entry c1=\"",cols$red,"\" c2=\"",cols$green,"\" c3=\"",cols$blue,"\" c4=\"32767\"/>")
     cti=grep("ColorInterp",vrt)  # get index of current color table
     vrt2=c(vrt[1:(cti-1)],hd,ct,ft,vrt[(cti+1):length(vrt)])
     ## update missing data flag following http://lists.osgeo.org/pipermail/gdal-dev/2010-February/023541.html
-    csi=grep("<ComplexSource>",vrt2)  # get index of current color table
-    vrt2=c(vrt2[1:csi],"<NODATA>327</NODATA>",vrt2[(csi+1):length(vrt2)])
+    #csi=grep("<ComplexSource>",vrt2)  # get index of current color table
+    #vrt2=c(vrt2[1:csi],"<NODATA>32767</NODATA>",vrt2[(csi+1):length(vrt2)])
     write.table(vrt2,file=outfilevrt,col.names=F,row.names=F,quote=F)              
     tags=c(paste("TIFFTAG_IMAGEDESCRIPTION='Monthly Cloud Frequency for 2000-2013 extracted from C5 MODIS M*D09GA PGE11 internal cloud mask algorithm (embedded in state_1km bit 10).",
                  "The daily cloud mask time series were summarized to mean cloud frequency (CF) by calculating the proportion of cloudy days.'"),
            "TIFFTAG_DOCUMENTNAME='Collection 5 Cloud Frequency'",
            paste("TIFFTAG_DATETIME='2014'",sep=""),
            "TIFFTAG_ARTIST='Adam M. Wilson (adam.wilson@yale.edu)'")
-    system(paste("gdal_translate -a_nodata 255 -ot Byte  -co COMPRESS=LZW -co PREDICTOR=2 ",paste("-mo ",tags,sep="",collapse=" ")," ",outfilevrt," ",outfile))
+    system(paste("gdal_translate -a_nodata 65535 -ot UInt16  -co COMPRESS=LZW -co PREDICTOR=2 ",paste("-mo ",tags,sep="",collapse=" ")," ",outfilevrt," ",outfile))
+  if(file.exists(outfile)) print(paste("Finished ",outfile))
     ## clean up  - keep the 16 bit filled version for additional calculations
-    file.remove(tfile1,tfile1a,tfile1a,tfile1a2,tfile1a3,tfile1a4,tfile1a5,tfile2,tfile3)
+    file.remove(tfile1,tfile1a,tfile1a2,tfile1a3,tfile1a4,tfile1a5,tfile2,tfile3)
 }
 
 
 ################
 ### calculate inter vs. intra annual variability
-f3=list.files(paste(datadir,"/mcd09ctif/",sep=""),pattern=paste(".*MCD09_mean_[0-9].*filled[.]tif$",sep=""),full=T)
-f3sd=list.files(paste(datadir,"/mcd09ctif/",sep=""),pattern=paste(".*MCD09_sd_[0-9].*filled[.]tif$",sep=""),full=T)
+f3=list.files(paste("data/MCD09/",sep=""),pattern=paste("MCD09_mean_[0-9].[.]tif$",sep=""),full=T)
+f3sd=list.files(paste("data/MCD09/",sep=""),pattern=paste(".*MCD09_sd_[0-9].[.]tif$",sep=""),full=T)
 
-dmean=stack(as.list(f3));NAvalue(dmean)=65535
-dsd=stack(as.list(f3sd));NAvalue(dsd)=65535
-
+dmean=readAll(stack(as.list(f3)));NAvalue(dmean)=65535
+dsd=readAll(stack(as.list(f3sd)));NAvalue(dsd)=65535
 
 ## Function to calculate standard deviation and round it to nearest integer
 Rsd=function(x) calc(x,function(x) {
-  sd=sd(x,na.rm=T)
-  if(is.na(sd)) sd=0
-  return(round(sd/100))
+  sd(x,na.rm=T)
 })
 
 Rmean=function(x) calc(x,function(x) {
-  return(round(mean(x,na.rm=T)/100))
+  mean(x,na.rm=T)
 })
 
-dintra=clusterR(dmean,Rsd,na.rm=T,file="data/MCD09_deriv/intra.tif",overwrite=T,dataType='INT1U',NAflag=255)
-dinter=clusterR(dsd,Rmean,na.rm=T,file="data/MCD09_deriv/inter.tif",overwrite=T,dataType='INT1U',NAflag=255)
+#dintra=clusterR(dmean,Rsd,na.rm=T,file="data/MCD09_deriv/intra.tif",overwrite=T,options=c("COMPRESS=LZW","PREDICTOR=2"),dataType='INT2U',NAflag=65535)
+#dinter=clusterR(dsd,Rmean,na.rm=T,file="data/MCD09_deriv/inter.tif",overwrite=T,options=c("COMPRESS=LZW","PREDICTOR=2"),dataType='INT2U',NAflag=65535)
+
+dintra=calc(dmean,sd,na.rm=T,file="data/MCD09_deriv/intra.tif",overwrite=T,dataType='INT2U',NAflag=65535)
+dinter=calc(dsd,mean,na.rm=T,file="data/MCD09_deriv/inter.tif",overwrite=T,dataType='INT2U',NAflag=65535)
+
 
 ## Overall annual mean
-dmeanannual=clusterR(dmean,Rmean,na.rm=T,file="data/MCD09_deriv/meanannual.tif",overwrite=T,dataType='INT1U',NAflag=255)
+#dmeanannual=clusterR(dmean,Rmean,na.rm=T,file="data/MCD09_deriv/meanannual.tif",overwrite=T,dataType='INT2U',NAflag=65535)
+dmeanannual=calc(dmean,mean,na.rm=T,file="data/MCD09_deriv/meanannual.tif",options=c("COMPRESS=LZW","PREDICTOR=2"),overwrite=T,dataType='INT2U',NAflag=65535)
+
+## use pkfilter to see if it goes faster
+## first make a 12-band image of means and sd's
+#system(paste0("oft-stack -ot UInt16 -o data/MCD09_deriv/monthmeans.tif ",
+#              paste(list.files(paste("data/MCD09/",sep=""),pattern=paste("MCD09_mean_[0-9].[.]tif$",sep=""),full=T),collapse=" ")))
+#system(paste0("pkfilter -nodata 65535 -f stdev -dx 1 1 -dy 1  -dz 12 -i data/MCD09_deriv/monthmeans.tif ",
+#              " -o data/MCD09_deriv/intra_new.tif"))
+
 
 #################################################
 ### Calculate Markham's Seasonality

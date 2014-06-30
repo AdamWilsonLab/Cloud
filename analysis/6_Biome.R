@@ -4,7 +4,7 @@ source("analysis/setup.R")
 
 
 ## Create a simplified version of the TEOW biome dataset
-if(!file.exists("data/teow/biomes.shp")){
+if(!file.exists("data/src/teow/biomes.shp")){
   library(geosphere)
   library(rgeos)
   teow=readOGR("/mnt/data/jetzlab/Data/environ/global/teow/official/","wwf_terr_ecos")
@@ -24,7 +24,7 @@ if(!file.exists("data/teow/biomes.shp")){
   biome=biome[order(biome$realm,as.numeric(biome$biomeid)),]
   biome$icode=1:nrow(biome)
   ## write it to disk as shapefile
-  writeOGR(biome,"data/teow","biomes",driver="ESRI Shapefile",overwrite=T)
+  writeOGR(biome,"data/src/teow","biomes",driver="ESRI Shapefile",overwrite=T)
 }
 
 ## rasterize the biome dataset
@@ -43,7 +43,8 @@ system(paste("gdal_rasterize -a icode -init 0 -l biomes -ot Byte -te -180 -90 18
 bprods=c("data/MCD09_deriv/inter.tif",
          "data/MCD09_deriv/intra.tif",
          "data/MCD09_deriv/seas_conc.tif",
-         "data/MCD09_deriv/meannanual.tif",paste("data/MCD09/MCD09_mean_",sprintf("%02d",1:12),".tif",sep=""))
+#         "data/MCD09_deriv/meannanual.tif")#,
+    paste("data/MCD09/MCD09_mean_",sprintf("%02d",1:12),".tif",sep=""))
 
 ### loop over products and summarize by biome
 foreach(m=bprods)%dopar%{
@@ -66,13 +67,23 @@ foreach(m=bprods)%dopar%{
 
 bs=do.call(rbind.data.frame,lapply(bprods,function(m){
   tcloudbiome=paste0("data/out/biomesummaries/teow_",sub(".tif",".txt",basename(m)))
-print(tcloudbiome)
-  td=read.table(tcloudbiome,col.names=c("icode","n","min","max","mean","sd"))  
+  print(tcloudbiome)
+  td=read.table(tcloudbiome)
+  if(basename(tcloudbiome)=="teow_seas_conc.txt"){
+      colnames(td)=c("icode","n","seasconc_min","seastheta_min","seasconc_max","seastheta_max","seasconc_mean","seastheta_mean","seasconc_sd","seastheta_sd")
+      tdl=melt(td,id.vars=c("icode","n"))
+      tdl[,c("product","met")]=do.call(rbind,strsplit(as.character(tdl$variable),"_"))
+      td2=dcast(tdl,icode+n+product~met,value.var="value")
+      td=td2[,c("icode","n","min","max","mean","sd","product")]
+  }
+      if(basename(tcloudbiome)!="teow_seas_conc.txt"){
+          colnames(td)=c("icode","n","min","max","mean","sd")
+          td$product=sub(".tif","",basename(m))
+      }
   td$meanpsd=td$mean+td$sd
   td$meanmsd=td$mean-td$sd
-  td$product=sub(".tif","",basename(m))
   td=merge(td,bcode,by="icode")
-  file.remove(tcloudbiome)
+#  file.remove(tcloudbiome)
   return(td)
   }))
 write.csv(bs,file="data/out/biomesummary.csv",row.names=F)
@@ -87,7 +98,7 @@ bs$realm=factor(bs$realm,ordered=T,levels=c("Antarctic","Australasia","Oceania",
 #colnames(biomepl)[grep("variable",colnames(biomepl))]="month"
 #biomepl$value[biomepl$value<0]=NA
 
-p1=useOuterStrips(xyplot(mean~monthname|realm+biome,data=bs,
+p1=useOuterStrips(xyplot(mean~product|realm+biome,data=bs,
                  panel=function(x,y,subscripts = subscripts){
                 td=bs[subscripts,]
                 panel.polygon(c(td$monthname,rev(td$monthname)),c(td$meanpsd,rev(td$meanmsd)),col=grey(0.4),border=NA)

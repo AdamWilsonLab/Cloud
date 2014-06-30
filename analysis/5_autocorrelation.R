@@ -2,6 +2,10 @@ source("analysis/setup.R")
 
 #tropics=extent(c(20,25,0,5))
 
+#library(devtools) 
+#install_github("adammwilson/rasterAutocorr")
+#detach("package:rasterAutocorr", unload=TRUE)
+#library(rasterAutocorr)
 ## mask cloud values where MAP is missing
 #cf_mean=mask(cf_mean,map)
 
@@ -10,8 +14,13 @@ tropics=extent(c(-180,180,-23.4378,23.4378))
 global=extent(c(-180,180,-60,60))
 
 
+## create a version of the cloud data with a land mask
+system(paste0("pksetmask -i data/MCD09_deriv/MCD09_meanannual.tif ",
+    "-m /mnt/data/jetzlab/Data/environ/global/worldclim/alt.bil --operator='=' --msknodata -9999 --nodata 255 ",
+    " -o data/MCD09_deriv/MCD09_meanannual_land.tif"))
+
 prods=list(
-  mac=raster("data/MCD09_deriv/MCD09_meanannual.tif"),
+  mac=raster("data/MCD09_deriv/MCD09_meanannual_land.tif"),
   map=raster("/mnt/data/jetzlab/Data/environ/global/worldclim/bio_12.bil"),
   dem=raster("/mnt/data/jetzlab/Data/environ/global/worldclim/alt.bil"),
   patmos=raster("data/src/gewex/CA_PATMOSX_NOAA.nc",varname="a_CA"))
@@ -21,48 +30,37 @@ region=regs[["Venezuela2"]]
 regionname="Venezuela"
 
 
+#wc=crop(prods[[2]],region)
+#cld=crop(prods[[1]],region)
+#dem=crop(prods[[3]],region)
+#plot(stack(wc,cld,dem))
 
 ## loop through products and write out autocorrelation data
 foreach(i=1:4) %dopar% {
-
 tprod=names(prods[i])
-  
 ## set file names
-treg=paste0("data/autocorr/data_",tprod,"_",regionname,".tif")
-tac=paste0("data/autocorr/ac_",tprod,"_",regionname,".tif")
-tdist=paste0("data/autocorr/dist_",tprod,"_",regionname,".tif")
-
+#treg=paste0("data/autocorr/data_",tprod,"_",regionname,".tif")
+#tac=paste0("data/autocorr/ac_",tprod,"_",regionname,".tif")
+#tdist=paste0("data/autocorr/dist_",tprod,"_",regionname,".tif")
 ## create subset
-#if(!file.exists(treg)) 
-reg=crop(prods[[i]],region,filename=treg,overwrite=T,dataType='INT1S',NAflag=-128)
-
-## mask ocean
-#tcld=raster(mac_tropic)
-#tmap=raster(map_tropic)
-#tcld[is.na(tmap)]=NA
-#tpatmos=raster(mac_tropic_patmos)
-
-## run the autocorrelation function and write out the output raster (and time it!)
-# tropics
-system.time(ac<<-acorr(reg,filename=tac,gain=100,overwrite=T,dataType='INT1S',NAflag=-128))
-dist=acorr_dist(reg)
-
-#system(paste("gdal_proximity.py ",fac_trop_patmos," ",patmos_trop_dist," -co COMPRESS=LZW -co PREDICTOR=2 -ot Int16",
-#             " -values 1000 -distunits GEO -nodata -32768"))
-
-
+reg=crop(prods[[i]],region)#,filename=treg,overwrite=T,dataType='INT1S',NAflag=-128)
+## run the autocorrelation function and write out the output raster
+ac=acorr2(reg)#,filename=tac,overwrite=T,dataType='INT2S')
 #########################################
 ## build the table of values to construct the correlograms
-ac=raster(tac)
-
-## summarize into tables
 ftd=rbind.data.frame(
-  data.frame(values=values(ac),dist=values(dist),type=tprod,region=regionname)
+  data.frame(values=values(ac[["acor"]])/10,dist=values(ac[["dist"]]),n=values(ac[["nobs"]]),type=tprod,region=regionname)
 )
-ftd$dist=round(ftd$dist)
-ftd <- filter(ftd, dist <= 10000)
+## filter to a reasonable distance, signal gets noisy above a few thousand km due to sparse measurements
+ftd <- filter(ftd, dist <= 1500)
+## normalize the covariogram to a correlogram by dividing by the max value
+ftd$values=ftd$values/max(ftd$values)
 
-ftd2 <- group_by(ftd, dist,type,region)
+## round to nearest km to faciliate binning
+#ftd$dist2=cut(ftd$dist,exp(seq(log(.5), log(3000), length.out=3000)))
+ftd$dist2=round(ftd$dist)#,c(0:50,seq(51,1000,by=10)))
+## take mean by km
+ftd2 <- group_by(ftd, dist2,type,region)
 ftd2 <- summarise(ftd2,
                   min = min(values, na.rm = TRUE),
                   max = max(values, na.rm = TRUE),
@@ -77,24 +75,42 @@ print(paste("Finished ",tprod," for ",regionname))
 
 
 ## compile all regions and products into a single table
-
+#ftd3=ftd2
 ftd3=do.call(rbind.data.frame,lapply(list.files("data/autocorr/",pattern="table",full=T),function(f) read.csv(f)))
+ftd3$dist3=ftd3$dist2
+#ftd3$dist3[ftd3$dist==0]=.01
+#ftdl=melt(ftd3,id.vars=c("dist","type","region"))
+#ftdl[,c("var","met")]=do.call(rbind,strsplit(as.character(ftdl$variable),"_"))
 
-ftdl=melt(ftd3,id.vars=c("dist","type","region"))
-ftdl[,c("var","met")]=do.call(rbind,strsplit(as.character(ftdl$variable),"_"))
+## update variable names 
+levels(ftd3$type)
+ftd3$type2=factor(ftd3$type,labels=c("Elevation","Mean Annual Cloud Frequency (MODCF)","Mean Annual Precipitation (WorldClim)","Mean Annual Cloud Frequency (PATMOS-X)"))
 
+
+panel.bands=function(x, y, upper, lower, subscripts, ..., font, fontface) {
+    upper <- upper[subscripts]
+    lower <- lower[subscripts]
+#    panel.polygon(c(x, rev(x)), c(upper, rev(lower)), ...)
+    panel.segments(x,lower,x,upper, ...)}
+x_at=c(1,2,5,10,20,50,100,200,500,1000,2000)
+x_labels <- formatC(x_at, digits = 0, format = "f")
 
 ## plot it...
-xyplot(mean~dist,data=ftd3,group=type,auto.key=F,
-  panel=function(x,y,subscripts){
-    td=ftd3[subscripts,]
-    for(i in unique(td$type)){
-    td2=td[td$type==i,]
-    #  td$dist=log(td$dist+1)
-    panel.xyplot(td2$dist,td2$mean,pch=16)  
-    panel.segments(td2$dist,td2$min,td2$dist,td2$max,lwd=.5)
-  }},
-subscripts=T,xlim=c(-5,250),ylim=c(-30,104),scales=list(x=list(log=F)))
+p1=xyplot(mean~dist3|region,data=ftd3,auto.key=list(space="inside",x=.55,y=.93),groups=type2,
+       upper=ftd3$mean+ftd3$sd,lower=ftd3$mean-ftd3$sd,
+        panel=function(x,y,...){
+            panel.superpose(x, y, panel.groups = 'panel.bands',alpha=.2,...)
+            panel.xyplot(x,y,pch=16,type="l",...)  
+        },
+       ylab="Autocorrelation",xlab="Distance (km)",
+subscripts=T,xlim=c(0.95,2000),ylim=c(-.2,1.1),scales=list(x=list(log=T,at=x_at,labels=x_labels)))+layer(panel.abline(h=0,col="red"))
+p1
+
+## save it to png
+png("manuscript/figures/autoCorr.png",width=3000,height=2000,res=300,pointsize=42,bg="white")
+trellis.par.set(my.theme)
+print(p1)
+dev.off()
 
 
   ## plot the autocorrlation and distance

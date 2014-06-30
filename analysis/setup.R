@@ -24,7 +24,7 @@ library(rasterAutocorr)
 
 ## register parallel backend
 library(doMC)
-registerDoMC(18)
+registerDoMC(10)
 
 rasterOptions(progress="text",maxmemory=1e12)
 
@@ -47,6 +47,11 @@ bgr=function(x,n=100,br=0,c1=c("darkblue","blue","grey"),c2=c("grey","red","purp
   gr=colorRampPalette(c2)
   return(list(at=at,col=c(bg(sum(at<br)),gr(sum(at>=br)))))
 }
+
+## set plotting parameters
+my.theme = trellis.par.get()
+my.theme$strip.background=list(col="transparent")
+trellis.par.set(my.theme)
 
 
 ## Set polar rotation for polar plot of color values

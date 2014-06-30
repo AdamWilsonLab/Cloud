@@ -1,7 +1,7 @@
 ### Script to download and process the NDP-026D station cloud dataset
 ### to validate MODIS cloud frequencies
 
-source("setup.R")
+source("analysis/setup.R")
 
 ## Data available here http://cdiac.ornl.gov/epubs/ndp/ndp026d/ndp026d.html
 
@@ -50,10 +50,10 @@ cld$Amt=cld$Amt/100
 cld=cld[!is.na(cld$Amt),]
 
 ## table of stations with > 20 observations per month
-dcast(cld,StaID~YR,value.var="Nobs")
-mtab=ddply(cld,c('StaID','month'),function(df){ data.frame(count=sum(df$Nobs>20,na.rm=T))})
+#dcast(cld,StaID~YR,value.var="Nobs")
+#mtab=ddply(cld,c('StaID','month'),function(df){ data.frame(count=sum(df$Nobs>20,na.rm=T))})
 #mtab2=mtab[table(mtab$count>10)]
-stem(mtab$count)
+#stem(mtab$count)
 
 ## calculate means and sds for full record (1970-2009)
 stem(cld$Nobs)
@@ -76,44 +76,37 @@ cldm=do.call(rbind.data.frame,by(cld,list(month=as.factor(cld$month),StaID=as.fa
 
 ## add the EarthEnvCloud data to cld
 mod09_mean=stack(list.files("data/MCD09/",pattern="MCD09_mean_[0-9]*[.]tif",full=T))
-NAvalue(mod09_mean)=255
+NAvalue(mod09_mean)=65535
+gain(mod09_mean)=.01
 names(mod09_mean)=month.name
 
 mod09_sd=stack(list.files("data/MCD09/",pattern="MCD09_sd_[0-9]*[.]tif",full=T))
-NAvalue(mod09_sd)=255
+NAvalue(mod09_sd)=65535
+gain(mod09_sd)=.01
 names(mod09_sd)=month.name
 
 
 ## overlay the data with 32km diameter (16km radius) buffer
 ## buffer size from Dybbroe, et al. (2005) doi:10.1175/JAM-2189.1.
-buf16=16000
-buf5=5000
+buf=16000
 bins=cut(st$lat,10)
 rerun=F
-if(rerun&file.exists("valid.csv")) file.remove("valid.csv")
+if(rerun&file.exists("valid.csv")) file.remove("data/validation/valid.csv")
 
 beginCluster(12)
 
 lapply(levels(bins),function(lb) {
   l=which(bins==lb)
   ## mean
-  td1=raster::extract(mod09_mean,st[l,],buffer=buf5,fun=mean,na.rm=T,df=T)
+  td1=raster::extract(mod09_mean,st[l,],buffer=buf,fun=mean,na.rm=T,df=T)
   td1$id=st$id[l]
-  td1$type="MCD09_meanb5"
-  ## mean buffered
-  td2=raster::extract(mod09_mean,st[l,],buffer=buf16,fun=mean,na.rm=T,df=T)
-  td2$id=st$id[l]
-  td2$type="MCD09_meanb16"
+  td1$type="MCD09_mean"
   ## std
-  td3=raster::extract(mod09_sd,st[l,],buffer=buf5,fun=mean,na.rm=T,df=T)
-  td3$id=st$id[l]
-  td3$type="MCD09_sdb5"
-  ## std buffered
-  td4=raster::extract(mod09_sd,st[l,],buffer=buf16,fun=mean,na.rm=T,df=T)
-  td4$id=st$id[l]
-  td4$type="MCD09_sdb16"
-  print(lb)#as.vector(c(l,td[,1:4])))
-  write.table(rbind(td1,td2,td3,td4),"valid.csv",append=T,col.names=F,quote=F,sep=",",row.names=F)
+  td2=raster::extract(mod09_sd,st[l,],buffer=buf,fun=mean,na.rm=T,df=T)
+  td2$id=st$id[l]
+  td2$type="MCD09_sd"
+  print(lb)
+  write.table(rbind(td1,td2),"valid.csv",append=T,col.names=F,quote=F,sep=",",row.names=F)
   return(lb)
 })
 
@@ -129,9 +122,8 @@ mod09stl=dcast(mod09stl,id+month~type,value="value")
 
 ## add it to cld
 cldm$monthname=month.name[cldm$month]
-cldm$MCD09_meanb16=mod09stl$MCD09_meanb16[match(paste(cldm$StaID,cldm$monthname),paste(mod09stl$id,mod09stl$month))]
-cldm$MCD09_meanb5=mod09stl$MCD09_meanb5[match(paste(cldm$StaID,cldm$monthname),paste(mod09stl$id,mod09stl$month))]
-cldm$MCD09_sdb16=mod09stl$MCD09_sdb16[match(paste(cldm$StaID,cldm$monthname),paste(mod09stl$id,mod09stl$month))]
+cldm$MCD09_mean=mod09stl$MCD09_meanb[match(paste(cldm$StaID,cldm$monthname),paste(mod09stl$id,mod09stl$month))]
+cldm$MCD09_sd=mod09stl$MCD09_sdb[match(paste(cldm$StaID,cldm$monthname),paste(mod09stl$id,mod09stl$month))]
 
 
 ## LULC
@@ -179,7 +171,7 @@ write.csv(cld,file="data/validation/cld.csv",row.names=F)
 write.csv(cldm,file="data/validation/cldm.csv",row.names=F)
 writeOGR(st,dsn="data/validation/",layer="stations",driver="ESRI Shapefile",overwrite_layer=T)
 #########################################################################
-
+cldm=read.csv("data/validation/cldm.csv")
 
 ### Extract regional transects
 cids=c(10866,10980,11130,11135,11138,11146,11210,11212,13014)
