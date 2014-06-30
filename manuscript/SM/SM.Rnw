@@ -56,6 +56,8 @@ print(getwd())
 <<loaddata>>=
 ## Run the setup script
 source("analysis/setup.R")
+source("analysis/6_LoadData.R")
+
 source(list.files("R",full=T))
    
 ## plotting parameters
@@ -98,7 +100,7 @@ HIRS & Cloud frequency from NOAA/HIRS/2	& Global &	$\approx$20km	&1979--2001 &Da
 
 AVHRR PATMOS-x &  Cloud product derived from NOAA's Advanced Very High Resolution Radiometer (AVHRR)	&Global&	$0.1^o$ ($\approx$11km)&	1981--2010 &	Daily& 	\cite{Foster2012}\\ \hline
 
-GridSat &  IR, water vapor and visible bands combined from multiple calibrated geostationary satellites.  Not currently available. &	Global, with missing data early in the record &	0.07$^o$ ($\approx$8km)&	1980--present	&3-hour	& \cite{Knapp2011} \\ \hline
+GridSat &  IR, water vapor and visible bands combined from multiple calibrated geostationary satellites. &	70$^o$S-70$^o$N, with missing data early in the record &	0.07$^o$ ($\approx$8km)&	1980--present	&3-hour	& \cite{Knapp2011} \\ \hline
 
 Tropical MODIS Cloud Climatology &  Optical and IR data from MODIS MOD35 algorithm	& 40$^o$S  -- 40$^o$N	& 1km &	2000--2006 &	monthly, diurnal	& \cite{Mulligan2006} \\ \hline
 
@@ -122,7 +124,7 @@ The daily 2000-2013 archive (approximately 260TB of data) were processed to calc
 Due to the algorithm’s use of tests based on reflectance data, the flag is only available for daytime scenes and thus high latitudes have missing data during winter months.
 These data are referred to below as the MODIS cloud frequency (MODCF) dataset.
 
-\subsection{Removal of Orbital Artifacts}    
+\subsection{Removal of Orbital Artifacts and Alb}    
 
 The MODIS orbit results in systematic gaps in the daily global coverage near the equator \citep{Gregg2007} that results in nearly longitudinal artifacts  (15$^o$ for Terra and 345$^o$ for Aqua) in the long-term cloud frequencies.  To remove these features, we used the Variational Stationary Noise Remover \citep[VSNR,][available at \url{http://www.math.univ-toulouse.fr/~weiss/Codes/VSNR/VNSR_VariationalStationaryNoiseRemover.html}]{Fehrenbach2012, Fehrenbach2013}, a Bayesian image restoration technique implemented in Matlab.  The VSNR is well suited to remove these artifacts because it allows specification of the shape and scale of known artifacts.  We explored various filter shapes and evaluated longitudinal profiles before and after correction and selected parameters that minimized the artifacts (see Figure \ref{fig:Sahara}).   We used a gabor filter with y=200, x=5, and $\theta$=15 for Terra and $\theta$=-15 for Aqua.
 
@@ -344,7 +346,7 @@ Figure 1: Cloud frequency seasonality and variability for each terrestrial biome
 
 <<BiomeTable,results="asis">>=
 bs=read.csv(file="data/sum/biomesummary.csv")
-bs$monthname=factor(month.name[as.numeric(as.character(bs$month))],ordered=T,levels=month.name)
+#bs$monthname=factor(month.name[as.numeric(as.character(bs$month))],ordered=T,levels=month.name)
 bs$realm=factor(bs$realm,ordered=T,levels=c("Antarctic","Australasia","Oceania","Afrotropics","IndoMalay", "Neotropics","Palearctic","Nearctic" ))
 bs$meansd=paste(round(bs$mean,1)," (",round(bs$sd,1),")",sep="")
 
@@ -357,9 +359,11 @@ print(xtable(bcode,caption="Biome and realm codes used in Table \\ref{tab:BiomeT
 
 \begin{landscape}
 <<BiomeTable2,results="asis">>=
-bst=dcast(bs,code~monthname,value="meansd")
+bst=dcast(bs[bs$product%in%c("inter","intra","seasconc","seastheta"),],code~product,value="meansd")
 colnames(bst)[1]="Code"
-print(xtable(bst,caption="Mean (SD) monthly cloud frequency summarized by biome and geographic realm. See Table \\ref{tab:BiomeTable} for  Code descriptions.",label = "tab:BiomeTable2"),type="latex",include.rownames=F,row.names=F,tabular.environment='longtable',floating=F,size="footnotesize",caption.placement='top')
+print(xtable(bst,caption="Mean (SD) cloud frequency metrics summarized by biome and geographic realm. See Table \\ref{tab:BiomeTable} for  Code descriptions.",
+             label = "tab:BiomeTable2"),type="latex",include.rownames=F,row.names=F,tabular.environment='longtable',floating=F,size="footnotesize",caption.placement='top')
+
 @
 \end{landscape}
 

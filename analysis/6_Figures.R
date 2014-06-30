@@ -2,12 +2,6 @@
 source("analysis/setup.R")
 source("analysis/6_LoadData.R")
 
-
-## set plotting parameters
-my.theme = trellis.par.get()
-my.theme$strip.background=list(col="transparent")
-trellis.par.set(my.theme)
-
 n=100
 res=1e6
 greg=list(ylim=c(-60,84),xlim=c(-180,180))
@@ -43,9 +37,6 @@ p_inter=levelplot(inter,col.regions=bgr(1:30,n,br=11)$col,cuts=99,at=seq(0,30,le
 
 #pdf("manuscript/figures/Figures.pdf",width=11,height=8.5,pointsize=14)
 png("manuscript/figures/MeanInter.png",width=2100,height=2000,res=300,pointsize=42,bg="white")
-## set plotting parameters
-my.theme = trellis.par.get()
-my.theme$strip.background=list(col="transparent")
 trellis.par.set(my.theme)
 #p3=c("Mean Cloud Frequency (%)"=p_mac,"Max Cloud Frequency (%)"=p_max,"Interannual Variability (sd)"=p_inter,"Intraannual Variability (sd)"=p_intra,x.same=T,y.same=F,merge.legends=T,layout=c(2,2))
 #p3=c("Mean Cloud Frequency (%)"=p_mean,"Inter-annual Variability (SD)"=p_inter,"Intra-annual Variability (SD)"=p_intra,x.same=T,y.same=T,merge.legends=T,layout=c(1,3))
