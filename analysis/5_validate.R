@@ -90,7 +90,7 @@ buf16=16000
 buf5=5000
 bins=cut(st$lat,10)
 rerun=F
-if(rerun&file.exists("data/validation/valid.csv")) file.remove("data/validation/valid.csv")
+if(rerun&file.exists("valid.csv")) file.remove("valid.csv")
 
 beginCluster(12)
 
@@ -173,22 +173,13 @@ cldm$seas=ifelse(cldm$month%in%c(12,1,2),"DJF",
                         ifelse(cldm$month%in%5:8,"JJA",
                                ifelse(cldm$month%in%9:11,"SON",NA))))
 
-## identify which stations have data in which era (pre or post-MODIS)
-st_era=dcast(cldml[cldml$variable%in%c("cld","cld_all"),],
-             StaID~variable,value.var="value",
-             fun.aggregate=function(x) sum(!is.na(x),na.rm=T))
-st_era$era=ifelse(st_era$cld_all>0&st_era$cld>0,"1970-2009",
-                  ifelse(st_era$cld_all>0&st_era$cld==0,"1970-2000",
-                         ifelse(st_era$cld_all==0&st_era$cld>0,"2000-2009","No Data")))
-st$era=st_era$era[match(st$id,st_era$StaID)]
-st$era[is.na(st$era)]="No Data"
 
 ## write out the tables
 write.csv(cld,file="data/validation/cld.csv",row.names=F)
 write.csv(cldm,file="data/validation/cldm.csv",row.names=F)
 writeOGR(st,dsn="data/validation/",layer="stations",driver="ESRI Shapefile",overwrite_layer=T)
 #########################################################################
-cldm=read.csv("data/validation/cldm.csv")
+
 
 ### Extract regional transects
 cids=c(10866,10980,11130,11135,11138,11146,11210,11212,13014)
