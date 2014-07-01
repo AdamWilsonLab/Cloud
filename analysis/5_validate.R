@@ -165,6 +165,14 @@ cldm$seas=ifelse(cldm$month%in%c(12,1,2),"DJF",
                         ifelse(cldm$month%in%5:8,"JJA",
                                ifelse(cldm$month%in%9:11,"SON",NA))))
 
+## add indicator for MODIS era to st
+mtab=do.call(rbind.data.frame,by(cldm,cldm$StaID,function(x) c(All=any(!is.na(x$cld_all)),MODIS=any(!is.na(x$cld)))))
+mtab$era=ifelse(mtab[,1]&mtab[,2],"Full",
+                ifelse(mtab[,1]&!mtab[,2],"Pre-MODIS",
+                       ifelse(!mtab[,1]&mtab[,2],"MODIS","None")))
+mtab$id=rownames(mtab$id)
+st$era=as.factor(mtab$era[match(as.character(st$id),rownames(mtab))])
+
 
 ## write out the tables
 write.csv(cld,file="data/validation/cld.csv",row.names=F)
@@ -172,6 +180,8 @@ write.csv(cldm,file="data/validation/cldm.csv",row.names=F)
 writeOGR(st,dsn="data/validation/",layer="stations",driver="ESRI Shapefile",overwrite_layer=T)
 #########################################################################
 cldm=read.csv("data/validation/cldm.csv")
+st=readOGR("data/validation","stations")
+
 
 ### Extract regional transects
 cids=c(10866,10980,11130,11135,11138,11146,11210,11212,13014)

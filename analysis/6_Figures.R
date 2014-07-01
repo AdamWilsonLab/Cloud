@@ -210,8 +210,6 @@ l2=levelplot(x~x*y,colours=seasl$col,data=seasl,pch=16,cex=1,
     layer(sp.lines(coast,col="black"),under=F)
 
 pdf(width=11,height=8.5,file="manuscript/figures/Seasonality.pdf",useDingbats=F,pointsize=12)
-my.theme = trellis.par.get()
-my.theme$strip.background=list(col="transparent")
 trellis.par.set(my.theme)
 
 print(l1,position=c(0,0,1,.25),more=T)
@@ -219,13 +217,37 @@ print(l2,position=c(0,.2,1,1),more=F)
 
 dev.off()
 
-# mangle=seq(30,360,30)*(pi/180)
 
 
-# pushViewport(viewport(x=.75,y=.65,width=.42,height=.35,name="d1"))
-# grid.rect(gp=gpar(fill="white", lty=1))
-# par(fig=gridFIG(),mar=c(0,0,0,0),new=T)
-# popViewport()
+##############
+### validation stations
+v1=xyplot(lat~lon,groups=era, data=st@data,asp=.75,auto.key=F,
+          ylab="Latitude",xlab="Longitude",
+          par.settings=list(superpose.symbol =list(cex=.5,pch=16,col=c("black","red"))))+
+  layer(sp.lines(coast,col="black",lwd=1),under=T)
+
+png("manuscript/figures/ValidationStations.png",width=2000,height=1500,res=300,pointsize=47,bg="white")
+trellis.par.set(my.theme)
+print(v1)
+dev.off()
+
+##########################
+## Sahara orbital correction
+dt=stack("data/out/SaharaBiasCorrectionExample.tif")[[1:2]]
+names(dt)=c("a   Uncorrected_Terra ","b    Corrected_Terra")
+gain(dt)=.01
+
+pars=list(layout.heights=list(key.bottom=2,key.top=1),layout.widths = list(axis.key.padding = 3,axis.left=0.6))
+bcols=colorRampPalette(c("#08306b","#0d57a1","#2878b8","#4997c9","#72b2d7","#a2cbe2","#c7dcef","#deebf7","#f7fbff"))
+
+png("manuscript/figures/Sahara.png",width=1500,height=1500,res=300,pointsize=47,bg="white")
+trellis.par.set(my.theme)
+s1=levelplot(dt[[1]],col.regions=bcols(100),at=seq(0,75,len=101),
+          cuts=99,margin=F,max.pixels=1e6,par.settings = pars)#+layer(sp.lines(coast))
+s2=levelplot(dt[[2]],col.regions=bcols(100),at=seq(0,75,len=101),
+          cuts=99,margin=F,max.pixels=1e6,par.settings = pars)#+layer(sp.lines(coast))
+
+dev.off()
 
 ## vector plot of seasonality
 vectorplot(seas,narrows=2e3, lwd.arrows=0.6, length=unit(5e-2, 'npc'),
