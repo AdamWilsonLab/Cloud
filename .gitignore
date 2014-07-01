@@ -6,7 +6,7 @@ manuscript/SM/figure
 data/MCD09/*
 data/MCD09_deriv/*
 *.tif
-
+*#*
 
 ## tex files
 *.bbl

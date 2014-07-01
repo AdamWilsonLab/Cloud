@@ -144,8 +144,8 @@ foreach(i=1:length(f2), .options.multicore=list(preschedule=FALSE)) %dopar% {
 f3=list.files(paste("data/MCD09/",sep=""),pattern=paste("MCD09_mean_[0-9].[.]tif$",sep=""),full=T)
 f3sd=list.files(paste("data/MCD09/",sep=""),pattern=paste(".*MCD09_sd_[0-9].[.]tif$",sep=""),full=T)
 
-dmean=readAll(stack(as.list(f3)));NAvalue(dmean)=65535
-dsd=readAll(stack(as.list(f3sd)));NAvalue(dsd)=65535
+dmean=stack(as.list(f3));NAvalue(dmean)=65535
+dsd=stack(as.list(f3sd));NAvalue(dsd)=65535
 
 ## Function to calculate standard deviation and round it to nearest integer
 Rsd=function(x) calc(x,function(x) {
@@ -156,16 +156,16 @@ Rmean=function(x) calc(x,function(x) {
   mean(x,na.rm=T)
 })
 
-#dintra=clusterR(dmean,Rsd,na.rm=T,file="data/MCD09_deriv/intra.tif",overwrite=T,options=c("COMPRESS=LZW","PREDICTOR=2"),dataType='INT2U',NAflag=65535)
-#dinter=clusterR(dsd,Rmean,na.rm=T,file="data/MCD09_deriv/inter.tif",overwrite=T,options=c("COMPRESS=LZW","PREDICTOR=2"),dataType='INT2U',NAflag=65535)
+dintra=clusterR(dmean,Rsd,na.rm=T,file="data/MCD09_deriv/intra.tif",overwrite=T,dataType='INT2U',NAflag=65535)
+dinter=clusterR(dsd,Rmean,na.rm=T,file="data/MCD09_deriv/inter.tif",overwrite=T,dataType='INT2U',NAflag=65535)
 
-dintra=calc(dmean,sd,na.rm=T,file="data/MCD09_deriv/intra.tif",overwrite=T,dataType='INT2U',NAflag=65535)
-dinter=calc(dsd,mean,na.rm=T,file="data/MCD09_deriv/inter.tif",overwrite=T,dataType='INT2U',NAflag=65535)
+#dintra=calc(dmean,sd,na.rm=T,file="data/MCD09_deriv/intra.tif",overwrite=T,dataType='INT2U',NAflag=65535)
+#dinter=calc(dsd,mean,na.rm=T,file="data/MCD09_deriv/inter.tif",overwrite=T,dataType='INT2U',NAflag=65535)
 
 
 ## Overall annual mean
-#dmeanannual=clusterR(dmean,Rmean,na.rm=T,file="data/MCD09_deriv/meanannual.tif",overwrite=T,dataType='INT2U',NAflag=65535)
-dmeanannual=calc(dmean,mean,na.rm=T,file="data/MCD09_deriv/meanannual.tif",options=c("COMPRESS=LZW","PREDICTOR=2"),overwrite=T,dataType='INT2U',NAflag=65535)
+dmeanannual=clusterR(dmean,Rmean,na.rm=T,file="data/MCD09_deriv/meanannual.tif",overwrite=T,overwrite=T,options=c("COMPRESS=LZW","PREDICTOR=2"),dataType='INT2U',NAflag=65535)
+#dmeanannual=calc(dmean,mean,na.rm=T,file="data/MCD09_deriv/meanannual.tif",options=c("COMPRESS=LZW","PREDICTOR=2"),overwrite=T,dataType='INT2U',NAflag=65535)
 
 ## use pkfilter to see if it goes faster
 ## first make a 12-band image of means and sd's
