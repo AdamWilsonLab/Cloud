@@ -75,7 +75,7 @@ cldm=do.call(rbind.data.frame,by(cld,list(month=as.factor(cld$month),StaID=as.fa
 
 
 ## add the EarthEnvCloud data to cld
-mod09_mean=stack(list.files("data/MCD09/",pattern="MCD09_mean_[0-9]*[.]tif",full=T))
+mod09_mean=stack((list.files("data/MCD09/",pattern="MCD09_mean_[0-9]*[.]tif",full=T)))
 NAvalue(mod09_mean)=65535
 gain(mod09_mean)=.01
 names(mod09_mean)=month.name
@@ -93,7 +93,7 @@ bins=cut(st$lat,10)
 rerun=F
 if(rerun&file.exists("valid.csv")) file.remove("data/validation/valid.csv")
 
-beginCluster(12)
+beginCluster(6)
 
 lapply(levels(bins),function(lb) {
   l=which(bins==lb)
@@ -106,7 +106,7 @@ lapply(levels(bins),function(lb) {
   td2$id=st$id[l]
   td2$type="MCD09_sd"
   print(lb)
-  write.table(rbind(td1,td2),"valid.csv",append=T,col.names=F,quote=F,sep=",",row.names=F)
+  write.table(rbind(td1,td2),"data/validation/valid.csv",append=T,col.names=F,quote=F,sep=",",row.names=F)
   return(lb)
 })
 
@@ -122,8 +122,8 @@ mod09stl=dcast(mod09stl,id+month~type,value="value")
 
 ## add it to cld
 cldm$monthname=month.name[cldm$month]
-cldm$MCD09_mean=mod09stl$MCD09_meanb[match(paste(cldm$StaID,cldm$monthname),paste(mod09stl$id,mod09stl$month))]
-cldm$MCD09_sd=mod09stl$MCD09_sdb[match(paste(cldm$StaID,cldm$monthname),paste(mod09stl$id,mod09stl$month))]
+cldm$MCD09_mean=mod09stl$MCD09_mean[match(paste(cldm$StaID,cldm$monthname),paste(mod09stl$id,mod09stl$month))]
+cldm$MCD09_sd=mod09stl$MCD09_sd[match(paste(cldm$StaID,cldm$monthname),paste(mod09stl$id,mod09stl$month))]
 
 
 ## LULC
@@ -139,7 +139,7 @@ Mode <- function(x) {
       ux <- na.omit(unique(x))
         ux[which.max(tabulate(match(x, ux)))]
       }
-lulcst=raster::extract(lulc,st,fun=Mode,buffer=buf16,df=T)
+lulcst=raster::extract(lulc,st,fun=Mode,buffer=buf,df=T)
 colnames(lulcst)=c("id","lulc")
 lulcst$StaID=st$id
 ## add it to cld
@@ -165,6 +165,14 @@ cldm$seas=ifelse(cldm$month%in%c(12,1,2),"DJF",
                         ifelse(cldm$month%in%5:8,"JJA",
                                ifelse(cldm$month%in%9:11,"SON",NA))))
 
+## add indicator for MODIS era to st
+mtab=do.call(rbind.data.frame,by(cldm,cldm$StaID,function(x) c(All=any(!is.na(x$cld_all)),MODIS=any(!is.na(x$cld)))))
+mtab$era=ifelse(mtab[,1]&mtab[,2],"Full",
+                ifelse(mtab[,1]&!mtab[,2],"Pre-MODIS",
+                       ifelse(!mtab[,1]&mtab[,2],"MODIS","None")))
+mtab$id=rownames(mtab$id)
+st$era=as.factor(mtab$era[match(as.character(st$id),rownames(mtab))])
+
 
 ## write out the tables
 write.csv(cld,file="data/validation/cld.csv",row.names=F)
@@ -172,6 +180,8 @@ write.csv(cldm,file="data/validation/cldm.csv",row.names=F)
 writeOGR(st,dsn="data/validation/",layer="stations",driver="ESRI Shapefile",overwrite_layer=T)
 #########################################################################
 cldm=read.csv("data/validation/cldm.csv")
+st=readOGR("data/validation","stations")
+
 
 ### Extract regional transects
 cids=c(10866,10980,11130,11135,11138,11146,11210,11212,13014)
@@ -181,12 +191,12 @@ ts=cldm[cldm$StaID%in%cids,]
 ts$trans=match(ts$StaID,cids)
 ts$cld_allpsd=ts$cld_all+ts$cldsd_all
 ts$cld_allmsd=ts$cld_all-ts$cldsd_all
-ts$mod09msd=ts$mod09-ts$mod09sd
-ts$mod09psd=ts$mod09+ts$mod09sd
-ts$mod09msd=ts$mod09-ts$mod09sd
-ts$mod09psd=ts$mod09+ts$mod09sd
+ts$mod09msd=ts$MCD09_mean-ts$MCD09_sd
+ts$mod09psd=ts$MCD09_mean+ts$MCD09_sd
+ts$mod09msd=ts$MCD09_mean-ts$MCD09_sd
+ts$mod09psd=ts$MCD09_mean+ts$MCD09_sd
 
-tsl=melt(ts,id.vars=c("month","trans"),measure.vars=c("cld_all","cld_allmsd","cld_allpsd","MCD09_meanb5","MCD09_meanb16","MCD09_sdb16"))
+tsl=melt(ts,id.vars=c("month","trans"),measure.vars=c("cld_all","cld_allmsd","cld_allpsd","MCD09_mean","MCD09_sd"))
 
 #as("SpatialLinesDataFrame")
 xyplot(value~trans|month,groups=variable,data=tsl,type="l",auto.key=T,ylim=c(0,100))

@@ -5,7 +5,7 @@
 ### Load validation data
 cldm=read.csv("data/validation/cldm.csv",row.names=NULL)
 st=readOGR("data/validation","stations")
-st=st[st$era!="No Data",]
+st$era=factor(st$era,levels=c("Pre-MODIS","Full"),labels=c("Pre-MODIS","Full"),ordered=T)
 
 ## month factors
 cldm$month2=factor(cldm$month,labels=month.name,ordered=T)

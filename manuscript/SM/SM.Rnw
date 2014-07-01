@@ -56,7 +56,7 @@ print(getwd())
 <<loaddata>>=
 ## Run the setup script
 source("analysis/setup.R")
-source("analysis/6_LoadData.R")
+#source("analysis/6_LoadData.R")
 
 source(list.files("R",full=T))
    
