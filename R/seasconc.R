@@ -12,8 +12,8 @@ seasconc <- function(x, na.rm=F) {
   if(!na.rm) if(any(is.na(x))) return(NA)
     rt=sqrt(sum(x * cos(theta),na.rm=T)^2 + sum(x * sin(theta),na.rm=T)^2)    # the magnitude of the summation
     rsum=sum(x,na.rm=T)
-    Pc=round((1000*rt/rsum))
-    return(Pc)
+    Pc=(1000*rt/rsum)
+    Pc
 }
 
 
