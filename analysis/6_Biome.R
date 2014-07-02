@@ -43,7 +43,7 @@ system(paste("gdal_rasterize -a icode -init 0 -l biomes -ot Byte -te -180 -90 18
 bprods=c("data/MCD09_deriv/inter.tif",
          "data/MCD09_deriv/intra.tif",
          "data/MCD09_deriv/seas_conc.tif",
-#         "data/MCD09_deriv/meannanual.tif")#,
+         "data/MCD09_deriv/meannanual.tif"),
     paste("data/MCD09/MCD09_mean_",sprintf("%02d",1:12),".tif",sep=""))
 
 ### loop over products and summarize by biome
@@ -61,9 +61,6 @@ foreach(m=bprods)%dopar%{
   ## clean up
   file.remove(tbiome)
 }    
-
-
-## add  seasonal mean(sd), intra, inter, seasonc
 
 bs=do.call(rbind.data.frame,lapply(bprods,function(m){
   tcloudbiome=paste0("data/out/biomesummaries/teow_",sub(".tif",".txt",basename(m)))
