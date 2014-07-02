@@ -26,7 +26,7 @@ library(rasterAutocorr)
 library(doMC)
 registerDoMC(10)
 
-rasterOptions(progress="text",maxmemory=1e12)
+rasterOptions(progress="text",maxmemory=1e6)
 
 ## increase the amount of memory for gdal to speed up processing
 Sys.setenv(GDAL_CACHEMAX=5000,CPL_LOG_ERRORS="ON")
@@ -74,39 +74,6 @@ write.table(cols,"data/out/grasscols.txt",col.names=F,row.names=F,quote=F)
 ## read in coast line
 coast=readOGR("data/gshhs/","coast")
 
-
-#######  Functions
-
-## Long term summaries
-seasconc <- function(x,return.Pc=T,return.thetat=T) {
-  #################################################################################################
-  ## Precipitation Concentration function
-  ## This function calculates Precipitation Concentration based on Markham's (1970) technique as described in Schulze (1997)
-  ## South Africa Atlas of Agrohydology and Climatology - R E Schulze, M Maharaj, S D Lynch, B J Howe, and B Melvile-Thomson
-  ## Pages 37-38
-  #################################################################################################
-  ## x is a vector of precipitation quantities - the mean for each factor in "months" will be taken,
-  ## so it does not matter if the data are daily or monthly, as long as the "months" factor correctly
-  ## identifies them into 12 monthly bins, collapse indicates whether the data are already summarized as monthly means.
-  #################################################################################################
-  theta=seq(30,360,30)*(pi/180)                                       # set up angles for each month & convert to radians
-  if(any(is.na(x))) { return(cbind(Pc=NA,thetat=NA))}
-  if(return.Pc) {
-    rt=sqrt(sum(x * cos(theta))^2 + sum(x * sin(theta))^2)    # the magnitude of the summation
-    Pc=as.integer(round((rt/sum(x))*1000))}
-  if(return.thetat){
-    s1=sum(x*sin(theta),na.rm=T); s2=sum(x*cos(theta),na.rm=T)
-    if(s1>=0 & s2>=0)  {thetat=abs((180/pi)*(atan(sum(x*sin(theta),na.rm=T)/sum(x*cos(theta),na.rm=T))))}
-    if(s1>=0 & s2<=0)  {thetat=180-abs((180/pi)*(atan(sum(x*sin(theta),na.rm=T)/sum(x*cos(theta),na.rm=T))))}
-    if(s1<=0 & s2<=0)  {thetat=180+abs((180/pi)*(atan(sum(x*sin(theta),na.rm=T)/sum(x*cos(theta),na.rm=T))))}
-    if(s1<=0 & s2>=0)  {thetat=360-abs((180/pi)*(atan(sum(x*sin(theta),na.rm=T)/sum(x*cos(theta),na.rm=T))))}
-    thetat=as.integer(round(thetat*10))
-  }
-  if(return.thetat&return.Pc) return(c(conc=Pc,theta=thetat))
-  if(return.Pc)          return(Pc)
-  if(return.thetat)  return(thetat)
-}
-
 ### 
 knitsDoc <- function(name) {
   library(knitr)
@@ -123,6 +90,7 @@ regs=list(
   Venezuela=extent(c(-69,-59,0,7)),
   Venezuela2=extent(c(-85,-59,-6,11)),
   Venezuela3=extent(c(-85,-53,-7,11)),
+  SouthAmerica=extent(c(-84,-33,-55,14)),
   Indonesia=extent(c(93.2,140,-14,12)),
   CFR=extent(c(17.5,29,-35,-29)),
   CFR2=extent(c(15,33,-35,-25)),
