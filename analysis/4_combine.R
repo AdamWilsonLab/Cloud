@@ -180,15 +180,17 @@ dmeanannual=clusterR(dmean,Rmean,m=4,file="data/MCD09_deriv/meanannual.tif",
 #################################################
 ### Calculate Markham's Seasonality
 
-seastheta(dmean[2000])
+fseasconc(dmean)
 stheta=calc(dmean,seastheta)
 
+fseasconc=function(x) calc(x,seasconc,na.rm=F)
+
+beginCluster(5)
 ## calculate seasonality
-sconc=clusterR(dmean,seasconc,overwrite=T,filename="data/MCD09_deriv/seasconc.tif",NAflag=65535,datatype="INT2U")
-stheta=clusterR(dmean,seastheta,overwrite=T,filename="data/MCD09_deriv/seastheta.tif",NAflag=65535,datatype="INT2U")
+sconc=clusterR(dmean,fun=fseasconc,overwrite=T,filename="data/MCD09_deriv/seasconc.tif",NAflag=65535,datatype="INT2U")
+stheta=clusterR(dmean,fun=seastheta,overwrite=T,filename="data/MCD09_deriv/seastheta.tif",NAflag=65535,datatype="INT2U")
 
 endCluster()
-beginCluster(10)
 
 ### generate color key
 seas=stack("data/MCD09_deriv/seasconc.tif","data/MCD09_deriv/seastheta.tif")
