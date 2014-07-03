@@ -50,10 +50,10 @@ cld$Amt=cld$Amt/100
 cld=cld[!is.na(cld$Amt),]
 
 ## table of stations with > 20 observations per month
-#dcast(cld,StaID~YR,value.var="Nobs")
-#mtab=ddply(cld,c('StaID','month'),function(df){ data.frame(count=sum(df$Nobs>20,na.rm=T))})
-#mtab2=mtab[table(mtab$count>10)]
-#stem(mtab$count)
+#dcast(cld,StaID~YR,value.var="Nobs",fun=sum)
+mtab=cld %.% group_by(StaID,month) %.% summarise(count=sum(Nobs>20,na.rm=T)) 
+mtab2=mtab %.% group_by(StaID) %.% summarise(count=any(count>10))
+stem(mtab$count)
 
 ## calculate means and sds for full record (1970-2009)
 stem(cld$Nobs)
@@ -89,13 +89,13 @@ names(mod09_sd)=month.name
 ## overlay the data with 32km diameter (16km radius) buffer
 ## buffer size from Dybbroe, et al. (2005) doi:10.1175/JAM-2189.1.
 buf=16000
-bins=cut(st$lat,10)
+bins=cut(st$lat,quantile(st$lat,seq(0,1,len=20)))
+## should cut by quantile instead to produce more even jobs...
+
 rerun=F
-if(rerun&file.exists("valid.csv")) file.remove("data/validation/valid.csv")
+if(rerun&file.exists("valid.csv")) file.remove(list.files("data/validation/",pattern="valid_tiled",full=T))
 
-beginCluster(6)
-
-lapply(levels(bins),function(lb) {
+foreach(lb=levels(bins)) %dopar% {
   l=which(bins==lb)
   ## mean
   td1=raster::extract(mod09_mean,st[l,],buffer=buf,fun=mean,na.rm=T,df=T)
@@ -106,15 +106,13 @@ lapply(levels(bins),function(lb) {
   td2$id=st$id[l]
   td2$type="MCD09_sd"
   print(lb)
-  write.table(rbind(td1,td2),"data/validation/valid.csv",append=T,col.names=F,quote=F,sep=",",row.names=F)
-  return(lb)
-})
+  write.csv(rbind(td1,td2),paste0("data/validation/valid_tiled_",gsub("\\(|\\]|,","",lb),".csv"),col.names=T,quote=F,row.names=F)
+}
 
-endCluster()
 
 ## read it back in
-mod09st=read.csv("data/validation/valid.csv",header=F)[,-c(1)]
-colnames(mod09st)=c(names(mod09_mean),"id","type")
+mod09st=do.call(rbind.data.frame,lapply(list.files("data/validation/",pattern="valid_tiled",full=T),function(f)
+  read.csv(f)[,-c(1)]))
 mod09stl=melt(mod09st,id.vars=c("id","type"))
 colnames(mod09stl)[grep("variable",colnames(mod09stl))]="month"
 mod09stl$value[mod09stl$value<0]=NA
@@ -181,6 +179,71 @@ writeOGR(st,dsn="data/validation/",layer="stations",driver="ESRI Shapefile",over
 #########################################################################
 cldm=read.csv("data/validation/cldm.csv")
 st=readOGR("data/validation","stations")
+st$era=factor(st$era,levels=c("Pre-MODIS","Full"),labels=c("Pre-MODIS","Full"),ordered=T)
+
+## set factor ordering
+cldm$monthname=factor(cldm$monthname,ordered=T,levels=month.name)
+cldm$seas=factor(cldm$seas,ordered=T,levels=c("DJF","MAM","JJA","SON"))
+
+## subset cldm to include only stations with full 10 years of data for 2000-2009 and >= 20 years for 1970-2009
+cldm[cldm$cldn<10,c("cld","cldsd")]=NA
+cldm[cldm$cldn_all<20,c("cld_all","cldsd_all")]=NA
+
+## compute seasonal means
+cldml=melt(cldm,id.vars=c("StaID","lat","lon","lulcc","biome","seas"),measure.vars=c("cld_all","cldsd_all","cldn_all","cld","cldsd","cldn","MCD09_meanb16","MCD09_meanb5","MCD09_sdb16"))
+clds=dcast(cldml,StaID+lat+lon+lulcc+biome+seas~variable,value.var="value",fun=mean,na.rm=T)
+
+# get residuals of simple linear model
+cldm$resid=NA
+cldm$resid[!is.na(cldm$cld_all)&!is.na(cldm$MCD09_mean)]=residuals(lm(MCD09_mean~cld_all,data=cldm[!is.na(cldm$cld_all)&!is.na(cldm$MCD09_mean),]))
+
+# get residuals of simple linear model
+cldm$difm_all=cldm$MCD09_mean-cldm$cld_all
+cldm$difm=cldm$MCD09_mean-cldm$cld
+
+
+source("R/lm_summary.R")
+t1=cldm %.% group_by(monthname) %.% summarise(
+  Mean=mean(MCD09_mean,na.rm=T),
+  n=lm_summary(cld,MCD09_mean,"n"),
+  R2=lm_summary(cld,MCD09_mean,"rs"),
+  RMSE=lm_summary(cld,MCD09_mean,"rmse"))
+t2=cldm %.% group_by(seas) %.% summarise(
+  Mean=mean(MCD09_mean,na.rm=T),
+  n=lm_summary(cld,MCD09_mean,"n"),
+  R2=lm_summary(cld,MCD09_mean,"rs"),
+  RMSE=lm_summary(cld,MCD09_mean,"rmse"))
+t3=data.frame(
+  "Annual",
+  Mean=mean(cldm$MCD09_mean,na.rm=T),
+  n=lm_summary(cldm$cld,cldm$MCD09_mean,"n"),
+  R2=lm_summary(cldm$cld,cldm$MCD09_mean,"rs"),
+  RMSE=lm_summary(cldm$cld,cldm$MCD09_mean,"rmse"))
+colnames(t1)[1]="Month/Season"
+colnames(t2)[1]="Month/Season"
+colnames(t3)[1]="Month/Season"
+
+## combine to a single table
+vtable=rbind.data.frame(t3,t2,t1)
+
+print(xtable(vtable,digits=2,#caption="Summary of validation data by month and season"),
+"html",format.args=list(big.mark = ",", decimal.mark = "."),include.rownames=F,file="manuscript/validtable.html")
+
+
+########################
+### Temporal stability
+### Compare two time periods
+lm_all1=lm(cld_all~MCD09_mean,data=cldm)#[!is.na(cldm$cld_all)&cldm$cldn_all>=10,])
+lm_mod=lm(cld~MCD09_mean,data=cldm)#[!is.na(cldm$cld)&cldm$cldn>=10,])
+
+mods=list("1970-2009"=lm_all1,"2000-2009"=lm_mod)
+
+screenreg(mods,digits=2,single.row=T,custom.model.names=names(mods),custom.coef.names = c("Intercept", "MODCF"))
+
+texreg(mods,custom.model.names = names(mods),custom.coef.names = c("Intercept", "MODCF"),
+       single.row = T,caption="Comparison of validation models for full station record (1970-2009) and MODIS era (2000-2009). Stations were included if they had at least 20 years of data for full record or 10 years for MODIS-era record")#,caption.placement='top')
+
+
 
 
 ### Extract regional transects
@@ -201,5 +264,5 @@ tsl=melt(ts,id.vars=c("month","trans"),measure.vars=c("cld_all","cld_allmsd","cl
 #as("SpatialLinesDataFrame")
 xyplot(value~trans|month,groups=variable,data=tsl,type="l",auto.key=T,ylim=c(0,100))
 
-xyplot(cld_all~mod09|month,data=ts,type="p",auto.key=T)
+xyplot(cld_all~MCD09_mean|month,data=ts,type="p",auto.key=T)
 

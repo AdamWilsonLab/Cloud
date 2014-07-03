@@ -3,40 +3,17 @@
 
 ### Load data
 print("Loading full raster layers")
-cf_mean=readAll(raster("data/MCD09_deriv/MCD09_meanannual.tif"))
-cf_visseas=readAll(raster("data/MCD09_deriv/seas_visct.tif"))
-inter=readAll(raster("data/MCD09_deriv/inter.tif"))
-intra=readAll(raster("data/MCD09_deriv/intra.tif"))
+cf_mean=raster("data/MCD09_deriv/meanannual.tif")
+gain(cf_mean)=.01
+cf_visseas=raster("data/MCD09_deriv/seas_visct.tif")
+NAvalue(cf_visseas)=65534
+
+inter=raster("data/MCD09_deriv/inter.tif")
+gain(inter)=.01
+intra=raster("data/MCD09_deriv/intra.tif")
+gain(intra)=.01
 NAvalue(inter)=0
 
-### Load validation data
-cldm=read.csv("data/validation/cldm.csv",row.names=NULL)
-st=readOGR("data/validation","stations")
-st$era=factor(st$era,levels=c("Pre-MODIS","Full"),labels=c("Pre-MODIS","Full"),ordered=T)
-
-## month factors
-cldm$month2=factor(cldm$month,labels=month.name,ordered=T)
-
-### Drop valitation station-months with fewer than 20 years of data for full record or less than 10 years for MODIS-era record
-cldm$cld_all[cldm$cldn_all<20]=NA
-cldm$cldsd_all[cldm$cldn_all<20]=NA
-
-cldm$cld[cldm$cldn<10]=NA
-cldm$cldsd[cldm$cldn<10]=NA
-
-cldm$seas=factor(cldm$seas,levels=c("DJF","MAM","JJA","SON"),ordered=T)
-
-## compute seasonal means
-cldml=melt(cldm,id.vars=c("StaID","lat","lon","lulcc","biome","seas"),measure.vars=c("cld_all","cldsd_all","cldn_all","cld","cldsd","cldn","MCD09_meanb16","MCD09_meanb5","MCD09_sdb16"))
-clds=dcast(cldml,StaID+lat+lon+lulcc+biome+seas~variable,value.var="value",fun=mean,na.rm=T)
-
-# get residuals of simple linear model
-cldm$resid=NA
-cldm$resid[!is.na(cldm$cld_all)&!is.na(cldm$MCD09_meanb16)]=residuals(lm(MCD09_meanb16~cld_all,data=cldm[!is.na(cldm$cld_all)&!is.na(cldm$MCD09_meanb16),]))
-
-# get residuals of simple linear model
-cldm$difm_all=cldm$MCD09_meanb16-cldm$cld_all
-cldm$difm=cldm$MCD09_meanb16-cldm$cld
 
 
 
