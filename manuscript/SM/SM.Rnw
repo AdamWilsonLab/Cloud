@@ -4,7 +4,7 @@
 \usepackage{natbib}
 \usepackage{hyperref}
 \usepackage{longtable}
-\usepackage{pdflscape}
+%\usepackage{pdflscape}
 \usepackage{fullpage}
 
 %\usepackage[backend=bibtex]{biblatex}
@@ -14,14 +14,14 @@
 
 
 %% commands for rotated table headers
-\usepackage{adjustbox}
-\usepackage{array}
-\newcolumntype{R}[2]{%
-    >{\adjustbox{angle=#1,lap=\width-(#2)}\bgroup}%
-    l%
-    <{\egroup}%
-}
-\newcommand*\rot{\multicolumn{1}{R{45}{1em}}}% no optional argument here, please!
+%\usepackage{adjustbox}
+%\usepackage{array}
+%\newcolumntype{R}[2]{%
+%    >{\adjustbox{angle=#1,lap=\width-(#2)}\bgroup}%
+%    l%
+%    <{\egroup}%
+%}
+%\newcommand*\rot{\multicolumn{1}{R{45}{1em}}}% no optional argument here, please!
 
 \graphicspath{manuscript/SM/figure/}
 
@@ -345,7 +345,7 @@ To illustrate and contrast the spatial variability in cloud frequency within and
 Figure 1: Cloud frequency seasonality and variability for each terrestrial biome separated by geographic realm.  The grey lines represent the seasonality for 1000 randomly selected locations within each region and the blue line is a thin-plate spline representing the overall seasonality.  
 
 <<BiomeTable,results="asis">>=
-bs=read.csv(file="data/sum/biomesummary.csv")
+bs=read.csv(file="data/out/biomesummary.csv")
 #bs$monthname=factor(month.name[as.numeric(as.character(bs$month))],ordered=T,levels=month.name)
 bs$realm=factor(bs$realm,ordered=T,levels=c("Antarctic","Australasia","Oceania","Afrotropics","IndoMalay", "Neotropics","Palearctic","Nearctic" ))
 bs$meansd=paste(round(bs$mean,1)," (",round(bs$sd,1),")",sep="")
@@ -359,7 +359,7 @@ print(xtable(bcode,caption="Biome and realm codes used in Table \\ref{tab:BiomeT
 
 \begin{landscape}
 <<BiomeTable2,results="asis">>=
-bst=dcast(bs[bs$product%in%c("inter","intra","seasconc","seastheta"),],code~product,value="meansd")
+bst=dcast(bs[bs$product%in%c("inter","intra","seasconc","seastheta"),],code~product,value.var="meansd")
 colnames(bst)[1]="Code"
 print(xtable(bst,caption="Mean (SD) cloud frequency metrics summarized by biome and geographic realm. See Table \\ref{tab:BiomeTable} for  Code descriptions.",
              label = "tab:BiomeTable2"),type="latex",include.rownames=F,row.names=F,tabular.environment='longtable',floating=F,size="footnotesize",caption.placement='top')
