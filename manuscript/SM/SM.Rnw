@@ -177,7 +177,7 @@ hmcols=colorRampPalette(c("grey","blue","red","purple"))
 tr=c(0,20)
 colkey <- draw.colorkey(list(col = hmcols(tr[2]), at = tr[1]:tr[2],height=.25))
 
-xyplot(cld~mod09|month2,data=cldm,panel=function(x,y,subscripts){
+xyplot(cld~MCD09_mean|monthname,data=cldm,panel=function(x,y,subscripts){
   n=50
   bins=seq(0,100,len=n)
   tb=melt(as.matrix(table(
@@ -200,7 +200,7 @@ xyplot(cld~mod09|month2,data=cldm,panel=function(x,y,subscripts){
 <<mapresidmonth,dev="png",fig.cap="Histogram and spatial distribution of residuals from linear model between station and satellite cloud amount at station locations.  Negative (positive) values indicate locations where MODCF was less than (greater than) expected given the global relationship between MODCF and station observations.",fig.width=6, fig.height=6>>=
 colat=bgr(cldm$resid)
 phist=histogram(cldm$resid,breaks=colat$at,border=NA,col=colat$col,xlim=c(-30,30),type="count",xlab="MODCF Residuals")#,seq(0,1,len=6),na.rm=T)
-pmap=xyplot(lat~lon|month2,data=cldm,groups=cut(cldm$resid,rev(colat$at)),
+pmap=xyplot(lat~lon|monthname,data=cldm,groups=cut(cldm$resid,rev(colat$at)),
        par.settings=list(superpose.symbol=list(col=colat$col)),pch=16,cex=.25,
        auto.key=F,#list(space="right",title="Difference\n(MOD09-NDP026D)",cex.title=1),asp=1,
        ylab="Latitude",xlab="Longitude")+
@@ -235,8 +235,8 @@ print(xtable(vtable,digits=2,caption="Summary of validation data by month and se
 In addition to monthly validation we also performed the same validation on the seasonal (DFJ,MAM,JJA,SON) mean values for MODCF and the station observations.
 
 <<seasscatter,fig.width=4, fig.height=4,fig.cap="Mean seasonal cloud amount over 2000-2009 from 5388 global stations versus mean 2000-2014 MOD09 cloud frequency by month.  Coefficient of determination is shown in each panel.  Colors represent the number of station observations within each grid cell of the scatterplot.">>=
-tr2=c(0,26)
-xyplot(cld~mod09|seas,data=cldm,panel=function(x,y,subscripts){
+tr2=c(0,27)
+xyplot(cld~MCD09_mean|seas,data=cldm,panel=function(x,y,subscripts){
   n=75
   bins=seq(0,100,len=n)
   tb=melt(as.matrix(table(
@@ -256,12 +256,12 @@ xyplot(cld~mod09|seas,data=cldm,panel=function(x,y,subscripts){
 @
 
 <<seasmapresid,dev="png",fig.width=6, fig.height=6>>=
-clds$resid=NA 
+cldm$resid=NA 
 # get residuals of simple linear model
-clds$resid[!is.na(clds$cld_all)&!is.na(clds$mod09)]=residuals(lm(mod09~cld_all,data=clds[!is.na(clds$cld_all)&!is.na(clds$mod09),]))
-colat=bgr(clds$resid)
-phist=histogram(clds$resid,breaks=colat$at,border=NA,col=colat$col,xlim=c(-30,30),type="count",xlab="MODCF Residuals")#,seq(0,1,len=6),na.rm=T)
-pmap=xyplot(lat~lon|seas,data=clds,groups=cut(clds$resid,rev(colat$at)),
+cldm$resid[!is.na(cldm$cld_all)&!is.na(cldm$MCD09_mean)]=residuals(lm(MCD09_mean~cld_all,data=cldm[!is.na(cldm$cld_all)&!is.na(cldm$MCD09_mean),]))
+colat=bgr(cldm$resid)
+phist=histogram(cldm$resid,breaks=colat$at,border=NA,col=colat$col,xlim=c(-30,30),type="count",xlab="MODCF Residuals")#,seq(0,1,len=6),na.rm=T)
+pmap=xyplot(lat~lon|seas,data=cldm,groups=cut(cldm$resid,rev(colat$at)),
        par.settings=list(superpose.symbol=list(col=colat$col)),pch=16,cex=.25,
        auto.key=F,#list(space="right",title="Difference\n(MOD09-NDP026D)",cex.title=1),asp=1,
        ylab="Latitude",xlab="Longitude")+
