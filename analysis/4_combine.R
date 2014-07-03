@@ -139,7 +139,6 @@ foreach(i=1:length(f2), .options.multicore=list(preschedule=FALSE)) %dopar% {
 }
 
 ########################################################################
-##  convert to netcdf
 f3=list.files(paste("data/MCD09/",sep=""),pattern=paste("MCD09_mean_[0-9].[.]tif$",sep=""),full=T)
 f3sd=list.files(paste("data/MCD09/",sep=""),pattern=paste(".*MCD09_sd_[0-9].[.]tif$",sep=""),full=T)
 
@@ -180,17 +179,16 @@ dmeanannual=clusterR(dmean,Rmean,m=4,file="data/MCD09_deriv/meanannual.tif",
 #################################################
 ### Calculate Markham's Seasonality
 
-fseasconc(dmean)
-stheta=calc(dmean,seastheta)
+#fseasconc(dmean)
+#stheta=calc(dmean,seastheta)
 
 fseasconc=function(x) calc(x,seasconc,na.rm=F)
+fseastheta=function(x) calc(x,seastheta,na.rm=F)
 
-beginCluster(5)
 ## calculate seasonality
-sconc=clusterR(dmean,fun=fseasconc,overwrite=T,filename="data/MCD09_deriv/seasconc.tif",NAflag=65535,datatype="INT2U")
-stheta=clusterR(dmean,fun=seastheta,overwrite=T,filename="data/MCD09_deriv/seastheta.tif",NAflag=65535,datatype="INT2U")
+sconc=clusterR(dmean,fun=fseasconc,export="seasconc",overwrite=T,filename="data/MCD09_deriv/seasconc.tif",NAflag=65535,datatype="INT2U")
+stheta=clusterR(dmean,fun=fseastheta,export="seastheta",overwrite=T,filename="data/MCD09_deriv/seastheta.tif",NAflag=65535,datatype="INT2U")
 
-endCluster()
 
 ### generate color key
 seas=stack("data/MCD09_deriv/seasconc.tif","data/MCD09_deriv/seastheta.tif")
@@ -235,6 +233,7 @@ col=expand.grid(conc=concs,theta=thetas)
 col=cbind.data.frame(col,t(col2rgb(as.character(cut(col$theta,breaks=1000,labels=rainbow(1000))))))
 col=cbind.data.frame(col,t(rgb2hsv(r=col$red,g=col$green,b=col$blue,maxColorValue=255)))
 col$id=as.integer(1:nrow(col))
+prot=-180
 col$x=col$conc*cos((pi/180)*(-col$theta+prot))
 col$y=col$conc*sin((pi/180)*(-col$theta+prot))
 ## adjust saturation and value to bring low concentration values down
@@ -253,7 +252,7 @@ col$exists=paste(round(col$conc),round(col$theta))%in%paste(uvals$conc,uvals$the
 write.csv(col,row.names=F,file="data/MCD09_deriv/coltable.csv")
 
 ## create new raster referencing this color table
-tcol=as(cast(col,conc~theta,value="id",df=F,fill=NA),"matrix")
+tcol=as(dcast(col,conc~theta,value.var="id",df=F,fill=NA),"matrix")
 dimnames(tcol)=NULL
 ## function to look up color table value for each pixel
 iseas=function(x,...){
@@ -273,7 +272,7 @@ endCluster()
 ## update color table via VRT
 seasvrt="data/MCD09_deriv/seas_vis.vrt"
 ## write a VRT
-system(paste("gdal_translate -of VRT -a_nodata 65535 data/MCD09_deriv/seas_ind.tif ",seasvrt)) 
+system(paste("gdal_translate -of VRT -a_nodata 65534 data/MCD09_deriv/seas_ind.tif ",seasvrt)) 
 ## read in the VRT and update the color information using the color table
 vrt=scan(seasvrt,what="char")
 hd=c("<ColorInterp>Palette</ColorInterp>","<ColorTable>")
@@ -289,6 +288,11 @@ system(paste("gdal_translate -co COMPRESS=LZW -a_nodata 65535 -co PREDICTOR=2 -o
 system(paste("gdal_translate -a_nodata 255 -expand rgba -co COMPRESS=LZW -co PREDICTOR=2 -of GTIFF -ot Byte ",seasvrt,"  data/MCD09_deriv/seas_rgb.tif")) 
 
 
+################################################################################
+################################################################################
+################################################################################
+################################################################################
+################################################################################
 
 #### old junk below here...
 ################################################################################

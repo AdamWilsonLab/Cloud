@@ -5,6 +5,8 @@ manuscript/SM/cache
 manuscript/SM/figure
 data/MCD09/*
 data/MCD09_deriv/*
+data/validation/valid_*
+data/tmp
 *.tif
 *#*
 

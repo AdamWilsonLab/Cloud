@@ -47,7 +47,8 @@ dev.off()
 
 
 
-
+#########
+#### Seasonality plot
 
 col=read.csv("data/MCD09_deriv/coltable.csv",stringsAsFactors=F)
 
@@ -71,7 +72,7 @@ mon=c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec") #
 ladj=65
 lims=c(-80,80)
 
-png(width=1000,height=1000,pointsize=32,file="manuscript/figures/SeasKey_%0d.png")
+png(width=1000,height=1000,pointsize=38,file="manuscript/figures/SeasKey_%0d.png")
 ### Create the color key
 xyplot(conc~theta,col=col$val[col$exists],data=col[col$exists,],pch=16,cex=1,
        scales=list(
@@ -102,16 +103,17 @@ g1=levelplot(cf_visseas,col.regions=cf_visseas@legend@colortable,cuts=length(cf_
              scales=list(cex=1,y=list(at=c(-40,0,40))))+
   layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col="black"),under=T)+
   layer(sp.polygons(as(regs[["CFR2"]],'SpatialPolygons'),col="red",lwd=1.5),under=F)+
-  layer(sp.polygons(as(regs[["Indonesia"]],'SpatialPolygons'),col="red",lwd=1.5),under=F)+
+  layer(sp.polygons(as(regs[["Venezuela2"]],'SpatialPolygons'),col="red",lwd=1.5),under=F)+
   layer(sp.lines(coast,col="white",lwd=.5),under=F)
 
 ## regional plots
-
-r_cfr=levelplot(crop(cf_visseas,regs[["CFR2"]]),col.regions=cf_visseas@legend@colortable,cuts=length(cf_visseas@legend@colortable),at=0:length(cf_visseas@legend@colortable),
-             colorkey=F,panel=panel.levelplot.raster,margin=F,maxpixels=res,ylab="",xlab="",useRaster=T,scales=list(cex=1,y=list(at=c(-34,-30,-26))),asp=1)+
+r_cfr=crop(cf_visseas,regs[["CFR"]],datatype="INT2U")
+r1=levelplot(r_cfr,col.regions=cf_visseas@legend@colortable,cuts=length(cf_visseas@legend@colortable),at=0:length(cf_visseas@legend@colortable),
+                colorkey=F,panel=panel.levelplot.raster,margin=F,maxpixels=res,ylab="",xlab="",useRaster=T,scales=list(cex=1,y=list(at=c(-34,-30,-26))),asp=1)+
   layer(sp.lines(coast,col="white",lwd=.5),under=F)
-r_ind=levelplot(crop(cf_visseas,regs[["Indonesia"]]),col.regions=cf_visseas@legend@colortable,cuts=length(cf_visseas@legend@colortable),at=0:length(cf_visseas@legend@colortable),
-                colorkey=F,panel=panel.levelplot.raster,margin=F,maxpixels=res,ylab="",xlab="",useRaster=T,scales=list(cex=1,y=list(at=c(-10,0,10))),asp=1)+
+r_ven=crop(cf_visseas,regs[["Venezuela2"]],datatype="INT2U")
+r2=levelplot(r_ven,col.regions=cf_visseas@legend@colortable,cuts=length(cf_visseas@legend@colortable),at=0:length(cf_visseas@legend@colortable),
+                colorkey=F,panel=panel.levelplot.raster,margin=F,maxpixels=res,ylab="",xlab="",useRaster=T,scales=list(cex=1,y=list(at=c(2,6,10))),asp=1)+
   layer(sp.lines(coast,col="white",lwd=.5),under=F)
 
 
@@ -119,8 +121,8 @@ r_ind=levelplot(crop(cf_visseas,regs[["Indonesia"]]),col.regions=cf_visseas@lege
 png(width=2400,height=1600,res=200,pointsize=12,type="cairo-png",file="manuscript/figures/Seasonality.png")
 print(k1,position=c(0,.5,.35,1),more=T) #legend
 print(g1,position=c(0.35,.5,1,1),more=T) #global
-print(r_cfr,position=c(0,0,.48,.5),more=T)
-print(r_ind,position=c(.46,0,1,.5),more=F)
+print(r1,position=c(.46,0,1,.5),more=T)
+print(r2,position=c(0,0,.48,.5),more=F)
 ## add panel labels
 gp=gpar(fontsize=18, col="black",fontface="bold")
 grid.text("a",x=0.05,y=.995,just=c("left","top"),gp=gp)
@@ -149,13 +151,14 @@ names(gewex)="PATMOS-x GEWEX AVHRR"
 #MOD_gewex2=zonal(mod09a,MOD_gewex,fun='mean')
 res=1e7
 
-r="Venezuela3"
+r="Venezuela2"
 # ylab.right = "Cloud Frequency (%)",par.settings = list(layout.widths = list(axis.key.padding = 0.1,axis.left=0.6,ylab.right = 3,right.padding=2)),
 pars=list(layout.heights=list(key.bottom=2,key.top=1),layout.widths = list(axis.key.padding = 3,axis.left=1))
-p1=levelplot(crop(cf_mean,regs[[r]]),col.regions=colR(n),at=seq(0,100,len=99),
+cf_r=crop(cf_mean,regs[[r]])
+p1=levelplot(cf_r,col.regions=colR(n),at=seq(0,100,len=99),
              ylab="",xlab="",
     colorkey=F,
-    cuts=99,margin=F,max.pixels=1e6,par.settings = pars)+
+    cuts=99,margin=F,maxpixels=1e7,par.settings = pars)+
   layer(sp.lines(coast,col="black",lwd=.5),under=F)
 
 p2=levelplot(crop(gewex,regs[[r]]),col.regions=colR(n),at=seq(0,1,len=99),cuts=99,margin=F,max.pixels=1e6,
@@ -171,21 +174,18 @@ p3=levelplot(tmap,col.regions=rev(terrain.colors(n)),cuts=100,at=seq(tmap@data@m
   layer(sp.lines(coast,col="black",lwd=.5),under=F)
 
 p4=levelplot(crop(wc_dem,regs[[r]]),col.regions=terrain.colors(n),cuts=99,margin=F,max.pixels=1e6,
-             ylab="",xlab="",
-             colorkey=list(space="bottom",height=.75,width=1),
-    par.settings = pars,labels=list(labels=c(0,2500,5000),at=c(0,2500,5000)))+
+             ylab="",xlab="",maxpixels=1e7,
+             colorkey=list(space="bottom",height=.75,width=1,labels=list(labels=c(0,2500,5000),at=c(0,2500,5000))),
+    par.settings = pars,scales=list(y=list(at=c(2,6,10))))+
   layer(sp.lines(coast,col="black",lwd=.5),under=F)
 
 
 png("manuscript/figures/Resolution.png",width=1000,height=2000,res=300,pointsize=47,bg="white")
 
-  
 trellis.par.set(my.theme)
 #pdf("output/mod09_resolution.pdf",width=11,height=8.5)
 #print(c("a    MODCF (%)"=p1,"b     PATMOS-x GEWEX (%)"=p2,"c    WorldClim Precip (mm)"=p3,"d    Elevation (m)"=p4,x.same=T,y.same=T,merge.legends=T,layout=c(2,2)))
 print(c("a     PATMOS-x GEWEX (%)"=p2,"b    MODCF (%)"=p1,"c    Elevation (m)"=p4,x.same=T,y.same=T,merge.legends=T,layout=c(1,3)))
-
-
 dev.off()
 
 ###  Spatial Autocorrelation
@@ -237,16 +237,16 @@ dt=stack("data/out/SaharaBiasCorrectionExample.tif")[[1:2]]
 names(dt)=c("a   Uncorrected_Terra ","b    Corrected_Terra")
 gain(dt)=.01
 
-pars=list(layout.heights=list(key.bottom=2,key.top=1),layout.widths = list(axis.key.padding = 3,axis.left=0.6))
+pars=list(layout.heights=list(key.bottom=2,key.top=1),layout.widths = list(axis.key.padding = 3,axis.left=1))
 bcols=colorRampPalette(c("#08306b","#0d57a1","#2878b8","#4997c9","#72b2d7","#a2cbe2","#c7dcef","#deebf7","#f7fbff"))
 
-png("manuscript/figures/Sahara.png",width=1500,height=1500,res=300,pointsize=47,bg="white")
+png("manuscript/figures/Sahara.png",width=2000,height=1500,res=300,pointsize=47,bg="white")
 trellis.par.set(my.theme)
 s1=levelplot(dt[[1]],col.regions=bcols(100),at=seq(0,75,len=101),
-          cuts=99,margin=F,max.pixels=1e6,par.settings = pars)#+layer(sp.lines(coast))
+          cuts=99,margin=F,max.pixels=1e6,par.settings = pars)+layer(sp.lines(coast))
 s2=levelplot(dt[[2]],col.regions=bcols(100),at=seq(0,75,len=101),
-          cuts=99,margin=F,max.pixels=1e6,par.settings = pars)#+layer(sp.lines(coast))
-
+          cuts=99,margin=F,max.pixels=1e6,par.settings = pars)+layer(sp.lines(coast))
+print(c("a   Uncorrected Terra"=s1,"b    Corrected Terra"=s2))
 dev.off()
 
 ## vector plot of seasonality

@@ -39,14 +39,10 @@ regionname="Venezuela"
 foreach(i=1:4) %dopar% {
 tprod=names(prods[i])
 ## set file names
-#treg=paste0("data/autocorr/data_",tprod,"_",regionname,".tif")
-#tac=paste0("data/autocorr/ac_",tprod,"_",regionname,".tif")
-#tdist=paste0("data/autocorr/dist_",tprod,"_",regionname,".tif")
 ## create subset
 reg=crop(prods[[i]],region)#,filename=treg,overwrite=T,dataType='INT1S',NAflag=-128)
 ## run the autocorrelation function and write out the output raster
 ac=acorr2(reg)#,filename=tac,overwrite=T,dataType='INT2S')
-#########################################
 ## build the table of values to construct the correlograms
 ftd=rbind.data.frame(
   data.frame(values=values(ac[["acor"]])/10,dist=values(ac[["dist"]]),n=values(ac[["nobs"]]),type=tprod,region=regionname)
@@ -111,6 +107,11 @@ png("manuscript/figures/autoCorr.png",width=3000,height=2000,res=300,pointsize=4
 trellis.par.set(my.theme)
 print(p1)
 dev.off()
+
+
+## get some stats
+ftd3%.%filter(dist2>10)%.% group_by(type2) %.%  arrange(desc(mean)) %.%head(1)
+
 
 
   ## plot the autocorrlation and distance

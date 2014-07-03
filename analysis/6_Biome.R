@@ -42,8 +42,9 @@ system(paste("gdal_rasterize -a icode -init 0 -l biomes -ot Byte -te -180 -90 18
 ## create a list of products to summarize
 bprods=c("data/MCD09_deriv/inter.tif",
          "data/MCD09_deriv/intra.tif",
-         "data/MCD09_deriv/seas_conc.tif",
-         "data/MCD09_deriv/meannanual.tif"),
+         "data/MCD09_deriv/seasconc.tif",
+         "data/MCD09_deriv/seastheta.tif",
+         "data/MCD09_deriv/meanannual.tif",
     paste("data/MCD09/MCD09_mean_",sprintf("%02d",1:12),".tif",sep=""))
 
 ### loop over products and summarize by biome
@@ -54,7 +55,7 @@ foreach(m=bprods)%dopar%{
 
   ## mask biome raster using missing data in cloud dataset
   nas=sub("^.*=","",system(paste0("gdalinfo ",m," | grep NoData"),intern=T))  #get NA for image
-  system(paste("pksetmask -i data/out/teow.tif -m ",m," -ot UInt8 ",
+  system(paste("pksetmask -i data/out/teow.tif -m ",m," -ot UInt16 ",
                "--operator='=' --msknodata ",nas," --nodata 0  -co COMPRESS=LZW -co PREDICTOR=2 -o ",tbiome))
   ## calculate biome-level summary metrics
   system(paste("oft-stat -i ",m," -o ",tcloudbiome," -um ",tbiome," -mm"))
@@ -66,17 +67,8 @@ bs=do.call(rbind.data.frame,lapply(bprods,function(m){
   tcloudbiome=paste0("data/out/biomesummaries/teow_",sub(".tif",".txt",basename(m)))
   print(tcloudbiome)
   td=read.table(tcloudbiome)
-  if(basename(tcloudbiome)=="teow_seas_conc.txt"){
-      colnames(td)=c("icode","n","seasconc_min","seastheta_min","seasconc_max","seastheta_max","seasconc_mean","seastheta_mean","seasconc_sd","seastheta_sd")
-      tdl=melt(td,id.vars=c("icode","n"))
-      tdl[,c("product","met")]=do.call(rbind,strsplit(as.character(tdl$variable),"_"))
-      td2=dcast(tdl,icode+n+product~met,value.var="value")
-      td=td2[,c("icode","n","min","max","mean","sd","product")]
-  }
-      if(basename(tcloudbiome)!="teow_seas_conc.txt"){
-          colnames(td)=c("icode","n","min","max","mean","sd")
-          td$product=sub(".tif","",basename(m))
-      }
+  colnames(td)=c("icode","n","min","max","mean","sd")
+  td$product=sub(".tif","",basename(m))
   td$meanpsd=td$mean+td$sd
   td$meanmsd=td$mean-td$sd
   td=merge(td,bcode,by="icode")
@@ -87,19 +79,22 @@ write.csv(bs,file="data/out/biomesummary.csv",row.names=F)
 
 ###################################################################
 ### summary by biome
-bs=read.csv(file="data/sum/biomesummary.csv")
-bs$monthname=factor(month.name[as.numeric(as.character(bs$month))],ordered=T,levels=month.name)
+bs=read.csv(file="data/out/biomesummary.csv")
 bs$realm=factor(bs$realm,ordered=T,levels=c("Antarctic","Australasia","Oceania","Afrotropics","IndoMalay", "Neotropics","Palearctic","Nearctic" ))
+
+bsm=bs[grep("MCD09",bs$product),]
+bsm$monthname=factor(month.name[as.numeric(as.character(sub("MCD09_mean_","",bsm$product)))],ordered=T,levels=month.name)
 
 #biomepl=melt(biomep@data,id.vars=c("id","code","biome","realm"))
 #colnames(biomepl)[grep("variable",colnames(biomepl))]="month"
 #biomepl$value[biomepl$value<0]=NA
 
-p1=useOuterStrips(xyplot(mean~product|realm+biome,data=bs,
+### plot by month
+p1=useOuterStrips(xyplot(I(mean/100)~monthname|realm+biome,data=bsm,
                  panel=function(x,y,subscripts = subscripts){
-                td=bs[subscripts,]
-                panel.polygon(c(td$monthname,rev(td$monthname)),c(td$meanpsd,rev(td$meanmsd)),col=grey(0.4),border=NA)
-                panel.xyplot(td$monthname,td$mean,col="black",type="l",lwd=1,subscripts=subscripts)
+                td=bsm[subscripts,]
+                panel.polygon(c(td$monthname,rev(td$monthname)),c(td$meanpsd/100,rev(td$meanmsd/100)),col=grey(0.4),border=NA)
+                panel.xyplot(td$monthname,td$mean/100,col="black",type="l",lwd=1,subscripts=subscripts)
     },scales=list(y=list(at=c(0,100),lim=c(-20,120),cex=.75,alternating=2,tck=c(0,1)),
                   x=list(at=c(1,7,12),rot=90,alternating=1)),
     ylab="Biome",xlab.top="Geographic Realm",ylab.right="MODCF (%)", xlab="Month"),
@@ -113,7 +108,34 @@ trellis.par.set(my.theme)
 print(p1)
 dev.off()
 
+####
+## Export summary table
+#bs$meansd=paste(round(bs$mean/100,1)," (",round(bs$sd/100,1),")",sep="")
+#bst=dcast(bs[bs$product%in%c("meanannual","inter","intra"),],realm+biome~product,value.var="meansd")
+#colnames(bst)=c("Realm","Biome","Interannual","Intraannual","MeanAnnual")
 
+
+## Summary stats for paper
+## overall max
+levels(bs$product)
+
+bs%.%filter(product=="meanannual")%.% arrange(desc(mean)) %.%head(5)
+
+bs%.%filter(product=="intra")%.% arrange(desc(mean)) %.%head(5)
+
+bs%.%filter(product=="inter")%.% arrange(desc(mean)) %.%head(5)
+
+bs%.%filter(product=="seasconc")%.% arrange(desc(mean)) %.%head(5)
+bs%.%filter(product=="seastheta")%.% arrange(desc(mean)) %.%head(5)
+
+
+bs[which.max(bs$mean),]
+
+bs[which.max(bs$min),]
+bs[which.max(bs$seasintra),]
+
+
+bs[which.min(bs$mean),]
 
 
 
