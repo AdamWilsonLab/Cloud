@@ -15,9 +15,11 @@ global=extent(c(-180,180,-60,60))
 
 
 ## create a version of the cloud data with a land mask
-system(paste0("pksetmask -i data/MCD09_deriv/MCD09_meanannual.tif ",
-    "-m /mnt/data/jetzlab/Data/environ/global/worldclim/alt.bil --operator='=' --msknodata -9999 --nodata 255 ",
-    " -o data/MCD09_deriv/MCD09_meanannual_land.tif"))
+if(!file.exists("data/MCD09_deriv/MCD09_meanannual_land.tif"))
+  system(paste0("pksetmask -i data/MCD09_deriv/meanannual.tif ",
+    "-m /mnt/data/jetzlab/Data/environ/global/worldclim/alt.bil --operator='<' --msknodata -1000 --nodata 65535 ",
+              "-m data/MCD09_deriv/meanannual.tif --operator='>' --msknodata 10000 --nodata 65535 ",
+              " -o data/MCD09_deriv/MCD09_meanannual_land.tif"))
 
 prods=list(
   mac=raster("data/MCD09_deriv/MCD09_meanannual_land.tif"),
@@ -29,20 +31,25 @@ prods=list(
 region=regs[["Venezuela2"]]
 regionname="Venezuela"
 
+region=tropics
+regionname="tropics"
 
+region=regs[["SouthAmerica"]]
+regionname="SouthAmerica"
 #wc=crop(prods[[2]],region)
 #cld=crop(prods[[1]],region)
 #dem=crop(prods[[3]],region)
 #plot(stack(wc,cld,dem))
-
+i=1
 ## loop through products and write out autocorrelation data
-foreach(i=1:4) %dopar% {
+foreach(i=1:length(prods)) %do% {
 tprod=names(prods[i])
 ## set file names
+treg=paste0("data/autocorr/",regionname,"_",tprod,".tif",sep="")
 ## create subset
-reg=crop(prods[[i]],region)#,filename=treg,overwrite=T,dataType='INT1S',NAflag=-128)
+reg=crop(prods[[i]],region,dataType="INT2U",filename=treg,overwrite=T,dataType='INT2U',NAflag=65535)
 ## run the autocorrelation function and write out the output raster
-ac=acorr2(reg)#,filename=tac,overwrite=T,dataType='INT2S')
+ac=acorr2(reg,padlongitude=F)#,filename=tac,overwrite=T,dataType='INT2S')
 ## build the table of values to construct the correlograms
 ftd=rbind.data.frame(
   data.frame(values=values(ac[["acor"]])/10,dist=values(ac[["dist"]]),n=values(ac[["nobs"]]),type=tprod,region=regionname)
@@ -50,9 +57,11 @@ ftd=rbind.data.frame(
 ## filter to a reasonable distance, signal gets noisy above a few thousand km due to sparse measurements
 ftd <- filter(ftd, dist <= 1500)
 ## normalize the covariogram to a correlogram by dividing by the max value
-ftd$values=ftd$values/max(ftd$values)
-
-## round to nearest km to faciliate binning
+ftd$values=ftd$values/max(ftd$values[which.min(ftd$dist)])
+##  Get approximate resolution of raster in km
+hist(diff(ftd$dist))#max(ftd$values[which.min(ftd$dist)])
+## round to approximate resolution of raster
+#round(log10(rasterRes(reg)))
 #ftd$dist2=cut(ftd$dist,exp(seq(log(.5), log(3000), length.out=3000)))
 ftd$dist2=round(ftd$dist)#,c(0:50,seq(51,1000,by=10)))
 ## take mean by km
@@ -72,7 +81,7 @@ print(paste("Finished ",tprod," for ",regionname))
 
 ## compile all regions and products into a single table
 #ftd3=ftd2
-ftd3=do.call(rbind.data.frame,lapply(list.files("data/autocorr/",pattern="table",full=T),function(f) read.csv(f)))
+ftd3=do.call(rbind.data.frame,lapply(list.files("data/autocorr/",pattern=paste0("table_.*_",regionname),full=T),function(f) read.csv(f)))
 ftd3$dist3=ftd3$dist2
 #ftd3$dist3[ftd3$dist==0]=.01
 #ftdl=melt(ftd3,id.vars=c("dist","type","region"))
@@ -92,7 +101,7 @@ x_at=c(1,2,5,10,20,50,100,200,500,1000,2000)
 x_labels <- formatC(x_at, digits = 0, format = "f")
 
 ## plot it...
-p1=xyplot(mean~dist3|region,data=ftd3,auto.key=list(space="inside",x=.55,y=.93),groups=type2,
+p1=xyplot(mean~dist3|region,data=ftd3,auto.key=list(space="inside",x=.55,y=.93),groups=type,
        upper=ftd3$mean+ftd3$sd,lower=ftd3$mean-ftd3$sd,
         panel=function(x,y,...){
             panel.superpose(x, y, panel.groups = 'panel.bands',alpha=.2,...)
