@@ -26,7 +26,7 @@ library(rasterAutocorr)
 library(doMC)
 registerDoMC(10)
 
-rasterOptions(progress="text",maxmemory=1e6)
+rasterOptions(progress="text",maxmemory=1e6,tmpdir="data/tmp/")
 
 ## increase the amount of memory for gdal to speed up processing
 Sys.setenv(GDAL_CACHEMAX=5000,CPL_LOG_ERRORS="ON")
