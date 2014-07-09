@@ -30,7 +30,7 @@ if(!file.exists("data/src/teow/biomes.shp")){
 ## rasterize the biome dataset
 ## create a copy with a numeric biome code
 biome=readOGR("data/src/teow/","biomes")
-bcode=unique(data.frame(icode=biome$icode,code=biome$code,realm=biome$realm,biome=biome$biome))
+bcode=unique(data.frame(icode=biome$icode,code=biome$code,realm=biome$realm,biome=biome$biome,area=biome$areakm))
 
 system(paste("gdal_rasterize -a icode -init 0 -l biomes -ot Byte -te -180 -90 180 90 -tr 0.008333333333333 -0.008333333333333",
               " -co COMPRESS=LZW -co ZLEVEL=9 -co PREDICTOR=2 ",
@@ -82,6 +82,8 @@ write.csv(bs,file="data/out/biomesummary.csv",row.names=F)
 bs=read.csv(file="data/out/biomesummary.csv")
 bs$realm=factor(bs$realm,ordered=T,levels=c("Antarctic","Australasia","Oceania","Afrotropics","IndoMalay", "Neotropics","Palearctic","Nearctic" ))
 
+
+## filter to get monthly timeseries for plotting
 bsm=bs[grep("MCD09",bs$product),]
 bsm$monthname=factor(month.name[as.numeric(as.character(sub("MCD09_mean_","",bsm$product)))],ordered=T,levels=month.name)
 
@@ -122,8 +124,10 @@ levels(bs$product)
 bs%.%filter(product=="meanannual")%.% arrange(desc(mean)) %.%head(5)
 
 bs%.%filter(product=="intra")%.% arrange(desc(mean)) %.%head(5)
+bs%.%filter(product=="intra")%.% arrange(mean) %.%head(5)
 
 bs%.%filter(product=="inter")%.% arrange(desc(mean)) %.%head(5)
+bs%.%filter(product=="inter")%.% arrange(mean) %.%head(5)
 
 bs%.%filter(product=="seasconc")%.% arrange(desc(mean)) %.%head(5)
 bs%.%filter(product=="seastheta")%.% arrange(desc(mean)) %.%head(5)

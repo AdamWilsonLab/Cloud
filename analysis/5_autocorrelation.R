@@ -28,6 +28,8 @@ prods=list(
   patmos=raster("data/src/gewex/CA_PATMOSX_NOAA.nc",varname="a_CA"))
 
 
+
+##### define region
 region=regs[["Venezuela2"]]
 regionname="Venezuela"
 
@@ -36,6 +38,14 @@ regionname="tropics"
 
 region=regs[["SouthAmerica"]]
 regionname="SouthAmerica"
+
+
+## read biomes
+biome=readOGR("data/src/teow/","biomes")
+bcode=unique(data.frame(icode=biome$icode,code=biome$code,realm=biome$realm,biome=biome$biome))
+
+region= biome[biome$realm=="Neotropics"&biome$biome=="Tropical & Subtropical Moist Broadleaf Forests",]
+
 #wc=crop(prods[[2]],region)
 #cld=crop(prods[[1]],region)
 #dem=crop(prods[[3]],region)
@@ -44,35 +54,7 @@ i=1
 ## loop through products and write out autocorrelation data
 foreach(i=1:length(prods)) %do% {
 tprod=names(prods[i])
-## set file names
-treg=paste0("data/autocorr/",regionname,"_",tprod,".tif",sep="")
-## create subset
-reg=crop(prods[[i]],region,dataType="INT2U",filename=treg,overwrite=T,dataType='INT2U',NAflag=65535)
-## run the autocorrelation function and write out the output raster
-ac=acorr2(reg,padlongitude=F)#,filename=tac,overwrite=T,dataType='INT2S')
-## build the table of values to construct the correlograms
-ftd=rbind.data.frame(
-  data.frame(values=values(ac[["acor"]])/10,dist=values(ac[["dist"]]),n=values(ac[["nobs"]]),type=tprod,region=regionname)
-)
-## filter to a reasonable distance, signal gets noisy above a few thousand km due to sparse measurements
-ftd <- filter(ftd, dist <= 1500)
-## normalize the covariogram to a correlogram by dividing by the max value
-ftd$values=ftd$values/max(ftd$values[which.min(ftd$dist)])
-##  Get approximate resolution of raster in km
-hist(diff(ftd$dist))#max(ftd$values[which.min(ftd$dist)])
-## round to approximate resolution of raster
-#round(log10(rasterRes(reg)))
-#ftd$dist2=cut(ftd$dist,exp(seq(log(.5), log(3000), length.out=3000)))
-ftd$dist2=round(ftd$dist)#,c(0:50,seq(51,1000,by=10)))
-## take mean by km
-ftd2 <- group_by(ftd, dist2,type,region)
-ftd2 <- summarise(ftd2,
-                  min = min(values, na.rm = TRUE),
-                  max = max(values, na.rm = TRUE),
-                  sd = sd(values, na.rm = TRUE),
-                  mean = mean(values, na.rm = TRUE)
-)
-
+acorr_table(prods[[i]],region)
 write.csv(ftd2,paste0("data/autocorr/table_",tprod,"_",regionname,".csv"),row.names=F)
 print(paste("Finished ",tprod," for ",regionname))
 

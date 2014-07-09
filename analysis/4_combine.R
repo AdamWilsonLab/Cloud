@@ -164,18 +164,27 @@ Rmean=function(x) calc(x,function(x) {
   mean(x,na.rm=T)
 })
 
-dintra=clusterR(dmean,Rsd,m=4,file="data/MCD09_deriv/intra.tif",
+dintra=clusterR(dmean,Rsd,m=4,file="data/MCD09_deriv/intra_uncompressed.tif",
                 #options=c("COMPRESS=LZW","PREDICTOR=2"),
                 overwrite=T,dataType='INT2U',NAflag=65535)
-dinter=clusterR(dsd,Rmean,m=4,file="data/MCD09_deriv/inter.tif",
+system("gdal_translate -ot UInt16 -co COMPRESS=DEFLATE -co ZLEVEL=9 -co BIGTIFF=YES -co COMPRESS=LZW -co PREDICTOR=2",
+" data/MCD09_deriv/intra_uncompressed.tif data/MCD09_deriv/intra.tif")
+file.remove("data/MCD09_deriv/intra_uncompressed.tif")
+
+dinter=clusterR(dsd,Rmean,m=4,file="data/MCD09_deriv/inter_uncompressed.tif",
                 #options=c("COMPRESS=LZW","PREDICTOR=2"),
                 overwrite=T,dataType='INT2U',NAflag=65535)
+system(paste("gdal_translate -ot UInt16 -co COMPRESS=DEFLATE -co ZLEVEL=9 -co BIGTIFF=YES -co COMPRESS=LZW -co PREDICTOR=2",
+       " data/MCD09_deriv/inter_uncompressed.tif data/MCD09_deriv/inter.tif"))
+file.remove("data/MCD09_deriv/inter_uncompressed.tif")
 
 ## Overall annual mean
-dmeanannual=clusterR(dmean,Rmean,m=4,file="data/MCD09_deriv/meanannual.tif",
+dmeanannual=clusterR(dmean,Rmean,m=4,file="data/MCD09_deriv/meanannual_uncompressed.tif",
 #                     options=c("COMPRESS=LZW","PREDICTOR=2"),
                      overwrite=T,dataType='INT2U',NAflag=65535)
-
+system(paste("gdal_translate -ot UInt16 -co COMPRESS=DEFLATE -co ZLEVEL=9 -co BIGTIFF=YES -co COMPRESS=LZW -co PREDICTOR=2",
+             " data/MCD09_deriv/meanannual_uncompressed.tif data/MCD09_deriv/meanannual.tif"))
+file.remove("data/MCD09_deriv/meanannual_uncompressed.tif")
 #################################################
 ### Calculate Markham's Seasonality
 
