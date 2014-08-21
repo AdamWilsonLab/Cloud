@@ -1,0 +1,196 @@
+# Load the libraries and set working directory
+source("analysis/setup.R")
+
+registerDoMC(3)
+
+## load region boundary
+cfr=readOGR("data/src/CFR","CFR")
+
+cf=stack(c("data/MCD09/MCD09_mean_01.tif","data/MCD09/MCD09_mean_07.tif","data/MCD09_deriv/meanannual.tif","data/MCD09_deriv/intra.tif"))
+names(cf)=c("c_mm_01","c_mm_07","c_ma","c_intra")
+gain(cf)=.01
+NAvalue(cf)=0
+cf=crop(cf,cfr)
+cf=mask(cf,cfr)
+
+## Load protea data
+prot=readOGR("data/src/proteaatlas/","prot")
+prot=prot[prot$pla%in%c("NA","A","E"),]  #get rid of planted
+
+prot=prot[-grep(".",prot$pro,fixed=T),]  # get rid of hybrids with .'s
+prot$pro=as.factor(as.character(prot$pro)) #reset the factors
+
+
+### Load environmental data
+vars=c(
+  paste0("/mnt/data/jetzlab/Data//environ/global/worldclim/",c("tmean_1","tmean_7","prec_1","prec_7","alt"),".bil"))
+
+
+env=stack(vars)
+names(env)=gsub("_","",names(env))
+
+env=crop(env,cfr)
+env=mask(env,cfr)
+
+##
+env=stack(env,cf)
+
+## rasterize protea data to grid and return a raster of presences and trials
+fprot=function(prot,rast=cf,sp="PRACAU"){
+  tpres=unique(prot@data[prot$pro==sp,c("obs","londd","latdd")])
+  coordinates(tpres)=c("londd","latdd")
+  ttrials=unique(prot@data[,c("obs","londd","latdd")])
+  coordinates(ttrials)=c("londd","latdd")
+  presences=rasterize(tpres,cf,fun="count",field="obs",background=0)
+  trials=rasterize(ttrials,cf,fun="count",field="obs",background=0)
+  td=mask(stack(presences,trials),cfr)
+  names(td)=c("presences","trials")
+  return(td)
+}
+
+
+rprot=fprot(prot,sp="PRACAU")
+
+senv=scale(env)
+## Make a plot to explore the data
+levelplot(senv,col.regions=rainbow(100,start=.2,end=.9),cuts=99)
+splom(senv)
+
+data=cbind.data.frame(values(stack(senv,rprot)),coordinates(senv))
+data=as.data.frame(data[!is.na(data[,"presences"]),])
+data$trials=as.integer(data$trials)
+data$presences=as.integer(data$presences)
+data=na.omit(data)
+
+## create 'fitting' dataset where there are observations
+fdata=data[data$trials>0,]
+
+
+mfun=function(model="hSDM.binomial",...)
+  call(model,...)
+)
+
+nchains=3
+
+mods=data.frame(
+  model=c("m1","m2","m3"),
+  suitability=c("~tmean1+tmean7+prec1+prec7+alt",
+                "~tmean1+tmean7+alt+c_mm_01+c_mm_07+c_intra",
+                "~tmean1+tmean7+prec1+prec7+alt+c_mm_01+c_mm_07+c_intra"))
+
+res=foreach(m=1:nrow(mods),.combine=rbind) %dopar% { 
+  tres1=foreach(ch=1:nchains) %dopar% {
+    tres2=hSDM.binomial(
+      suitability=as.character(mods$suitability[m]),
+      presences=fdata$presences,
+      trials=fdata$trials,
+      data=fdata,
+      burnin=100, mcmc=100, thin=1,
+      beta.start=0,
+      suitability.pred=data,
+      mubeta=0, Vbeta=1.0E6,
+      save.p=0,
+      verbose=1,
+      seed=round(runif(1,0,1000)))
+}
+
+  #if(!is.null(res1[[1]]$theta.pred)){
+  #  res2[["theta.pred"]]=rowMeans(do.call(cbind,lapply(res1,FUN=function(x) x$theta.pred)))
+  #  res2[["theta.latent"]]=rowMeans(do.call(cbind,lapply(res1,FUN=function(x) x$theta.latent)))
+  #}
+  
+  cbind.data.frame(model=mods$model[m],
+                   suitability=mods$suitability[m],
+                   param=colnames(tres1[[1]][[1]]),
+        summary(as.mcmc.list(lapply(tres1,FUN=function(x) x$mcmc)))$quantiles)
+}
+
+colnames(res)[grepl("%",colnames(res))]=paste0("Q",sub("%","",colnames(res)[grepl("%",colnames(res))]))
+#res$param=sub("beta[.]","",rownames(res))
+resl=melt(res,id.vars=c("model","suitability","param"))
+levels(resl$variable)=c(0.025,0.25,0.5,0.75,0.975)
+
+library(grid) # needed for arrow function
+library(ggplot2)
+
+ggplot(res[res$param!="Deviance",], aes(ymin = Q2.5,ymax=Q97.5,y=Q50, x = param,colour=suitability)) + 
+  geom_hline(yintercept=0)+
+  geom_point(position = position_dodge(.5))+
+  geom_linerange(position = position_dodge(.5),lwd=1)+
+  ylab("Value")+xlab("Parameter")+
+  coord_flip()
+
+
+
+xyplot(res2$mcmc)
+densityplot(res2$mcmc)
+
+## Fit a simple GLM to the data
+obs=as.matrix(data[,c("presences","trials")])
+m1=glm(obs~tmean_1+tmean_7+prec_1+prec_7+alt+meanannual+intra,data=data,family="binomial")
+summary(m1)
+plot(m1)
+
+
+#= Parameter estimates
+summary(mod1$mcmc)
+xyplot(mod1$mcmc)
+#= Predictions
+summary(mod1$theta.latent)
+summary(mod1$theta.pred)
+plot(theta,mod1$theta.pred)
+
+### Check Convergence
+xyplot(mod1$mcmc, main="Beta",strip=strip.custom(factor.levels=c("intercept",vars)))
+gelman.diag(mod1$mcmc,confidence = 0.95,autoburnin=F,multivariate=T)
+
+
+
+densityplot(mod1$mcmc)#, main="Posterior Distributions",
+            strip=strip.custom(factor.levels=c("intercept",vars)),
+            scales=list(relation="same"),layout=c(1,7))+
+  layer(panel.abline(v=0))
+HPDinterval(ps.beta[[1]], prob = 0.95)
+
+## Predict model to the grid
+
+```{r,predictmodel}
+## First subset area to speed up predictions
+pext=extent(c(-50,-48,-26.5,-24))
+penv=crop(senv,pext)
+
+## if you want to make predictions for the full grid, run this line:
+#penv=senv
+
+## Calculate posterior estimates of p(occurrence) for each cell
+## This extracts the posterior coefficients, performs the regression, 
+## calculates the quantiles, and takes the inverse logit to get p(occurrence)
+
+## niter will use a reduced number of posterior samples to generate the summaries
+pred=calc(penv,function(x,niter=30) {
+  mu1=apply(apply(ps.beta[[1]][1:niter,],1,function(y) y*c(1,x)),2,sum,na.rm=T)
+  mu2=quantile(mu1,c(0.025,0.5,0.975),na.rm=T)  
+  p=1/(1+exp(-mu2))
+  return(p)
+})
+names(pred)=c("Lower_CI_2.5","Median","Upper_CI_97.5")
+## Write out the predictions
+writeRaster(pred,file="Prediction.tif",overwrite=T)
+```
+
+Plot the predictions
+```{r}
+levelplot(pred,col.regions=rainbow(100,start=.2,end=.9),cuts=99,margin=F)+
+  layer(sp.polygons(tin_range,lwd=2))+
+  layer(sp.points(points[points$obs==0,],pch="-",col="black",cex=8,lwd=4))+ #add absences
+  layer(sp.points(points[points$obs==1,],pch="+",col="black",cex=4,lwd=4))    #add presences
+```
+
+# Summary
+
+In this script we have illustrated a complete workflow, including:
+  
+  1. Calling a BASH script (including GDAL Functions) from R to perform data pre-processing
+2. Running a (simple) Bayesian Species Distribution Model using rjags
+3. Making spatial predictions from model posteriors
+4. Writing results to disk as a geotif (for use in GIS, etc.)

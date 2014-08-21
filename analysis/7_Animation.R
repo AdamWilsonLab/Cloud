@@ -1,35 +1,10 @@
 ## script to visualize cloud frequency data
+source("analysis/setup.R")
 
-setwd("~/acrobates/adamw/projects/cloud/")
 
-library(rasterVis)
 
-## read in global coasts for nice plotting
-library(maptools)
-library(doMC)
-
-registerDoMC(6)
-#### Evaluate MOD35 Cloud data
-#mc=brick("~/acrobates/adamw/projects/cloud/data/mod09.nc",varname="CF")
-f=list.files("/mnt/data2/projects/cloud/mcd09tif",pattern=paste(".*[O].*[.]tif$",sep=""),full=T)
-f=f[c(4:12,1:3)]   
-mc=stack(f,bands=1)
-names(mc)=month.name
-
-#NAvalue(mc)=-1
-#coast=spTransform(coast,CRS(projection(mod35)))
-land=readShapePoly("/mnt/data/jetzlab/Data/environ/global/gshhg/GSHHS_shp/c/GSHHS_c_L1.shp",force_ring=TRUE)
-projection(land)="+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
-CP <- as(extent(-180, 180, -60, 66), "SpatialPolygons")
-proj4string(CP) <- CRS(proj4string(land))
-
-## World outline
-world=readOGR("/mnt/data/jetzlab/Data/environ/global/MODIS/modis_sinusoidal/","worldborder_sinusoidal")
-
-coast=crop(as(land[land$area>50,],"SpatialLines"),CP)
-coast2=spTransform(coast,CRS(projection(mc)))
-CP2=spTransform(CP,CRS(projection(mc)))
-
+#####  Daily animation
+clda=stack(list.files("/mnt/data2/scratch/tmp/MCD09/"))
 cols=colorRampPalette(c("#000000","#00FF00","#FF0000"))#"black","blue","red"))
 foreach(i=1:12)%dopar% {
     print(i)

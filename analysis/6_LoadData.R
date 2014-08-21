@@ -2,7 +2,7 @@
 
 
 ### Load data
-print("Loading full raster layers")
+print("Loading raster layers")
 cf_mean=raster("data/MCD09_deriv/meanannual.tif")
 gain(cf_mean)=.01
 cf_visseas=raster("data/MCD09_deriv/seas_visct.tif")
@@ -13,7 +13,6 @@ gain(inter)=.01
 intra=raster("data/MCD09_deriv/intra.tif")
 gain(intra)=.01
 NAvalue(inter)=0
-=======
 
 
 
@@ -53,10 +52,10 @@ if( Sys.info()["nodename"]=="repens"){
 
 if( Sys.info()["nodename"]=="litoria"){  
   print("Loading full raster layers")
-  cf_mean=readAll(raster("data/MCD09_deriv/MCD09_meanannual.tif"))
-  cf_visseas=readAll(raster("data/MCD09_deriv/seas_visct.tif"))
-  inter=readAll(raster("data/MCD09_deriv/inter.tif"))
-  intra=readAll(raster("data/MCD09_deriv/intra.tif"))
+  cf_mean=raster("data/MCD09_deriv/MCD09_meanannual.tif")
+  cf_visseas=raster("data/MCD09_deriv/seas_visct.tif")
+  inter=raster("data/MCD09_deriv/inter.tif")
+  intra=raster("data/MCD09_deriv/intra.tif")
   NAvalue(inter)=0
 }
 
