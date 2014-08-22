@@ -1,17 +1,18 @@
 # Load the libraries and set working directory
 source("analysis/setup.R")
 
-registerDoMC(3)
-
+registerDoMC(12)
+rasterOptions(datatype="FLT4S")
+  
 ## load region boundary
 cfr=readOGR("data/src/CFR","CFR")
 
 cf=stack(c("data/MCD09/MCD09_mean_01.tif","data/MCD09/MCD09_mean_07.tif","data/MCD09_deriv/meanannual.tif","data/MCD09_deriv/intra.tif"))
 names(cf)=c("c_mm_01","c_mm_07","c_ma","c_intra")
-gain(cf)=.01
 NAvalue(cf)=0
 cf=crop(cf,cfr)
 cf=mask(cf,cfr)
+gain(cf)=.01
 
 ## Load protea data
 prot=readOGR("data/src/proteaatlas/","prot")
@@ -49,26 +50,33 @@ fprot=function(prot,rast=cf,sp="PRACAU"){
 }
 
 
-rprot=fprot(prot,sp="PRACAU")
+rprot=fprot(prot,sp="PRMUND")
 
 senv=scale(env)
 ## Make a plot to explore the data
 levelplot(senv,col.regions=rainbow(100,start=.2,end=.9),cuts=99)
-splom(senv)
 
-data=cbind.data.frame(values(stack(senv,rprot)),coordinates(senv))
+#splom(senv)
+
+data=cbind.data.frame(values(stack(senv,rprot)),coordinates(senv),cell=cellFromXY(senv,xy=coordinates(senv)))
 data=as.data.frame(data[!is.na(data[,"presences"]),])
 data$trials=as.integer(data$trials)
 data$presences=as.integer(data$presences)
 data=na.omit(data)
 
+gplot(senv) + geom_tile(aes(fill = value)) +
+  facet_wrap(~ variable) +
+  scale_fill_gradientn(colours=c('white','blue','red'),na.value="transparent") +
+  coord_equal()
+
+## adjacency matrix
+neighbors.mat <- adjacent(senv, cells=1:ncell(senv), directions=8, pairs=TRUE, sorted=TRUE)
+#neighbors.mat=neighbors.mat[neighbors.mat[,1]%in%data$cell,]
+n.neighbors <- as.data.frame(table(as.factor(neighbors.mat[,1])))[,2]
+adj <- neighbors.mat[,2]
+
 ## create 'fitting' dataset where there are observations
 fdata=data[data$trials>0,]
-
-
-mfun=function(model="hSDM.binomial",...)
-  call(model,...)
-)
 
 nchains=3
 
@@ -78,56 +86,118 @@ mods=data.frame(
                 "~tmean1+tmean7+alt+c_mm_01+c_mm_07+c_intra",
                 "~tmean1+tmean7+prec1+prec7+alt+c_mm_01+c_mm_07+c_intra"))
 
-res=foreach(m=1:nrow(mods),.combine=rbind) %dopar% { 
-  tres1=foreach(ch=1:nchains) %dopar% {
-    tres2=hSDM.binomial(
+res=foreach(m=1:nrow(mods)) %dopar% { 
+#  tres1=foreach(ch=1:nchains) %dopar% {
+    tres2=hSDM.ZIB.iCAR(
       suitability=as.character(mods$suitability[m]),
       presences=fdata$presences,
+      observability=~1,
+      mugamma=0, Vgamma=1.0E6,
+      gamma.start=0,
       trials=fdata$trials,
       data=fdata,
-      burnin=100, mcmc=100, thin=1,
+      spatial.entity=fdata$cell,
+      n.neighbors=n.neighbors,
+      neighbors=adj,
+      spatial.entity.pred=data$cell,
+      burnin=2000, mcmc=1000, thin=1,
       beta.start=0,
       suitability.pred=data,
+      Vrho.start=20,
+      priorVrho="1/Gamma",
+      shape=1, rate=1,
+      save.rho=0, 
       mubeta=0, Vbeta=1.0E6,
       save.p=0,
       verbose=1,
       seed=round(runif(1,0,1000)))
 }
 
-  #if(!is.null(res1[[1]]$theta.pred)){
-  #  res2[["theta.pred"]]=rowMeans(do.call(cbind,lapply(res1,FUN=function(x) x$theta.pred)))
-  #  res2[["theta.latent"]]=rowMeans(do.call(cbind,lapply(res1,FUN=function(x) x$theta.latent)))
-  #}
-  
-  cbind.data.frame(model=mods$model[m],
+## combine the chains for each model
+  coef=data.frame(model=mods$model[m],
                    suitability=mods$suitability[m],
                    param=colnames(tres1[[1]][[1]]),
         summary(as.mcmc.list(lapply(tres1,FUN=function(x) x$mcmc)))$quantiles)
+  pred=data.frame(model=mods$model[m],
+                  suitability=mods$suitability[m],
+                  x=data$x,y=data$y,
+                  pred=rowMeans(do.call(cbind,lapply(tres1,FUN=function(x) x$theta.pred))))
+  if(!is.null(tres1[[1]]$rho.pred)){
+    rho=data.frame(model=mods$model[m],
+                  suitability=mods$suitability[m],
+                   coordinates(senv),
+                   cell=1:ncell(senv),
+                  rho=rowMeans(do.call(cbind,lapply(tres1,FUN=function(x) x$rho.pred))))
+    rho=rho[rho$cell%in%data$cell,]
+  }
+  return(list(coef=coef,pred=pred,rho=rho))  
 }
 
-colnames(res)[grepl("%",colnames(res))]=paste0("Q",sub("%","",colnames(res)[grepl("%",colnames(res))]))
+coef=do.call(rbind,lapply(res,function(x) x$coef))
+pred=do.call(rbind,lapply(res,function(x) x$pred))
+rho=do.call(rbind,lapply(res,function(x) x$rho))
+
+coef[grepl("Deviance",coef$param),]
+
+#colnames(coef)[grepl("X",colnames(coef))]=paste0("Q",sub("X","",colnames(coef)[grepl("X",colnames(coef))]))
 #res$param=sub("beta[.]","",rownames(res))
-resl=melt(res,id.vars=c("model","suitability","param"))
-levels(resl$variable)=c(0.025,0.25,0.5,0.75,0.975)
+#0resl=melt(res,id.vars=c("model","suitability","param"))
+#levels(resl$variable)=c(0.025,0.25,0.5,0.75,0.975)
 
 library(grid) # needed for arrow function
 library(ggplot2)
 
-ggplot(res[res$param!="Deviance",], aes(ymin = Q2.5,ymax=Q97.5,y=Q50, x = param,colour=suitability)) + 
+ggplot(coef[coef$param=="Deviance",], aes(ymin = X2.5.,ymax=X97.5.,y=X50., x = param,colour=suitability)) + 
+  geom_point(position = position_dodge(.5))+
+  geom_linerange(position = position_dodge(.5),lwd=1)+
+  ylab("Value")+xlab("Parameter")+
+  coord_flip()
+
+ggplot(coef[!coef$param%in%c("Vrho","Deviance"),], aes(ymin = X2.5.,ymax=X97.5.,y=X50., x = param,colour=suitability)) + 
   geom_hline(yintercept=0)+
   geom_point(position = position_dodge(.5))+
   geom_linerange(position = position_dodge(.5),lwd=1)+
   ylab("Value")+xlab("Parameter")+
   coord_flip()
 
+ggplot(coef[coef$param%in%c("Vrho"),], aes(ymin = X2.5.,ymax=X97.5.,y=X50., x = param,colour=suitability)) + 
+  geom_hline(yintercept=0)+
+  geom_point(position = position_dodge(.5))+
+  geom_linerange(position = position_dodge(.5),lwd=1)+
+  ylab("Value")+xlab("Parameter")+
+  coord_flip()
 
+ggplot(pred) + geom_tile(aes(x=x,y=y,fill = pred)) +
+  facet_wrap(~suitability,ncol=1) +
+  scale_fill_gradientn(colours=c('white','blue','red')) +
+  coord_equal()
 
-xyplot(res2$mcmc)
-densityplot(res2$mcmc)
+ggplot(rho) + geom_tile(aes(x=x,y=y,fill = rho)) +
+  facet_wrap(~suitability,ncol=1) +
+  scale_fill_gradientn(colours=c('white','blue','red')) +
+  coord_equal()
+
+## regional
+ggplot(pred) + geom_tile(aes(x=x,y=y,fill = pred)) +
+  facet_wrap(~suitability,ncol=1) +
+  scale_fill_gradientn(colours=c('white','blue','red')) +
+  coord_equal()+
+  xlim(c(22,25))+ylim(-34.2,-33.5)+
+  geom_point(data=prot[prot$pro!="PRMUND",]@data,aes(x=londd,y=latdd),col="grey")+
+  geom_point(data=prot[prot$pro=="PRMUND",]@data,aes(x=londd,y=latdd))
+
+gplot(rprot[["presences"]]) + geom_tile(aes(fill = value)) +
+  scale_fill_gradientn(colours=c('white','blue','red'),na.value="transparent") +
+  coord_equal()+
+  xlim(c(22,25))+ylim(-34.2,-33.5)
+
+gplot(rprot[["presences"]]) + geom_tile(aes(fill = value)) +
+  scale_fill_gradientn(colours=c('white','blue','red'),na.value="transparent") +
+  coord_equal()
 
 ## Fit a simple GLM to the data
 obs=as.matrix(data[,c("presences","trials")])
-m1=glm(obs~tmean_1+tmean_7+prec_1+prec_7+alt+meanannual+intra,data=data,family="binomial")
+m1=glm(obs~tmean1+tmean7+prec1+prec7+alt+c_ma+c_intra,data=data,family="binomial")
 summary(m1)
 plot(m1)
 
