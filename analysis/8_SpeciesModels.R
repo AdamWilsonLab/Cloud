@@ -206,25 +206,32 @@ p1=ggplot(pred) + geom_tile(aes(x=x,y=y,fill = pred)) +
   xlim(c(20,25))+ylim(-34.2,-33.5)+
 #  geom_point(data=prot[prot$pro!=sp,]@data,aes(x=londd,y=latdd),col="grey",alpha=.2,pch=1)+
 #  geom_point(data=prot[prot$pro==sp,]@data,aes(x=londd,y=latdd),pch="+",cex=1)+
-  theme(panel.background = element_rect(fill='transparent'))+
+  theme(panel.background = element_rect(fill='transparent'),legend.key.width = unit(1.5, "cm"))+
   xlab(label="Longitude")+ylab("Latitude")
   
-
 p2=gplot(env[["alt"]],maxpixels=5e6) + geom_tile(aes(fill = value)) +
-  scale_fill_gradientn(colours=c('darkgreen','yellow','red'),na.value="transparent",
+  facet_grid(~variable,labeller=function(...) return("Protea cynaroides occurrence")) +
+    scale_fill_gradientn(colours=c('darkgreen','yellow','red'),na.value="transparent",
                        name="Elevation (m)") +
   coord_equal()+
   geom_point(data=prot[prot$pro!=sp,]@data,aes(x=londd,y=latdd),col="grey",alpha=.2,pch=1,cex=.5)+
   geom_point(data=prot[prot$pro==sp,]@data,aes(x=londd,y=latdd),pch="+",cex=2)+
+  scale_colour_manual(name = 'Occurrence', 
+                      values =c('black'='black','grey'='grey'),
+                      labels = c('Presence','Absence'))+
   xlim(c(20,25))+ylim(-34.2,-33.5)+
   xlab(label="")+
-  theme(panel.background = element_rect(fill='transparent'))
+  theme(panel.background = element_rect(fill='transparent'),legend.key.width = unit(1.5, "cm"))+
+  ylab("")
 
+
+pdf(file="manuscript/figures/SDM.pdf",width=11,height=7)
 grid.newpage()
 vp1 <- viewport(width = 1, height = 0.67, x=.5,y=.33)
-vp2 <- viewport(width = 1, height = .33, x = .5, y = 0.83)
+vp2 <- viewport(width = 1, height = .33, x = .5, y = 0.72)
 print(p1, vp = vp1)
 print(p2, vp = vp2)
+dev.off()
 
 gplot(rprot[["presences"]]) + geom_tile(aes(fill = value)) +
   scale_fill_gradientn(colours=c('white','blue','red'),na.value="transparent") +
