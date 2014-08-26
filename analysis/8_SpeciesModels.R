@@ -49,8 +49,8 @@ fprot=function(prot,rast=cf,sp="PRACAU"){
   return(td)
 }
 
-
-rprot=fprot(prot,sp="PRMUND")
+sp="PRCYNA"
+rprot=fprot(prot,sp=sp)
 
 senv=scale(env)
 ## Make a plot to explore the data
@@ -82,31 +82,34 @@ nchains=3
 
 mods=data.frame(
   model=c("m1","m2","m3"),
-  suitability=c("~tmean1+tmean7+prec1+prec7+alt",
-                "~tmean1+tmean7+alt+c_mm_01+c_mm_07+c_intra",
-                "~tmean1+tmean7+prec1+prec7+alt+c_mm_01+c_mm_07+c_intra"))
+  formula=c("~tmean1+tmean7+prec1+prec7+alt",
+                "~tmean1+tmean7+c_mm_01+c_mm_07+alt",
+                "~tmean1+tmean7+prec1+prec7+c_mm_01+c_mm_07+alt"),
+  name=c("Temperature & Precipitation",
+         "Temperature & Cloud",
+         "Temperature, Precipitation, & Cloud"))
 
 res=foreach(m=1:nrow(mods)) %dopar% { 
-#  tres1=foreach(ch=1:nchains) %dopar% {
-    tres2=hSDM.ZIB.iCAR(
-      suitability=as.character(mods$suitability[m]),
+  tres1=foreach(ch=1:nchains) %dopar% {
+    tres2=hSDM.ZIB(
+      suitability=as.character(mods$formula[m]),
       presences=fdata$presences,
       observability=~1,
       mugamma=0, Vgamma=1.0E6,
       gamma.start=0,
       trials=fdata$trials,
       data=fdata,
-      spatial.entity=fdata$cell,
-      n.neighbors=n.neighbors,
-      neighbors=adj,
-      spatial.entity.pred=data$cell,
-      burnin=2000, mcmc=1000, thin=1,
+#      spatial.entity=fdata$cell,
+#      n.neighbors=n.neighbors,
+#      neighbors=adj,
+#      spatial.entity.pred=data$cell,
+      burnin=5000, mcmc=10000, thin=10,
       beta.start=0,
       suitability.pred=data,
-      Vrho.start=20,
-      priorVrho="1/Gamma",
-      shape=1, rate=1,
-      save.rho=0, 
+#      Vrho.start=20,
+#      priorVrho="1/Gamma",
+#      shape=1, rate=1,
+#      save.rho=0, 
       mubeta=0, Vbeta=1.0E6,
       save.p=0,
       verbose=1,
@@ -115,29 +118,44 @@ res=foreach(m=1:nrow(mods)) %dopar% {
 
 ## combine the chains for each model
   coef=data.frame(model=mods$model[m],
-                   suitability=mods$suitability[m],
+                   model=mods$model[m],
+                  modelname=mods$name[m],
                    param=colnames(tres1[[1]][[1]]),
-        summary(as.mcmc.list(lapply(tres1,FUN=function(x) x$mcmc)))$quantiles)
+                  summary(as.mcmc.list(lapply(tres1,FUN=function(x) x$mcmc)))$statistics,
+                  summary(as.mcmc.list(lapply(tres1,FUN=function(x) x$mcmc)))$quantiles)
   pred=data.frame(model=mods$model[m],
-                  suitability=mods$suitability[m],
+                  model=mods$model[m],
+                  modelname=mods$name[m],
                   x=data$x,y=data$y,
-                  pred=rowMeans(do.call(cbind,lapply(tres1,FUN=function(x) x$theta.pred))))
+                  pred=rowMeans(do.call(cbind,lapply(tres1,FUN=function(x) x$prob.p.pred))))
   if(!is.null(tres1[[1]]$rho.pred)){
     rho=data.frame(model=mods$model[m],
                   suitability=mods$suitability[m],
+                   model=mods$model[m],
+                   modelname=mods$name[m],
                    coordinates(senv),
                    cell=1:ncell(senv),
                   rho=rowMeans(do.call(cbind,lapply(tres1,FUN=function(x) x$rho.pred))))
     rho=rho[rho$cell%in%data$cell,]
   }
-  return(list(coef=coef,pred=pred,rho=rho))  
+  if(is.null(tres1[[1]]$rho.pred)){
+    rho=NULL
+  }
+return(list(coef=coef,pred=pred,rho=rho))  
 }
 
 coef=do.call(rbind,lapply(res,function(x) x$coef))
 pred=do.call(rbind,lapply(res,function(x) x$pred))
 rho=do.call(rbind,lapply(res,function(x) x$rho))
 
-coef[grepl("Deviance",coef$param),]
+pred=pred[pred$model%in%mods$model[1:2],]
+
+# http://www.bayesian-inference.com/modelfit
+# http://voteview.com/DIC-slides.pdf
+dic=coef[grepl("Deviance",coef$param),]
+dic$pv=(dic$SD^2)/2
+dic$dic=dic$Mean+dic$pv
+dic
 
 #colnames(coef)[grepl("X",colnames(coef))]=paste0("Q",sub("X","",colnames(coef)[grepl("X",colnames(coef))]))
 #res$param=sub("beta[.]","",rownames(res))
@@ -168,8 +186,10 @@ ggplot(coef[coef$param%in%c("Vrho"),], aes(ymin = X2.5.,ymax=X97.5.,y=X50., x = 
   coord_flip()
 
 ggplot(pred) + geom_tile(aes(x=x,y=y,fill = pred)) +
-  facet_wrap(~suitability,ncol=1) +
+  facet_wrap(~modelname,ncol=1) +
   scale_fill_gradientn(colours=c('white','blue','red')) +
+  geom_point(data=prot[prot$pro==sp,]@data,aes(x=londd,y=latdd),pch="+")+
+  xlim(c(17.8,25.2))+ylim(-35,-32)+
   coord_equal()
 
 ggplot(rho) + geom_tile(aes(x=x,y=y,fill = rho)) +
@@ -178,18 +198,33 @@ ggplot(rho) + geom_tile(aes(x=x,y=y,fill = rho)) +
   coord_equal()
 
 ## regional
-ggplot(pred) + geom_tile(aes(x=x,y=y,fill = pred)) +
-  facet_wrap(~suitability,ncol=1) +
-  scale_fill_gradientn(colours=c('white','blue','red')) +
+p1=ggplot(pred) + geom_tile(aes(x=x,y=y,fill = pred)) +
+  facet_wrap(~modelname,ncol=1) +
+  scale_fill_gradientn(colours=c('white','blue','red'),
+                       name="P(Presence)") +
   coord_equal()+
-  xlim(c(22,25))+ylim(-34.2,-33.5)+
-  geom_point(data=prot[prot$pro!="PRMUND",]@data,aes(x=londd,y=latdd),col="grey")+
-  geom_point(data=prot[prot$pro=="PRMUND",]@data,aes(x=londd,y=latdd))
+  xlim(c(20,25))+ylim(-34.2,-33.5)+
+#  geom_point(data=prot[prot$pro!=sp,]@data,aes(x=londd,y=latdd),col="grey",alpha=.2,pch=1)+
+#  geom_point(data=prot[prot$pro==sp,]@data,aes(x=londd,y=latdd),pch="+",cex=1)+
+  theme(panel.background = element_rect(fill='transparent'))+
+  xlab(label="Longitude")+ylab("Latitude")
+  
 
-gplot(rprot[["presences"]]) + geom_tile(aes(fill = value)) +
-  scale_fill_gradientn(colours=c('white','blue','red'),na.value="transparent") +
+p2=gplot(env[["alt"]],maxpixels=5e6) + geom_tile(aes(fill = value)) +
+  scale_fill_gradientn(colours=c('darkgreen','yellow','red'),na.value="transparent",
+                       name="Elevation (m)") +
   coord_equal()+
-  xlim(c(22,25))+ylim(-34.2,-33.5)
+  geom_point(data=prot[prot$pro!=sp,]@data,aes(x=londd,y=latdd),col="grey",alpha=.2,pch=1,cex=.5)+
+  geom_point(data=prot[prot$pro==sp,]@data,aes(x=londd,y=latdd),pch="+",cex=2)+
+  xlim(c(20,25))+ylim(-34.2,-33.5)+
+  xlab(label="")+
+  theme(panel.background = element_rect(fill='transparent'))
+
+grid.newpage()
+vp1 <- viewport(width = 1, height = 0.67, x=.5,y=.33)
+vp2 <- viewport(width = 1, height = .33, x = .5, y = 0.83)
+print(p1, vp = vp1)
+print(p2, vp = vp2)
 
 gplot(rprot[["presences"]]) + geom_tile(aes(fill = value)) +
   scale_fill_gradientn(colours=c('white','blue','red'),na.value="transparent") +
@@ -203,7 +238,7 @@ plot(m1)
 
 
 #= Parameter estimates
-summary(mod1$mcmc)
+summary(res[[1]])
 xyplot(mod1$mcmc)
 #= Predictions
 summary(mod1$theta.latent)
