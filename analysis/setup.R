@@ -15,6 +15,7 @@ require(knitcitations)
 library(maptools)
 library(rgdal)
 library(coda)
+library(hSDM)
 #library(spgrass6)
 
 ## install rasterAutocorr
