@@ -4,37 +4,90 @@ source("analysis/setup.R")
 registerDoMC(12)
 rasterOptions(datatype="FLT4S")
   
-## load region boundary
-cfr=readOGR("data/src/CFR","CFR")
 
+sp=c("Lepidocolaptes","lacrymiger")
+fam="Furnariidae (Ovenbirds and Woodcreepers)"
+
+## load region boundary
+download.file(paste0("http://mol.cartodb.com/api/v2/sql?",
+                  "q=SELECT%20ST_TRANSFORM(the_geom_webmercator,4326)%20as%20the_geom,%20seasonality%20FROM%20",
+                  "get_tile('jetz','range','",
+                  sp[1],"%20",sp[2],
+                  "','jetz_maps')&format=shp&filename=expert"),
+              destfile="data/SDM/expert.zip")
+unzip("data/SDM/expert.zip",exdir="data/SDM/")
+
+reg=readOGR("data/SDM/","expert")
+
+### Load eBird data for 
+## ebird data downloaded and unzipped from http://ebirddata.ornith.cornell.edu/downloads/erd/ebird_all_species/erd_western_hemisphere_data_grouped_by_year_v5.0.tar.gz
+ebirddir="/mnt/data/jetzlab/Data/specdist/global/ebird/"
+
+## select species for presences and 'absences'
+taxon=read.csv(paste0(ebirddir,"/doc/taxonomy.csv"))
+#taxon=taxon%.%filter(GENUS_NAME==sp[1])
+taxon=taxon%.%filter(FAMILY_NAME==fam)
+
+idcols=c("SAMPLING_EVENT_ID","LATITUDE","LONGITUDE","YEAR","MONTH","DAY","TIME","COUNTRY","STATE_PROVINCE","COUNT_TYPE","EFFORT_HRS","EFFORT_DISTANCE_KM",
+         "EFFORT_AREA_HA","OBSERVER_ID","NUMBER_OBSERVERS","GROUP_ID","PRIMARY_CHECKLIST_FLAG")
+spcols=as.character(taxon$SCI_NAME)
+
+library(data.table)
+library(ff)
+library(sqldf)
+
+f=list.files(ebirddir,pattern="checklists.csv",recursive=T,full=T)[2]
+
+d=foreach(f=list.files(ebirddir,pattern="checklists.csv",recursive=T,full=T),.combine=rbind) %dopar% {
+  ## read in data
+#  f=list.files(ebirddir,pattern="checklists.csv",recursive=T,full=T)[10]
+#  d=fread( f,header = T, sep = ',',select=c(idcols,spcols),na.strings="?",showProgress=T,verbose=T)
+#  d=read.csv.ffdf(file=f)
+  
+  ## get colnames in table
+  hdr=colnames(read.csv(f,nrows=1))
+## which colnames are in our list
+  tsp=grep(paste(c(idcols,spcols),collapse="|"),hdr,value=T)
+   d=system.time(read.csv.sql(f, sql = paste0("select \"",paste(tsp,collapse="\",\""),"\" FROM file WHERE ",
+                                 "LATITUDE  BETWEEN ",bbox(reg)["y","min"]," AND ",bbox(reg)["y","max"]," AND ",
+                                 "LONGITUDE BETWEEN ",bbox(reg)["x","min"]," AND ",bbox(reg)["x","max"]," AND ",
+                                 "PRIMARY_CHECKLIST_FLAG=1",";")))
+  colnames(d)=gsub("\"","",colnames(d))
+  ## loop through species and clean up "X" flags
+  for(i in tsp){
+    x=d[,i]
+    x[x=="X"]="1"
+    x=as.numeric(x)
+    x[x>0]=1
+    d[,i]=x
+    #  print(i)
+  }
+  ## calculate number of trials and presences
+  d$trials=rowSums(d[,tsp])>0
+  d=d%.%filter(trials>0)
+  d$presence=d[,paste(sp,collapse="_")]
+  ## subset to columns of interest
+  d=d[,c("LATITUDE","LONGITUDE","YEAR","MONTH","presence","trials")]
+  print(f)
+  return(d)
+}
+
+#########  Environmental Data
 cf=stack(c("data/MCD09/MCD09_mean_01.tif","data/MCD09/MCD09_mean_07.tif","data/MCD09_deriv/meanannual.tif","data/MCD09_deriv/intra.tif"))
 names(cf)=c("c_mm_01","c_mm_07","c_ma","c_intra")
 NAvalue(cf)=0
-cf=crop(cf,cfr)
-cf=mask(cf,cfr)
+cf=crop(cf,reg)
 gain(cf)=.01
-
-## Load protea data
-prot=readOGR("data/src/proteaatlas/","prot")
-prot=prot[prot$pla%in%c("NA","A","E"),]  #get rid of planted
-
-prot=prot[-grep(".",prot$pro,fixed=T),]  # get rid of hybrids with .'s
-prot$pro=as.factor(as.character(prot$pro)) #reset the factors
-
 
 ### Load environmental data
 vars=c(
   paste0("/mnt/data/jetzlab/Data//environ/global/worldclim/",c("tmean_1","tmean_7","prec_1","prec_7","alt"),".bil"))
-
-
 env=stack(vars)
 names(env)=gsub("_","",names(env))
-
-env=crop(env,cfr)
-env=mask(env,cfr)
-
-##
+env=crop(env,reg)
+##  Create single stack
 env=stack(env,cf)
+
 
 ## rasterize protea data to grid and return a raster of presences and trials
 fprot=function(prot,rast=cf,sp="PRACAU"){
@@ -53,8 +106,6 @@ sp="PRCYNA"
 rprot=fprot(prot,sp=sp)
 
 senv=scale(env)
-## Make a plot to explore the data
-levelplot(senv,col.regions=rainbow(100,start=.2,end=.9),cuts=99)
 
 #splom(senv)
 
@@ -63,11 +114,6 @@ data=as.data.frame(data[!is.na(data[,"presences"]),])
 data$trials=as.integer(data$trials)
 data$presences=as.integer(data$presences)
 data=na.omit(data)
-
-gplot(senv) + geom_tile(aes(fill = value)) +
-  facet_wrap(~ variable) +
-  scale_fill_gradientn(colours=c('white','blue','red'),na.value="transparent") +
-  coord_equal()
 
 ## adjacency matrix
 neighbors.mat <- adjacent(senv, cells=1:ncell(senv), directions=8, pairs=TRUE, sorted=TRUE)
@@ -103,7 +149,7 @@ res=foreach(m=1:nrow(mods)) %dopar% {
 #      n.neighbors=n.neighbors,
 #      neighbors=adj,
 #      spatial.entity.pred=data$cell,
-      burnin=5000, mcmc=10000, thin=10,
+      burnin=1000, mcmc=5000, thin=5,
       beta.start=0,
       suitability.pred=data,
 #      Vrho.start=20,
@@ -165,25 +211,33 @@ dic
 library(grid) # needed for arrow function
 library(ggplot2)
 
-ggplot(coef[coef$param=="Deviance",], aes(ymin = X2.5.,ymax=X97.5.,y=X50., x = param,colour=suitability)) + 
+## Make a plot to explore the data
+pdf(file="manuscript/figures/SDM.pdf",width=11,height=7)
+
+gplot(senv) + geom_tile(aes(fill = value)) +
+  facet_wrap(~ variable) +
+  scale_fill_gradientn(colours=c('white','blue','red'),na.value="transparent") +
+  coord_equal()
+
+ggplot(coef[coef$param=="Deviance",], aes(ymin = X2.5.,ymax=X97.5.,y=X50., x = param,colour=modelname)) + 
   geom_point(position = position_dodge(.5))+
   geom_linerange(position = position_dodge(.5),lwd=1)+
   ylab("Value")+xlab("Parameter")+
   coord_flip()
 
-ggplot(coef[!coef$param%in%c("Vrho","Deviance"),], aes(ymin = X2.5.,ymax=X97.5.,y=X50., x = param,colour=suitability)) + 
+ggplot(coef[!coef$param%in%c("Vrho","Deviance"),], aes(ymin = X2.5.,ymax=X97.5.,y=X50., x = param,colour=modelname)) + 
   geom_hline(yintercept=0)+
   geom_point(position = position_dodge(.5))+
   geom_linerange(position = position_dodge(.5),lwd=1)+
   ylab("Value")+xlab("Parameter")+
   coord_flip()
 
-ggplot(coef[coef$param%in%c("Vrho"),], aes(ymin = X2.5.,ymax=X97.5.,y=X50., x = param,colour=suitability)) + 
-  geom_hline(yintercept=0)+
-  geom_point(position = position_dodge(.5))+
-  geom_linerange(position = position_dodge(.5),lwd=1)+
-  ylab("Value")+xlab("Parameter")+
-  coord_flip()
+#ggplot(coef[coef$param%in%c("Vrho"),], aes(ymin = X2.5.,ymax=X97.5.,y=X50., x = param,colour=modelname)) + 
+#  geom_hline(yintercept=0)+
+#  geom_point(position = position_dodge(.5))+
+#  geom_linerange(position = position_dodge(.5),lwd=1)+
+#  ylab("Value")+xlab("Parameter")+
+#  coord_flip()
 
 ggplot(pred) + geom_tile(aes(x=x,y=y,fill = pred)) +
   facet_wrap(~modelname,ncol=1) +
@@ -192,10 +246,10 @@ ggplot(pred) + geom_tile(aes(x=x,y=y,fill = pred)) +
   xlim(c(17.8,25.2))+ylim(-35,-32)+
   coord_equal()
 
-ggplot(rho) + geom_tile(aes(x=x,y=y,fill = rho)) +
-  facet_wrap(~suitability,ncol=1) +
-  scale_fill_gradientn(colours=c('white','blue','red')) +
-  coord_equal()
+#ggplot(rho) + geom_tile(aes(x=x,y=y,fill = rho)) +
+#  facet_wrap(~suitability,ncol=1) +
+#  scale_fill_gradientn(colours=c('white','blue','red')) +
+#  coord_equal()
 
 ## regional
 p1=ggplot(pred) + geom_tile(aes(x=x,y=y,fill = pred)) +
@@ -225,7 +279,6 @@ p2=gplot(env[["alt"]],maxpixels=5e6) + geom_tile(aes(fill = value)) +
   ylab("")
 
 
-pdf(file="manuscript/figures/SDM.pdf",width=11,height=7)
 grid.newpage()
 vp1 <- viewport(width = 1, height = 0.67, x=.5,y=.33)
 vp2 <- viewport(width = 1, height = .33, x = .5, y = 0.72)
@@ -239,10 +292,9 @@ gplot(rprot[["presences"]]) + geom_tile(aes(fill = value)) +
 
 ## Fit a simple GLM to the data
 obs=as.matrix(data[,c("presences","trials")])
-m1=glm(obs~tmean1+tmean7+prec1+prec7+alt+c_ma+c_intra,data=data,family="binomial")
-summary(m1)
-plot(m1)
+m_glm=lapply(1:nrow(mods),function(i) glm(paste0("obs",mods$formula[i]),data=data,family="binomial"))
 
+screenreg(m_glm,custom.model.names=as.character(mods$name),format="markdown")
 
 #= Parameter estimates
 summary(res[[1]])
@@ -289,20 +341,3 @@ names(pred)=c("Lower_CI_2.5","Median","Upper_CI_97.5")
 ## Write out the predictions
 writeRaster(pred,file="Prediction.tif",overwrite=T)
 ```
-
-Plot the predictions
-```{r}
-levelplot(pred,col.regions=rainbow(100,start=.2,end=.9),cuts=99,margin=F)+
-  layer(sp.polygons(tin_range,lwd=2))+
-  layer(sp.points(points[points$obs==0,],pch="-",col="black",cex=8,lwd=4))+ #add absences
-  layer(sp.points(points[points$obs==1,],pch="+",col="black",cex=4,lwd=4))    #add presences
-```
-
-# Summary
-
-In this script we have illustrated a complete workflow, including:
-  
-  1. Calling a BASH script (including GDAL Functions) from R to perform data pre-processing
-2. Running a (simple) Bayesian Species Distribution Model using rjags
-3. Making spatial predictions from model posteriors
-4. Writing results to disk as a geotif (for use in GIS, etc.)
