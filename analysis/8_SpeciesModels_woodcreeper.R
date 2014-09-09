@@ -25,52 +25,51 @@ ebirddir="/mnt/data/jetzlab/Data/specdist/global/ebird/"
 
 ## select species for presences and 'absences'
 taxon=read.csv(paste0(ebirddir,"/doc/taxonomy.csv"))
-#taxon=taxon%.%filter(GENUS_NAME==sp[1])
+taxon$TAXON_ORDER2=round(taxon$TAXON_ORDER)
 taxon=taxon%.%filter(FAMILY_NAME==fam)
 
-idcols=c("SAMPLING_EVENT_ID","LATITUDE","LONGITUDE","YEAR","MONTH","DAY","TIME","COUNTRY","STATE_PROVINCE","COUNT_TYPE","EFFORT_HRS","EFFORT_DISTANCE_KM",
-         "EFFORT_AREA_HA","OBSERVER_ID","NUMBER_OBSERVERS","GROUP_ID","PRIMARY_CHECKLIST_FLAG")
-spcols=as.character(taxon$SCI_NAME)
-
 library(data.table)
-library(ff)
-library(sqldf)
 
-f=list.files(ebirddir,pattern="checklists.csv",recursive=T,full=T)[2]
 
-d=foreach(f=list.files(ebirddir,pattern="checklists.csv",recursive=T,full=T),.combine=rbind) %dopar% {
-  ## read in data
-#  f=list.files(ebirddir,pattern="checklists.csv",recursive=T,full=T)[10]
-#  d=fread( f,header = T, sep = ',',select=c(idcols,spcols),na.strings="?",showProgress=T,verbose=T)
-#  d=read.csv.ffdf(file=f)
-  
-  ## get colnames in table
-  hdr=colnames(read.csv(f,nrows=1))
-## which colnames are in our list
-  tsp=grep(paste(c(idcols,spcols),collapse="|"),hdr,value=T)
-   d=system.time(read.csv.sql(f, sql = paste0("select \"",paste(tsp,collapse="\",\""),"\" FROM file WHERE ",
-                                 "LATITUDE  BETWEEN ",bbox(reg)["y","min"]," AND ",bbox(reg)["y","max"]," AND ",
-                                 "LONGITUDE BETWEEN ",bbox(reg)["x","min"]," AND ",bbox(reg)["x","max"]," AND ",
-                                 "PRIMARY_CHECKLIST_FLAG=1",";")))
-  colnames(d)=gsub("\"","",colnames(d))
-  ## loop through species and clean up "X" flags
-  for(i in tsp){
-    x=d[,i]
-    x[x=="X"]="1"
-    x=as.numeric(x)
-    x[x>0]=1
-    d[,i]=x
-    #  print(i)
-  }
-  ## calculate number of trials and presences
-  d$trials=rowSums(d[,tsp])>0
-  d=d%.%filter(trials>0)
-  d$presence=d[,paste(sp,collapse="_")]
-  ## subset to columns of interest
-  d=d[,c("LATITUDE","LONGITUDE","YEAR","MONTH","presence","trials")]
-  print(f)
-  return(d)
+
+
+
+fspdata=paste0("data/SDM/points_",paste(sp,collapse="_"),".csv")
+if(!file.exists(fspdata)){
+    f="/mnt/data2/projects/mol/points_Aug_2014/ebd_relMay-2014.txt"
+    hdr=colnames( read.table(f,nrows=3,header=T,sep="\t"))
+  ## define columns to keep  
+    cols=c("GLOBAL UNIQUE IDENTIFIER","TAXONOMIC ORDER","CATEGORY",
+         "COMMON NAME","SCIENTIFIC NAME",
+         "SUBSPECIES COMMON NAME","SUBSPECIES SCIENTIFIC NAME",
+         "OBSERVATION COUNT","COUNTRY","COUNTRY CODE",  
+         "LATITUDE","LONGITUDE","OBSERVATION DATE",
+         "OBSERVER ID","SAMPLING EVENT.IDENTIFIER","PROTOCOL TYPE",
+         "DURATION MINUTES","EFFORT DISTANCE KM","EFFORT AREA HA",
+         "NUMBER OBSERVERS","ALL SPECIES REPORTED","GROUP IDENTIFIER",
+         "APPROVED","REVIEWED","REASON")
+
+  # make a new copy with no quotes
+  system(paste("sed -e 's|[\"'\']||g' ",f," > ebird.txt"))
+    # 50 minutes
+  d=fread("ebird.txt",header = T, sep = '\t',select=cols,na.strings=c("","?","\""),showProgress=T,verbose=T)
+  setkey(d,"TAXONOMIC_ORDER")
+  setnames(d,colnames(d),gsub(" ","_",colnames(d)))
+    # subset by lat/lon - 2 minutes
+  system.time(d2<<-d%.%mutate(TAXO=round(TAXONOMIC_ORDER))%.%
+                filter(LATITUDE>=bbox(reg)["y","min"],
+                       LATITUDE<=bbox(reg)["y","max"],
+                       LONGITUDE>=bbox(reg)["x","min"],
+                       LONGITUDE<=bbox(reg)["x","max"],
+                       TAXO%in%taxon$TAXON_ORDER2))  
+     write.csv(d2,file=fspdata,row.names=F)
+  ## clean up
+    rm(d,d2); gc()
+    file.remove("ebird.txt")
 }
+
+## read it back in
+spd=read.csv(fspdata)
 
 #########  Environmental Data
 cf=stack(c("data/MCD09/MCD09_mean_01.tif","data/MCD09/MCD09_mean_07.tif","data/MCD09_deriv/meanannual.tif","data/MCD09_deriv/intra.tif"))
