@@ -41,7 +41,6 @@ if(!file.exists(fspdata)){
   ## define columns to keep  
     cols=c("GLOBAL UNIQUE IDENTIFIER","TAXONOMIC ORDER","CATEGORY",
          "COMMON NAME","SCIENTIFIC NAME",
-         "SUBSPECIES COMMON NAME","SUBSPECIES SCIENTIFIC NAME",
          "OBSERVATION COUNT","COUNTRY","COUNTRY CODE",  
          "LATITUDE","LONGITUDE","OBSERVATION DATE",
          "OBSERVER ID","SAMPLING EVENT.IDENTIFIER","PROTOCOL TYPE",
@@ -53,8 +52,8 @@ if(!file.exists(fspdata)){
   system(paste("sed -e 's|[\"'\']||g' ",f," > ebird.txt"))
     # 50 minutes
   d=fread("ebird.txt",header = T, sep = '\t',select=cols,na.strings=c("","?","\""),showProgress=T,verbose=T)
-  setkey(d,"TAXONOMIC_ORDER")
   setnames(d,colnames(d),gsub(" ","_",colnames(d)))
+  setkey(d,"TAXONOMIC_ORDER")
     # subset by lat/lon - 2 minutes
   system.time(d2<<-d%.%mutate(TAXO=round(TAXONOMIC_ORDER))%.%
                 filter(LATITUDE>=bbox(reg)["y","min"],
@@ -68,8 +67,9 @@ if(!file.exists(fspdata)){
     file.remove("ebird.txt")
 }
 
+####################
 ## read it back in
-spd=read.csv(fspdata)
+
 
 #########  Environmental Data
 cf=stack(c("data/MCD09/MCD09_mean_01.tif","data/MCD09/MCD09_mean_07.tif","data/MCD09_deriv/meanannual.tif","data/MCD09_deriv/intra.tif"))
@@ -88,40 +88,47 @@ env=crop(env,reg)
 env=stack(env,cf)
 
 
-## rasterize protea data to grid and return a raster of presences and trials
-fprot=function(prot,rast=cf,sp="PRACAU"){
-  tpres=unique(prot@data[prot$pro==sp,c("obs","londd","latdd")])
-  coordinates(tpres)=c("londd","latdd")
-  ttrials=unique(prot@data[,c("obs","londd","latdd")])
-  coordinates(ttrials)=c("londd","latdd")
-  presences=rasterize(tpres,cf,fun="count",field="obs",background=0)
-  trials=rasterize(ttrials,cf,fun="count",field="obs",background=0)
-  td=mask(stack(presences,trials),cfr)
-  names(td)=c("presences","trials")
-  return(td)
-}
+### clean up species data
+spd=read.csv(fspdata)
 
-sp="PRCYNA"
-rprot=fprot(prot,sp=sp)
+sptax=round(taxon$TAXON_ORDER[taxon$GENUS_NAME==sp[1]&taxon$SPECIES_NAME==sp[2]])
+
+## observations of all species
+spd_ns=spd%.%filter(ALL_SPECIES_REPORTED==1)%.%
+  group_by(LATITUDE,LONGITUDE,OBSERVATION_DATE)
+spd_ns=unique(spd_ns[,c("LATITUDE","LONGITUDE","OBSERVATION_DATE")])%.%mutate(presence=0)
+
+## presences
+spd_s=spd%.%filter(round(TAXONOMIC_ORDER)==sptax)%.%select(LONGITUDE,LATITUDE,OBSERVATION_DATE)%.%mutate(presence=1)
+
+spd_sp=as.data.frame(rbind(spd_ns,spd_s))
+coordinates(spd_sp)=c("LONGITUDE","LATITUDE")
+  
+  presences=rasterize(spd_sp[spd_sp$presence==1,],cf,fun="count",field="presence",background=0)
+  trials=rasterize(spd_sp[spd_sp$presence==0,],cf,fun="count",field="presence",background=0)
+  td=stack(presences,trials)
+  names(td)=c("presences","trials")
 
 senv=scale(env)
 
 #splom(senv)
 
-data=cbind.data.frame(values(stack(senv,rprot)),coordinates(senv),cell=cellFromXY(senv,xy=coordinates(senv)))
+data=cbind.data.frame(values(stack(senv,td)),coordinates(senv),cell=cellFromXY(senv,xy=coordinates(senv)))
 data=as.data.frame(data[!is.na(data[,"presences"]),])
 data$trials=as.integer(data$trials)
 data$presences=as.integer(data$presences)
 data=na.omit(data)
 
 ## adjacency matrix
-neighbors.mat <- adjacent(senv, cells=1:ncell(senv), directions=8, pairs=TRUE, sorted=TRUE)
+#neighbors.mat <- adjacent(senv, cells=1:ncell(senv), directions=8, pairs=TRUE, sorted=TRUE)
 #neighbors.mat=neighbors.mat[neighbors.mat[,1]%in%data$cell,]
-n.neighbors <- as.data.frame(table(as.factor(neighbors.mat[,1])))[,2]
-adj <- neighbors.mat[,2]
+#n.neighbors <- as.data.frame(table(as.factor(neighbors.mat[,1])))[,2]
+#adj <- neighbors.mat[,2]
 
 ## create 'fitting' dataset where there are observations
 fdata=data[data$trials>0,]
+## due to opportunistic observations, there are a few sites with more presences than trials, update those records so presences=trials
+fdata$trials[fdata$presences>fdata$trials]=fdata$presences[fdata$presences>fdata$trials]
 
 nchains=3
 
