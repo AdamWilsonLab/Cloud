@@ -82,6 +82,10 @@ mods=data.frame(
          "Temperature & Cloud",
          "Temperature, Precipitation, & Cloud"))
 
+## file to save output
+fres=paste0("data/SDM/",paste(sp,collapse="_"),"_modeloutput.Rdata")
+
+if(!file.exists(fres)){
 res=foreach(m=1:nrow(mods)) %dopar% { 
   tres1=foreach(ch=1:nchains) %dopar% {
     tres2=hSDM.ZIB(
@@ -92,17 +96,9 @@ res=foreach(m=1:nrow(mods)) %dopar% {
       gamma.start=0,
       trials=fdata$trials,
       data=fdata,
-#      spatial.entity=fdata$cell,
-#      n.neighbors=n.neighbors,
-#      neighbors=adj,
-#      spatial.entity.pred=data$cell,
-      burnin=1000, mcmc=5000, thin=5,
+      burnin=10000, mcmc=10000, thin=10,
       beta.start=0,
       suitability.pred=data,
-#      Vrho.start=20,
-#      priorVrho="1/Gamma",
-#      shape=1, rate=1,
-#      save.rho=0, 
       mubeta=0, Vbeta=1.0E6,
       save.p=0,
       verbose=1,
@@ -136,6 +132,13 @@ res=foreach(m=1:nrow(mods)) %dopar% {
   }
 return(list(coef=coef,pred=pred,rho=rho))  
 }
+
+save(res,file=fres)
+
+}
+
+#################
+load(fres)
 
 coef=do.call(rbind,lapply(res,function(x) x$coef))
 pred=do.call(rbind,lapply(res,function(x) x$pred))
