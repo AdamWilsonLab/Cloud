@@ -1,12 +1,49 @@
 # Load the libraries and set working directory
 source("analysis/setup.R")
+install_github(repo="Rdatatable/data.table")
+library(data.table)
+library(AUC)
+library(dismo)
+library(redshift)
+library(rasterVis)
 
-registerDoMC(12)
+#library(devtools)
+#install_github("adammwilson/rasterAutocorr")
+library(rasterAutocorr)
+
+ncores=12
+registerDoMC(ncores)
 rasterOptions(datatype="FLT4S")
-  
 
-sp=c("Lepidocolaptes","lacrymiger")
-fam="Furnariidae (Ovenbirds and Woodcreepers)"
+#sp=c("Lepidocolaptes","lacrymiger")
+#fam="Furnariidae (Ovenbirds and Woodcreepers)"
+
+## cock of the rock
+sp=c("Rupicola","peruvianus")
+fam="Cotingidae (Cotingas)"
+
+sp2=paste0(sp,collapse="_")
+
+### Load eBird data for 
+## ebird data downloaded and unzipped from http://ebirddata.ornith.cornell.edu/downloads/erd/ebird_all_species/erd_western_hemisphere_data_grouped_by_year_v5.0.tar.gz
+ebirddir="/mnt/data/jetzlab/Data/specdist/global/ebird/"
+
+## select species for presences and 'absences'
+taxon=read.csv(paste0(ebirddir,"/doc/taxonomy.csv"),na.strings="?")
+taxon$TAXON_ORDER2=round(taxon$TAXON_ORDER)
+## some duplicate species names marked with "/"
+## Many SPECIES_NAME and GENUS_NAME are null but SCI_NAME is not
+taxon$gensp=apply(do.call(rbind,lapply(strsplit(as.character(taxon$SCI_NAME),split="_|/"),function(x) x[1:2])),1,paste,collapse="_")
+taxon=taxon%.%filter(FAMILY_NAME==fam)
+
+## Select list (or single) taxon ids for use as 'presence'
+sptaxon=taxon$TAXON_ORDER2[taxon$gensp%in%sp2]
+## Select list of taxon ids for use as 'non-detection/absence'
+nulltaxon=taxon$TAXON_ORDER2[taxon$TAXON_ORDER2!=sptaxon]
+
+## create output folder
+outputdir=paste0("output/sdm/",sp2,"/")
+if(!file.exists(outputdir)) dir.create(outputdir,recursive=T)
 
 ## load region boundary
 download.file(paste0("http://mol.cartodb.com/api/v2/sql?",
@@ -14,136 +51,106 @@ download.file(paste0("http://mol.cartodb.com/api/v2/sql?",
                   "get_tile('jetz','range','",
                   sp[1],"%20",sp[2],
                   "','jetz_maps')&format=shp&filename=expert"),
-              destfile="data/SDM/expert.zip")
-unzip("data/SDM/expert.zip",exdir="data/SDM/")
-
-reg=readOGR("data/SDM/","expert")
-
-### Load eBird data for 
-## ebird data downloaded and unzipped from http://ebirddata.ornith.cornell.edu/downloads/erd/ebird_all_species/erd_western_hemisphere_data_grouped_by_year_v5.0.tar.gz
-ebirddir="/mnt/data/jetzlab/Data/specdist/global/ebird/"
-
-## select species for presences and 'absences'
-taxon=read.csv(paste0(ebirddir,"/doc/taxonomy.csv"))
-taxon$TAXON_ORDER2=round(taxon$TAXON_ORDER)
-taxon=taxon%.%filter(FAMILY_NAME==fam)
-
-library(data.table)
-library(AUC)
-library(dismo)
+              destfile=paste0(outputdir,"expert.zip"))
+unzip(paste0(outputdir,"expert.zip"),exdir=outputdir)
 
 
 
-fspdata=paste0("data/SDM/points_",paste(sp,collapse="_"),".csv")
-if(!file.exists(fspdata)){
-    f="/mnt/data2/projects/mol/points_Aug_2014/ebd_relMay-2014.txt"
-    hdr=colnames( read.table(f,nrows=3,header=T,sep="\t"))
-  ## define columns to keep  
-    cols=c("GLOBAL UNIQUE IDENTIFIER","TAXONOMIC ORDER","CATEGORY",
-         "COMMON NAME","SCIENTIFIC NAME",
-         "OBSERVATION COUNT","COUNTRY","COUNTRY CODE",  
-         "LATITUDE","LONGITUDE","OBSERVATION DATE",
-         "OBSERVER ID","SAMPLING EVENT.IDENTIFIER","PROTOCOL TYPE",
-         "DURATION MINUTES","EFFORT DISTANCE KM","EFFORT AREA HA",
-         "NUMBER OBSERVERS","ALL SPECIES REPORTED","GROUP IDENTIFIER",
-         "APPROVED","REVIEWED","REASON")
+reg=readOGR(outputdir,"expert")
 
-  # make a new copy with no quotes
-  system(paste("sed -e 's|[\"'\']||g' ",f," > ebird.txt"))
-    # 50 minutes
-  d=fread("ebird.txt",header = T, sep = '\t',select=cols,na.strings=c("","?","\""),showProgress=T,verbose=T)
-  setnames(d,colnames(d),gsub(" ","_",colnames(d)))
-  setkey(d,"TAXONOMIC_ORDER")
-    # subset by lat/lon - 2 minutes
-  system.time(d2<<-d%.%mutate(TAXO=round(TAXONOMIC_ORDER))%.%
-                filter(LATITUDE>=bbox(reg)["y","min"],
-                       LATITUDE<=bbox(reg)["y","max"],
-                       LONGITUDE>=bbox(reg)["x","min"],
-                       LONGITUDE<=bbox(reg)["x","max"],
-                       TAXO%in%taxon$TAXON_ORDER2))  
-     write.csv(d2,file=fspdata,row.names=F)
-  ## clean up
-    rm(d,d2); gc()
-    file.remove("ebird.txt")
-}
 
-####################
-## read it back in
+## get species data
+t1=system.time(spd<<-getebird(con=conn,sptaxon=sptaxon,nulltaxon=nulltaxon,region=reg))
+coordinates(spd)=c("longitude","latitude")
+projection(spd)="+proj=longlat +datum=WGS84 +ellps=WGS84"
+spd@data[,c("lon","lat")]=coordinates(spd)  
 
+## print a little summary
+
+writeLines(paste(sp2," has ",nrow(spd),"rows"))
 
 #########  Environmental Data
-cf=stack(c("data/MCD09/MCD09_mean_01.tif","data/MCD09/MCD09_mean_07.tif","data/MCD09_deriv/meanannual.tif","data/MCD09_deriv/intra.tif"))
-names(cf)=c("c_mm_01","c_mm_07","c_ma","c_intra")
+cf=stack(c("data/MCD09/MCD09_mean_01.tif","data/MCD09/MCD09_mean_07.tif"))
+names(cf)=c("CLDJAN","CLDJUL")
 NAvalue(cf)=0
 cf=crop(cf,reg)
 gain(cf)=.01
 
 ### Load environmental data
 vars=c(
-  paste0("/mnt/data/jetzlab/Data//environ/global/worldclim/",c("tmean_1","tmean_7","prec_1","prec_7","alt"),".bil"))
+  paste0("/mnt/data/jetzlab/Data/environ/global/worldclim/",c("prec_1","prec_7","bio_1","alt"),".bil"))
 env=stack(vars)
-names(env)=gsub("_","",names(env))
+names(env)=c("PPTJAN","PPTJUL","MAT","ALT")
 env=crop(env,reg)
 ##  Create single stack
 env=stack(env,cf)
 
-
-### clean up species data
-spd=read.csv(fspdata)
-
-sptax=round(taxon$TAXON_ORDER[taxon$GENUS_NAME==sp[1]&taxon$SPECIES_NAME==sp[2]])
-
-## observations of all species
-spd_ns=spd%.%filter(ALL_SPECIES_REPORTED==1)%.%
-  group_by(LATITUDE,LONGITUDE,OBSERVATION_DATE)
-spd_ns=unique(spd_ns[,c("LATITUDE","LONGITUDE","OBSERVATION_DATE")])%.%mutate(presence=0)
-
-## presences
-spd_s=spd%.%filter(round(TAXONOMIC_ORDER)==sptax)%.%select(LONGITUDE,LATITUDE,OBSERVATION_DATE)%.%mutate(presence=1)
-
-spd_sp=as.data.frame(rbind(spd_ns,spd_s))
-coordinates(spd_sp)=c("LONGITUDE","LATITUDE")
-spd_sp@data[,c("lon","lat")]=coordinates(spd_sp)  
-  
-presences=rasterize(spd_sp[spd_sp$presence==1,],cf,fun="count",field="presence",background=0)
-  trials=rasterize(spd_sp[spd_sp$presence==0,],cf,fun="count",field="presence",background=0)
-  td=stack(presences,trials)
-  names(td)=c("presences","trials")
+## rasterize species data to environmental grid
+presences=rasterize(spd[spd$presence==1,],cf,fun="count",field="presence",background=0)
+trials=rasterize(spd[spd$presence==0,],cf,fun="count",field="presence",background=0)
+spr=stack(presences,trials)
+names(spr)=c("presences","trials")
 
 senv=scale(env)
 
+### identify elevation band
+adata=data.frame(values(stack(env[["ALT"]],spr)))
+adata=na.omit(adata)
+adata=adata[adata$trials>0,]
+adata$p=adata$presences>0
+
+ggplot(adata, aes(x=ALT, fill=p)) + geom_density(alpha=.3)+
+  geom_vline(aes(xintercept=c(900,2400),col="red",lwd=2))+
+  geom_rug(aes(group=p),sides="b") 
+
+ggplot(adata, aes(y=ALT, x=p)) + 
+  geom_boxplot()+ geom_jitter()+
+  geom_hline(aes(yintercept=c(900,2400),col="red",lwd=2))+
+  geom_rug(aes(group=p),sides="b") 
+
+altrange=calc(env[["ALT"]],function(x) x>900&x<2400)
+names(altrange)="altrange"
+senv=stack(senv,altrange)
+
+tcor=layerStats(env, "pearson",asSample=F, na.rm=T)
+
 #splom(senv)
 
-data=cbind.data.frame(values(stack(senv,td)),coordinates(senv),cell=cellFromXY(senv,xy=coordinates(senv)))
+data=cbind.data.frame(values(stack(senv,spr)),coordinates(senv),cell=cellFromXY(senv,xy=coordinates(senv)))
 data=as.data.frame(data[!is.na(data[,"presences"]),])
 data$trials=as.integer(data$trials)
 data$presences=as.integer(data$presences)
 data=na.omit(data)
-
-## adjacency matrix
-#neighbors.mat <- adjacent(senv, cells=1:ncell(senv), directions=8, pairs=TRUE, sorted=TRUE)
-#neighbors.mat=neighbors.mat[neighbors.mat[,1]%in%data$cell,]
-#n.neighbors <- as.data.frame(table(as.factor(neighbors.mat[,1])))[,2]
-#adj <- neighbors.mat[,2]
 
 ## create 'fitting' dataset where there are observations
 fdata=data[data$trials>0,]
 ## due to opportunistic observations, there are a few sites with more presences than trials, update those records so presences=trials
 fdata$trials[fdata$presences>fdata$trials]=fdata$presences[fdata$presences>fdata$trials]
 
+### Save model input data
+save(env,senv,spr,data,fdata,file=paste0(outputdir,"modelinput.Rdata"))
+
+#####################################################################################
+#####################################################################################
+load(paste0(outputdir,"modelinput.Rdata")))
+
 nchains=3
 
 mods=data.frame(
-  model=c("m1","m2","m3"),
-  formula=c("~tmean1+tmean7+prec1+prec7+alt",
-                "~tmean1+tmean7+c_mm_01+c_mm_07+alt",
-                "~tmean1+tmean7+prec1+prec7+c_mm_01+c_mm_07+alt"),
-  name=c("Temperature & Precipitation",
-         "Temperature & Cloud",
-         "Temperature, Precipitation, & Cloud"))
+  model=c("m1","m2","m3","m4"),
+  formula=c("~PPTJAN+PPTJUL+MAT",
+            "~PPTJAN+PPTJUL+MAT+altrange",
+            "~CLDJAN+CLDJUL+MAT",
+            "~CLDJAN+CLDJUL+MAT+altrange"),
+  name=c("Precipitation",
+         "Precipitation & Alt Range",
+         "Cloud",
+         "Cloud & Alt Range"))
 
 ## file to save output
-fres=paste0("data/SDM/",paste(sp,collapse="_"),"_modeloutput.Rdata")
+fres=paste0(outputdir,"modeloutput.Rdata")
+
+registerDoMC(ncores)
 
 if(!file.exists(fres)){
 res=foreach(m=1:nrow(mods)) %dopar% { 
@@ -156,7 +163,7 @@ res=foreach(m=1:nrow(mods)) %dopar% {
       gamma.start=0,
       trials=fdata$trials,
       data=fdata,
-      burnin=10000, mcmc=10000, thin=10,
+      burnin=5000, mcmc=10000, thin=10,
       beta.start=0,
       suitability.pred=data,
       mubeta=0, Vbeta=1.0E6,
@@ -193,9 +200,7 @@ res=foreach(m=1:nrow(mods)) %dopar% {
 return(list(coef=coef,pred=pred,rho=rho))  
 }
 
-
 save(res,file=fres)
-
 }
 
 #################
@@ -203,32 +208,39 @@ load(fres)
 
 coef=do.call(rbind,lapply(res,function(x) x$coef))
 pred=do.call(rbind,lapply(res,function(x) x$pred))
-rho=do.call(rbind,lapply(res,function(x) x$rho))
 
-pred=pred[pred$model%in%mods$model[1:2],]
+#pred=pred[pred$model%in%mods$model[1:2],]
 pred$cell=cellFromXY(senv,xy=pred[,c("x","y")])
 
 predr=stack(lapply(unique(pred$model),function(m) rasterFromXYZ(xyz=pred[pred$model==m,c("x","y","pred")])))
 names(predr)=unique(pred$model)
 projection(predr)='+proj=longlat'
-#writeRaster(predr*100,file=paste0("data/SDM/",paste(sp,collapse="_"),".tif"))
+writeRaster(predr*100,file=paste0(outputdir,sp2,".tif"))
 
 
 ##### Autocorrelation
-library(devtools)
-install_github("adammwilson/rasterAutocorr")
-library(rasterAutocorr)
 
 ac1=acor_table(predr[[1]],verbose=T)
 ac1$model=names(predr)[1]
 ac2=acor_table(predr[[2]],verbose=T)
 ac2$model=names(predr)[2]
+ac3=acor_table(predr[[3]],verbose=T)
+ac3$model=names(predr)[3]
+ac4=acor_table(predr[[4]],verbose=T)
+ac4$model=names(predr)[4]
 
-ac=rbind.data.frame(ac1,ac2)
+ac=rbind.data.frame(ac1,ac2,ac3,ac4)
+
+## observed data
+mask=ifelse(trials>0,1,0)
+NAvalue(mask)=0
+pres1=mask(presences,mask)
+ac_obs=acor_table(pres1,verbose=T)
+ac_obs$model="Observed"
 
 
 ## Global Spatial Autocorrelation
-fspac=paste0("output/sdm/globalautocorr_",paste(sp,collapse="_"),".csv")
+fspac=paste0(outputdir,sp2,".csv")
 if(!file.exists(fspac)){
 spac=do.call(rbind.data.frame,
              lapply(1:nlayers(predr),function(i) {
@@ -246,7 +258,7 @@ spac=read.csv(fspac)
 rs=cellStats(predr,"sum")
 (rs[[1]]-rs[[2]])/rs[[1]]
 
-splom(predr)
+#splom(predr)
 
 cor(fdata$c_mm_07,fdata$prec7)
 
@@ -258,7 +270,7 @@ dic$dic=dic$Mean+dic$pv
 
 ## AUC
 aucdat=merge(fdata[,c("presences","trials","cell")],pred,by=c("cell"))
-aucdat$model=factor(aucdat$model,levels=c("m1","m2"),ordered=T)
+#aucdat$model=factor(aucdat$model,levels=mods$model,ordered=T)
 
 feval=function(x){
   e=evaluate(p=x$pred[x$presences>0],a=x$pred[x$presences==0])
@@ -267,26 +279,48 @@ feval=function(x){
 
 restable=do.call(rbind.data.frame,by(aucdat,INDICES=aucdat$modelname,FUN=feval))
 restable$species=paste(sp,collapse=" ")
-restable$modelname=unique(as.character(aucdat$modelname))
-restable$model=dic$model[match(restable$modelname,dic$modelname)]
-restable$Deviance=dic$Mean[match(restable$model,dic$modelname)]
-restable$Pv=dic$pv[match(restable$model,dic$modelname)]
-restable$DIC=dic$dic[match(restable$model,dic$modelname)]
+restable$model=dic$model[match(rownames(restable),dic$modelname)]
+restable$Deviance=dic$Mean[match(restable$model,dic$model)]
+restable$Pv=dic$pv[match(restable$model,dic$model)]
+restable$DIC=dic$dic[match(restable$model,dic$model)]
 ##
 restable[,c("MoransI","GearyC")]=spac[match(restable$model,spac$model),c("MoransI","GearyC")]
 
-restable=restable[,c("species","model","modelname","nPresence","nTrials","Deviance","Pv","DIC","auc","cor","MoransI","GearyC")]
+restable=restable[order(restable$model),
+                  c("species","model","modelname","nPresence","nTrials","Deviance","Pv","DIC","auc","cor","MoransI","GearyC")]
 
-write.csv(restable,file=paste0("data/SDM/",paste(sp,collapse="_"),"_summary.csv"),row.names=F)
+write.csv(restable,file=paste0(outputdir,sp2,"_summary.csv"),row.names=F)
+
+## add elevation gradient
+
+## Correlogram of points
+#library(ncf)
+#s=sample(1:nrow(fdata),100)
+#pcg=correlog(x=fdata$x[s],y=fdata$y[s],z=fdata$presence[s]>0,latlon=T,increment=50)
+
+#library(spdep)
+#ds=c(seq(0,100,by=5))
+#joincount.mc(HICRIME, nb2listw(COL.nb, style="B"), nsim=99)
+#d1=dnearneigh(as.matrix(fdata[,c("x","y")]),d1=0,d2=100,longlat=T)
+#plot(pcg);abline(h=0,col="red")
 
 #colnames(coef)[grepl("X",colnames(coef))]=paste0("Q",sub("X","",colnames(coef)[grepl("X",colnames(coef))]))
 #res$param=sub("beta[.]","",rownames(res))
 #0resl=melt(res,id.vars=c("model","suitability","param"))
 #levels(resl$variable)=c(0.025,0.25,0.5,0.75,0.975)
+library(spdep)
+set.ZeroPolicyOption(T)  
+
+nb=dnearneigh(spd,0,5,longlat=T)
+plot(nb)
+nblist=nb2listw(nb,style="B")
+#tdrop=do.call(c,lapply(nblist$weights,function(x) length(x)==0))
+#nblist=nb2listw(nb,style="B",zero.policy=TRUE)
+joincount.test(as.factor(spd$presence>0),nblist)
 
 library(grid) # needed for arrow function
 library(ggplot2)
-
+library(scales)
 ## Make a plot to explore the data
 
 
@@ -296,11 +330,9 @@ gplot(senv) + geom_tile(aes(fill = value)) +
   coord_equal()
 
 ## compare predictions
-p1=gplot(predr,maxpixels=5e5) + geom_tile(aes(fill = value)) +
+p1=gplot(predr,maxpixels=1e5) + geom_tile(aes(fill = value)) +
   facet_wrap(~ variable) +
   scale_fill_gradientn(colours=c('white','blue','red'),na.value="transparent") +
-#  geom_point(data=spd_sp[spd_sp$presence==0,]@data,aes(x=lon,y=lat),pch="-",col="grey",cex=1)+
-  geom_point(data=spd_sp[spd_sp$presence==1,]@data,aes(x=lon,y=lat),pch="+",cex=1)+
   coord_equal()+xlab("Longitude")+ylab("Latitude")+
   labs(fill = "p(presence)")+ 
   theme(legend.position="bottom")
@@ -309,7 +341,6 @@ p2=ggplot(aucdat, aes(factor(presences>0,labels=c("Absent","Present")), pred))+
   geom_boxplot()+facet_wrap(~model)+
   xlab("Observed")+ylab("p(presence)")+
   coord_flip()
-
 
 ## plot the correlogram
 p3=ggplot(ac, aes(x=dist2, y=mean, group=model))+
@@ -322,9 +353,14 @@ p3=ggplot(ac, aes(x=dist2, y=mean, group=model))+
   ylab("Autocorrelation")+xlab("Distance (km)")+
   theme(legend.position=c(.25, .25))
 
+p4=p1+
+  geom_point(data=spd[spd$presence==0,]@data,aes(x=lon,y=lat),pch=1,col=grey(.8),cex=1)+
+  geom_point(data=spd[spd$presence==1,]@data,aes(x=lon,y=lat),pch=3,cex=2)+
+  ylim(c(-1,7.5))+xlim(c(-79,-72))
+p4
 
 ## make the pdf
-pdf(file=paste0("manuscript/figures/SDM_",paste(sp,collapse="_"),".pdf"),width=5,height=10)
+pdf(file=paste0(outputdir,"SDM_",sp2,".pdf"),width=5,height=10)
 
 grid.newpage()
 
@@ -339,22 +375,8 @@ print(p2, vp = vp3)
 dev.off()
 
 
-## Fit a simple GLM to the data
-obs=as.matrix(data[,c("presences","trials")])
-m_glm=lapply(1:nrow(mods),function(i) glm(paste0("obs",mods$formula[i]),data=data,family="binomial"))
-
-screenreg(m_glm,custom.model.names=as.character(mods$name),format="markdown")
-
-#= Parameter estimates
-summary(res[[1]])
-xyplot(mod1$mcmc)
-#= Predictions
-summary(mod1$theta.latent)
-summary(mod1$theta.pred)
-plot(theta,mod1$theta.pred)
-
 ### Check Convergence
-xyplot(mod1$mcmc, main="Beta",strip=strip.custom(factor.levels=c("intercept",vars)))
-gelman.diag(mod1$mcmc,confidence = 0.95,autoburnin=F,multivariate=T)
+#xyplot(mod1$mcmc, main="Beta",strip=strip.custom(factor.levels=c("intercept",vars)))
+#gelman.diag(mod1$mcmc,confidence = 0.95,autoburnin=F,multivariate=T)
 
 
