@@ -57,7 +57,10 @@ unzip(paste0(outputdir,"expert.zip"),exdir=outputdir)
 
 
 reg=readOGR(outputdir,"expert")
+ereg=extent(reg)
 
+## adjust bbox if desired
+ereg@xmin=-81.4
 
 ## get species data
 t1=system.time(spd<<-getebird(con=conn,sptaxon=sptaxon,nulltaxon=nulltaxon,region=reg))
@@ -70,20 +73,25 @@ spd@data[,c("lon","lat")]=coordinates(spd)
 writeLines(paste(sp2," has ",nrow(spd),"rows"))
 
 #########  Environmental Data
-cf=stack(c("data/MCD09/MCD09_mean_01.tif","data/MCD09/MCD09_mean_07.tif"))
-names(cf)=c("CLDJAN","CLDJUL")
+cf=stack(c("data/MCD09/MCD09_mean_01.tif","data/MCD09/MCD09_mean_07.tif","data/MCD09_deriv/intra.tif"))
+names(cf)=c("CLDJAN","CLDJUL","CLDSEAS")
 NAvalue(cf)=0
-cf=crop(cf,reg)
+cf=crop(cf,ereg)
 gain(cf)=.01
 
-### Load environmental data
-vars=c(
-  paste0("/mnt/data/jetzlab/Data/environ/global/worldclim/",c("prec_1","prec_7","bio_1","alt"),".bil"))
-env=stack(vars)
-names(env)=c("PPTJAN","PPTJUL","MAT","ALT")
-env=crop(env,reg)
+tvars=c(
+  paste0("/mnt/data/jetzlab/Data/environ/global/worldclim/",
+      c("prec_1","prec_7","bio_1","bio_12","bio_15","tmean_1","tmean_7","alt"),".bil"))
+tenv=stack(crop(stack(tvars),ereg),cf)
+## Covariate correlation
+tcor=layerStats(tenv, "pearson",asSample=F, na.rm=T)
+write.csv(tcor,file=paste0(outputdir,sp2,"_covariatecorrelation.csv"),row.names=F)
+
+
+### Select environmental data
 ##  Create single stack
-env=stack(env,cf)
+env=stack(tenv[[c("prec_1","prec_7","bio_15","bio_1","alt")]],cf[[c("CLDJAN","CLDJUL","CLDSEAS")]])
+names(env)=c("PPTJAN","PPTJUL","PPTSEAS","MAT","ALT","CLDJAN","CLDJUL","CLDSEAS")
 
 ## rasterize species data to environmental grid
 presences=rasterize(spd[spd$presence==1,],cf,fun="count",field="presence",background=0)
@@ -110,9 +118,8 @@ ggplot(adata, aes(y=ALT, x=p)) +
 
 altrange=calc(env[["ALT"]],function(x) x>900&x<2400)
 names(altrange)="altrange"
-senv=stack(senv,altrange)
+#senv=stack(senv,altrange)
 
-tcor=layerStats(env, "pearson",asSample=F, na.rm=T)
 
 #splom(senv)
 
@@ -124,6 +131,9 @@ data=na.omit(data)
 
 ## create 'fitting' dataset where there are observations
 fdata=data[data$trials>0,]
+
+fdata=data[data$trials>0&data$trials>=data$presences,]
+
 ## due to opportunistic observations, there are a few sites with more presences than trials, update those records so presences=trials
 fdata$trials[fdata$presences>fdata$trials]=fdata$presences[fdata$presences>fdata$trials]
 
@@ -137,15 +147,11 @@ load(paste0(outputdir,"modelinput.Rdata")))
 nchains=3
 
 mods=data.frame(
-  model=c("m1","m2","m3","m4"),
-  formula=c("~PPTJAN+PPTJUL+MAT",
-            "~PPTJAN+PPTJUL+MAT+altrange",
-            "~CLDJAN+CLDJUL+MAT",
-            "~CLDJAN+CLDJUL+MAT+altrange"),
+  model=c("m1","m2"),
+  formula=c("~PPTJAN+PPTJUL+PPTSEAS+MAT",
+            "~CLDJAN+CLDJUL+CLDSEAS+MAT"),
   name=c("Precipitation",
-         "Precipitation & Alt Range",
-         "Cloud",
-         "Cloud & Alt Range"))
+         "Cloud"))
 
 ## file to save output
 fres=paste0(outputdir,"modeloutput.Rdata")
@@ -163,7 +169,7 @@ res=foreach(m=1:nrow(mods)) %dopar% {
       gamma.start=0,
       trials=fdata$trials,
       data=fdata,
-      burnin=5000, mcmc=10000, thin=10,
+      burnin=10000, mcmc=10000, thin=10,
       beta.start=0,
       suitability.pred=data,
       mubeta=0, Vbeta=1.0E6,
@@ -184,22 +190,8 @@ res=foreach(m=1:nrow(mods)) %dopar% {
                   modelname=mods$name[m],
                   x=data$x,y=data$y,
                   pred=rowMeans(do.call(cbind,lapply(tres1,FUN=function(x) x$prob.p.pred))))
-  if(!is.null(tres1[[1]]$rho.pred)){
-    rho=data.frame(model=mods$model[m],
-                  suitability=mods$suitability[m],
-                   model=mods$model[m],
-                   modelname=mods$name[m],
-                   coordinates(senv),
-                   cell=1:ncell(senv),
-                  rho=rowMeans(do.call(cbind,lapply(tres1,FUN=function(x) x$rho.pred))))
-    rho=rho[rho$cell%in%data$cell,]
-  }
-  if(is.null(tres1[[1]]$rho.pred)){
-    rho=NULL
-  }
 return(list(coef=coef,pred=pred,rho=rho))  
 }
-
 save(res,file=fres)
 }
 
@@ -209,13 +201,13 @@ load(fres)
 coef=do.call(rbind,lapply(res,function(x) x$coef))
 pred=do.call(rbind,lapply(res,function(x) x$pred))
 
-#pred=pred[pred$model%in%mods$model[1:2],]
+#pred=pred[pred$model%in%mods$model[c(1,3)],]
 pred$cell=cellFromXY(senv,xy=pred[,c("x","y")])
 
 predr=stack(lapply(unique(pred$model),function(m) rasterFromXYZ(xyz=pred[pred$model==m,c("x","y","pred")])))
 names(predr)=unique(pred$model)
 projection(predr)='+proj=longlat'
-writeRaster(predr*100,file=paste0(outputdir,sp2,".tif"))
+writeRaster(predr*100,file=paste0(outputdir,sp2,".tif"),overwrite=T)
 
 
 ##### Autocorrelation
@@ -224,12 +216,8 @@ ac1=acor_table(predr[[1]],verbose=T)
 ac1$model=names(predr)[1]
 ac2=acor_table(predr[[2]],verbose=T)
 ac2$model=names(predr)[2]
-ac3=acor_table(predr[[3]],verbose=T)
-ac3$model=names(predr)[3]
-ac4=acor_table(predr[[4]],verbose=T)
-ac4$model=names(predr)[4]
 
-ac=rbind.data.frame(ac1,ac2,ac3,ac4)
+ac=rbind.data.frame(ac1,ac2)
 
 ## observed data
 mask=ifelse(trials>0,1,0)
@@ -258,10 +246,6 @@ spac=read.csv(fspac)
 rs=cellStats(predr,"sum")
 (rs[[1]]-rs[[2]])/rs[[1]]
 
-#splom(predr)
-
-cor(fdata$c_mm_07,fdata$prec7)
-
 # http://www.bayesian-inference.com/modelfit
 # http://voteview.com/DIC-slides.pdf
 dic=coef[grepl("Deviance",coef$param),]
@@ -287,11 +271,15 @@ restable$DIC=dic$dic[match(restable$model,dic$model)]
 restable[,c("MoransI","GearyC")]=spac[match(restable$model,spac$model),c("MoransI","GearyC")]
 
 restable=restable[order(restable$model),
-                  c("species","model","modelname","nPresence","nTrials","Deviance","Pv","DIC","auc","cor","MoransI","GearyC")]
+                  c("species","model","nPresence","nTrials","Deviance","Pv","DIC","auc","cor","MoransI","GearyC")]
 
 write.csv(restable,file=paste0(outputdir,sp2,"_summary.csv"),row.names=F)
 
-## add elevation gradient
+print(xtable(restable,caption="Evaluation of distribution models using interpolated precipitation or cloud product"), 
+      include.rownames = FALSE,"html",file=paste0(outputdir,sp2,"_summary.html"))
+
+
+ ## add elevation gradient
 
 ## Correlogram of points
 #library(ncf)
@@ -322,18 +310,24 @@ library(grid) # needed for arrow function
 library(ggplot2)
 library(scales)
 ## Make a plot to explore the data
+#fcoast=fortify(crop(coast,ereg))
 
-
-gplot(senv) + geom_tile(aes(fill = value)) +
+penv=gplot(senv) + geom_tile(aes(fill = value)) +
   facet_wrap(~ variable) +
   scale_fill_gradientn(colours=c('white','blue','red'),na.value="transparent") +
-  coord_equal()
+  coord_equal()+ theme(legend.position="bottom")
 
 ## compare predictions
-p1=gplot(predr,maxpixels=1e5) + geom_tile(aes(fill = value)) +
+p1=
+  gplot(predr,maxpixels=1e4) + geom_tile(aes(fill = value)) +
   facet_wrap(~ variable) +
-  scale_fill_gradientn(colours=c('white','blue','red'),na.value="transparent") +
+   scale_fill_gradientn(colours=c('white','blue','red'),values = c(0,.6,.75,1), 
+                        rescaler = function(x, ...) x,
+                       na.value="transparent") +
   coord_equal()+xlab("Longitude")+ylab("Latitude")+
+  geom_point(data=spd[spd$presence==0,]@data,aes(x=lon,y=lat),pch=1,col=grey(.8),cex=1)+
+  geom_point(data=spd[spd$presence==1,]@data,aes(x=lon,y=lat),pch=3,cex=2)+
+#  geom_line(data=fcoast,mapping=aes(long,lat,group=group)) +
   labs(fill = "p(presence)")+ 
   theme(legend.position="bottom")
 
@@ -353,15 +347,25 @@ p3=ggplot(ac, aes(x=dist2, y=mean, group=model))+
   ylab("Autocorrelation")+xlab("Distance (km)")+
   theme(legend.position=c(.25, .25))
 
-p4=p1+
+p4=  gplot(predr,maxpixels=1e7) + geom_tile(aes(fill = value)) +
+  facet_wrap(~ variable) +
+  scale_fill_gradientn(colours=c('white','blue','red'),values = c(0,.6,.75,1), 
+                       rescaler = function(x, ...) x,
+                       na.value="white") +
+  coord_equal()+xlab("Longitude")+ylab("Latitude")+
   geom_point(data=spd[spd$presence==0,]@data,aes(x=lon,y=lat),pch=1,col=grey(.8),cex=1)+
   geom_point(data=spd[spd$presence==1,]@data,aes(x=lon,y=lat),pch=3,cex=2)+
-  ylim(c(-1,7.5))+xlim(c(-79,-72))
-p4
+  labs(fill = "p(presence)")+ 
+  theme(legend.position="bottom")+
+  ylim(c(-1,7.5))+xlim(c(-79.5,-72))
 
 ## make the pdf
-pdf(file=paste0(outputdir,"SDM_",sp2,".pdf"),width=5,height=10)
+pdf(file=paste0(outputdir,"env_",sp2,".pdf"),width=5,height=10)
+penv
+dev.off()
 
+
+pdf(file=paste0(outputdir,"SDM_",sp2,".pdf"),width=5,height=10)
 grid.newpage()
 
 vp1 <- viewport(width = 1, height = 0.3, x=.5,y=.15)
@@ -369,11 +373,15 @@ vp2 <- viewport(width = 1, height = .5, x = .5, y = 0.55)
 vp3 <- viewport(width = .95, height = .2, x = .5, y = 0.9)
 
 print(p3, vp = vp1)
-print(p1, vp = vp2)
+print(p4, vp = vp2)
 print(p2, vp = vp3)
 
 dev.off()
 
+
+
+ggplot(coef[coef$param!="Deviance",], aes(x = Mean, y = param,colour=model))+  
+  geom_segment(aes(xend = X97.5.,yend=param),lwd=2)
 
 ### Check Convergence
 #xyplot(mod1$mcmc, main="Beta",strip=strip.custom(factor.levels=c("intercept",vars)))
