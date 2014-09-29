@@ -1,0 +1,166 @@
+___Process monthly precipitation climatologies from the GHCN monthly database___
+Adam M. Wilson
+
+
+```{r setup,echo=F,message=F}
+source("/media/data/Cloud/analysis/setup.R")
+opts_knit$set(root.dir=getwd(),cache=T,base.url = NULL,fig.width=8)
+```
+
+# GHCN Data Processing
+## Download, uncompress, and import GHCN data
+```{r datadownload}
+if(!file.exists("data/ghcn/v2.prcp")){
+system("wget ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/v2.prcp.Z -P data/ghcn/")
+system("uncompress data/ghcn/v2.prcp.Z")
+}
+
+if(!file.exists("data/ghcn/v2.prcp.inv"))
+   system("wget ftp://ftp.ncdc.noaa.gov/pub/data/ghcn/v2/v2.prcp.inv -P data/ghcn/")
+
+```
+
+
+## GHCN pre-processing
+
+Subset to 2000-present, take monthly means, & reshape to long format
+
+```{r dataprocess}
+fpds="data/out/ghcn.csv"
+if(!file.exists(fpds)){
+
+## read in metadata
+fwi=c(11,-1,20,10,8,7,5)
+pdi=read.fwf("data/ghcn/v2.prcp.inv",
+            widths=fwi,col.names=c("id","stationname","country","latitude","longitude","elevation"),comment.char="")
+
+## read in precipitation data
+fwd=c(11,1,4,rep(5,12))
+pd=read.fwf("data/ghcn/v2.prcp",na.strings=-9999,
+             widths=fwd,col.names=c("id","duplicate","year",month.name),comment.char="")
+
+
+pdc1=pd%.%filter(year>=1950);pdc1$era="1950-2014"
+pdc2=pd%.%filter(year>=2000);pdc2$era="2000-2014"
+
+pdl=melt(rbind(pdc1,pdc2),id.vars=c("id","year","era"),measure.vars=month.name)
+
+#convert "trace" precipitation to 0.1mm
+pdl$value[pdl$value==-8888]=1
+
+pds=pdl%.%group_by(id,era,variable)%.%summarize(
+  mmp=mean(value/10,na.rm=T),
+  count=sum(!is.na(value)),
+  min=min(value/10,na.rm=T),
+  max=max(value/10,na.rm=T))
+
+pds$month=1:12[pds$variable==month.name]
+pds[,colnames(pdi)[-1]]=pdi[match(pds$id,pdi$id),-1]
+pds=as.data.frame(pds)
+
+## drop stations not in inventory data
+pds=pds[!is.na(pds$latitude),]
+
+## extract cloud data
+cf=stack(list.files("data/MCD09/",pattern="MCD09_mean_",full=T))
+NAvalue(cf)=0
+gain(cf)=.01
+
+pts=unique(pds[,c("id","latitude","longitude")])
+coordinates(pts)=c("longitude","latitude")
+
+biome=raster("data/out/teow.tif")
+pts=raster::extract(biome,pts,sp=T)
+
+pts=raster::extract(cf,pts,sp=T)
+ptsl=melt(pts@data,id.var=c("id","teow"))
+ptsl$month=as.numeric(do.call(rbind,strsplit(as.character(ptsl$variable),"_"))[,3])
+pds$cld=ptsl$value[match(paste(pds$id,pds$month),paste(ptsl$id,ptsl$month))]
+pds$biome=pts$teow[match(pds$id,pts$id)]
+
+write.csv(pds,file=fpds,row.names=F)
+}
+pds=read.csv(fpds)
+pds$variable=factor(pds$variable,levels=month.name,ordered=T)
+```
+
+## Comparison with Precipitation 
+
+Mean monthly precipitation over 1950-2014
+```{r mmpmap,fig.width=15}
+ggplot(pds,aes(x=longitude,y=latitude,colour=mmp+1,order = mmp))+
+  geom_point(size=1)+
+  facet_wrap(~variable)+
+  scale_colour_gradientn(trans = "log",colours=c("grey","tan","darkgreen","green","purple"))+
+  coord_fixed(ratio = 1.25)
+```
+
+## Mean monthly cloud frequency and precipitation
+
+```{r cloudAndPrecip,fig.width=10,fig.height=15}
+ggplot(na.omit(pds),aes(x=cld,y=mmp+1))+
+  stat_density2d(geom="tile", aes(fill = ..density..), contour = FALSE)+
+  facet_wrap(~variable)+
+  scale_fill_gradientn(colours=c("transparent","blue","red","purple"))+
+  stat_smooth(method="loess",se=T,col="black")+
+  scale_y_continuous(trans = log10_trans(),
+                        breaks = trans_breaks("log10", function(x) 10^x),
+                        labels = trans_format("log10", math_format(10^.x)))+
+  ylab("Mean Monthly Precipitation (mm)")+
+  xlab("Mean Monthly Cloud Frequency (%)")
+  
+```
+
+## Mean monthly precipitation vs. cloud frequency by biome
+
+Global Spearman's Correlation between mean monthly temperature and precipitation:
+```{r globalcor,results='asis'}
+t1=cor.test(pds$mmp[pds$era=="1950-2014"] , pds$cld[pds$era=="1950-2014"] , method = "spearman",use="complete")
+t1n=nrow(na.omit(data.frame(pds$mmp[pds$era=="1950-2014"] , pds$cld[pds$era=="1950-2014"])))
+t2=cor.test(pds$mmp[pds$era=="2000-2014"] , pds$cld[pds$era=="2000-2014"] , method = "spearman",use="complete")
+t2n=nrow(na.omit(data.frame(pds$mmp[pds$era=="2000-2014"] , pds$cld[pds$era=="2000-2014"])))
+
+td=data.frame(Era=c("1950-2014","2000-2014"),
+              "SpearmanRho"=c(t1$estimate,t2$estimate),
+              'p-value'=c(t1$p.value,t2$p.value),
+              n=c(t1n,t2n))
+kable(td)
+```
+
+```{r summarizebybiome,fig.width=10,fig.height=15}
+tb=table(pds$biome)
+pds$biome=as.factor(pds$biome)
+bcode=read.csv("data/out/biomecode_condensed.csv")
+
+pds$biomename=paste(bcode$realm,bcode$biome,sep="_")[match(pds$biome,bcode$icode)]
+
+pdss=data.frame(cor=c(by(data=pds,INDICES=list(pds$biomename),FUN=function(x){
+  tc=cor(x$cld,log(x$mmp+1),method="spearman",use="complete")
+  round(tc,2)
+},simplify=T)))
+pdss$biomename=rownames(pdss);rownames(pdss)=1:nrow(pdss)
+
+ggplot(na.omit(pds[pds$biome%in%names(tb)[tb>100],]),aes(x=cld,y=mmp+1))+
+  facet_wrap(~biomename)+
+  stat_density2d(geom="tile", aes(fill = ..density..), contour = FALSE)+
+  scale_fill_gradientn(colours=c("transparent","blue","red","purple"))+
+  stat_smooth(method="loess",se=T,col="black")+
+  scale_y_continuous(trans = log10_trans(),
+                        breaks = trans_breaks("log10", function(x) 10^x),
+                        labels = trans_format("log10", math_format(10^.x)))+
+  ylab("Mean Monthly Precipitation (mm)")+
+  xlab("Mean Monthly Cloud Frequency (%)")+
+  geom_text(data = pdss, aes(x = 20, y = 1000, label = cor, family = "serif"), 
+          color = 'blue',  parse = TRUE)
+
+```
+
+```{r modeleval,results='asis'}
+m1=lm(cld~mmp,data=pds)
+m2=lm(cld~log(mmp+1),data=pds)
+m3=lm(cld~log(mmp+1)+elevation,data=pds)
+m4=lm(cld~log(mmp+1)+biomename,data=pds)
+
+#screenreg(list(m1,m2,m3,m4),ci.force=T,single.row=T,omit.coef="biome")
+htmlreg(list(m1,m2,m3,m4),ci.force=T,single.row=T,doctype=F,omit.coef="biome")
+```

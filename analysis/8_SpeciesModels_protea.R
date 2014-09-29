@@ -6,13 +6,22 @@ rasterOptions(datatype="FLT4S")
   
 ## load region boundary
 cfr=readOGR("data/src/CFR","CFR")
+ereg=extent(cfr)
 
-cf=stack(c("data/MCD09/MCD09_mean_01.tif","data/MCD09/MCD09_mean_07.tif","data/MCD09_deriv/meanannual.tif","data/MCD09_deriv/intra.tif"))
-names(cf)=c("c_mm_01","c_mm_07","c_ma","c_intra")
+cf=stack(c("data/MCD09/MCD09_mean_01.tif","data/MCD09/MCD09_mean_07.tif","data/MCD09_deriv/intra.tif"))
+names(cf)=c("CLDJAN","CLDJUL","CLDSEAS")
 NAvalue(cf)=0
 cf=crop(cf,cfr)
 cf=mask(cf,cfr)
 gain(cf)=.01
+
+sp="PRCYNA"
+sp2="Protea_cynaroides"
+
+
+## create output folder
+outputdir=paste0("output/sdm/",sp2,"/")
+if(!file.exists(outputdir)) dir.create(outputdir,recursive=T)
 
 ## Load protea data
 prot=readOGR("data/src/proteaatlas/","prot")
@@ -23,18 +32,25 @@ prot$pro=as.factor(as.character(prot$pro)) #reset the factors
 
 
 ### Load environmental data
-vars=c(
-  paste0("/mnt/data/jetzlab/Data//environ/global/worldclim/",c("tmean_1","tmean_7","prec_1","prec_7","alt"),".bil"))
+tvars=c(
+  paste0("/mnt/data/jetzlab/Data/environ/global/worldclim/",
+         c("prec_1","prec_7","bio_1","bio_12","bio_15","tmean_1","tmean_7","alt"),".bil"))
+tenv=stack(crop(stack(tvars),ereg),cf)
 
+## Covariate correlation
+tcor=layerStats(tenv, "pearson",asSample=F, na.rm=T)
+write.csv(tcor,file=paste0(outputdir,sp2,"_covariatecorrelation.csv"),row.names=F)
 
-env=stack(vars)
-names(env)=gsub("_","",names(env))
+### Select environmental data
+##  Create single stack
+env=stack(tenv[[c("prec_1","prec_7","bio_15","bio_1","alt")]],cf[[c("CLDJAN","CLDJUL","CLDSEAS")]])
+names(env)=c("PPTJAN","PPTJUL","PPTSEAS","MAT","ALT","CLDJAN","CLDJUL","CLDSEAS")
 
-env=crop(env,cfr)
+env=crop(env,ereg)
 env=mask(env,cfr)
 
-##
-env=stack(env,cf)
+senv=scale(env)
+
 
 ## rasterize protea data to grid and return a raster of presences and trials
 fprot=function(prot,rast=cf,sp="PRACAU"){
@@ -49,12 +65,7 @@ fprot=function(prot,rast=cf,sp="PRACAU"){
   return(td)
 }
 
-sp="PRCYNA"
 rprot=fprot(prot,sp=sp)
-
-senv=scale(env)
-
-#splom(senv)
 
 data=cbind.data.frame(values(stack(senv,rprot)),coordinates(senv),cell=cellFromXY(senv,xy=coordinates(senv)))
 data=as.data.frame(data[!is.na(data[,"presences"]),])
@@ -62,28 +73,33 @@ data$trials=as.integer(data$trials)
 data$presences=as.integer(data$presences)
 data=na.omit(data)
 
-## adjacency matrix
-neighbors.mat <- adjacent(senv, cells=1:ncell(senv), directions=8, pairs=TRUE, sorted=TRUE)
-#neighbors.mat=neighbors.mat[neighbors.mat[,1]%in%data$cell,]
-n.neighbors <- as.data.frame(table(as.factor(neighbors.mat[,1])))[,2]
-adj <- neighbors.mat[,2]
-
 ## create 'fitting' dataset where there are observations
 fdata=data[data$trials>0,]
+
+
+
+### Save model input data
+save(env,senv,spr,data,fdata,file=paste0(outputdir,"modelinput.Rdata"))
+
+
+
+##############################################################
+load(paste0(outputdir,"modelinput.Rdata"))
 
 nchains=3
 
 mods=data.frame(
-  model=c("m1","m2","m3"),
-  formula=c("~tmean1+tmean7+prec1+prec7+alt",
-                "~tmean1+tmean7+c_mm_01+c_mm_07+alt",
-                "~tmean1+tmean7+prec1+prec7+c_mm_01+c_mm_07+alt"),
-  name=c("Temperature & Precipitation",
-         "Temperature & Cloud",
-         "Temperature, Precipitation, & Cloud"))
+  model=c("m1","m2"),
+  formula=c("~PPTJAN+PPTJUL+PPTSEAS+MAT",
+            "~CLDJAN+CLDJUL+CLDSEAS+MAT"),
+  name=c("Precipitation",
+         "Cloud"))
+
 
 ## file to save output
-fres=paste0("data/SDM/",paste(sp,collapse="_"),"_modeloutput.Rdata")
+fres=paste0(outputdir,"modeloutput.Rdata")
+
+registerDoMC(ncores)
 
 if(!file.exists(fres)){
 res=foreach(m=1:nrow(mods)) %dopar% { 
@@ -117,19 +133,6 @@ res=foreach(m=1:nrow(mods)) %dopar% {
                   modelname=mods$name[m],
                   x=data$x,y=data$y,
                   pred=rowMeans(do.call(cbind,lapply(tres1,FUN=function(x) x$prob.p.pred))))
-  if(!is.null(tres1[[1]]$rho.pred)){
-    rho=data.frame(model=mods$model[m],
-                  suitability=mods$suitability[m],
-                   model=mods$model[m],
-                   modelname=mods$name[m],
-                   coordinates(senv),
-                   cell=1:ncell(senv),
-                  rho=rowMeans(do.call(cbind,lapply(tres1,FUN=function(x) x$rho.pred))))
-    rho=rho[rho$cell%in%data$cell,]
-  }
-  if(is.null(tres1[[1]]$rho.pred)){
-    rho=NULL
-  }
 return(list(coef=coef,pred=pred,rho=rho))  
 }
 
@@ -142,9 +145,41 @@ load(fres)
 
 coef=do.call(rbind,lapply(res,function(x) x$coef))
 pred=do.call(rbind,lapply(res,function(x) x$pred))
-rho=do.call(rbind,lapply(res,function(x) x$rho))
 
-pred=pred[pred$model%in%mods$model[1:2],]
+
+pred$cell=cellFromXY(senv,xy=pred[,c("x","y")])
+predr=stack(lapply(unique(pred$model),function(m) rasterFromXYZ(xyz=pred[pred$model==m,c("x","y","pred")])))
+names(predr)=unique(pred$model)
+projection(predr)='+proj=longlat'
+writeRaster(predr*100,file=paste0(outputdir,sp2,".tif"),overwrite=T)
+
+## Global Spatial Autocorrelation
+fspac=paste0(outputdir,sp2,".csv")
+if(!file.exists(fspac)){
+  spac=do.call(rbind.data.frame,
+               lapply(1:nlayers(predr),function(i) {
+                 data.frame(species=paste(sp,collapse=" "),
+                            model=names(predr)[i],
+                            MoransI=Moran(predr[[i]],w=matrix(1,51,51)),
+                            GearyC=Geary(predr[[i]],w=matrix(1,51,51)))}
+               ))
+  write.csv(spac,file=fspac,row.names=F)
+}
+spac=read.csv(fspac)
+
+##### Autocorrelation
+faspac=paste0(outputdir,sp2,"_autocorrelation_FFT.csv")
+  ac1=acor_table(predr[[1]],verbose=T)
+  ac1$model=names(predr)[1]
+  ac2=acor_table(predr[[2]],verbose=T)
+  ac2$model=names(predr)[2]
+  ac=rbind(ac1,ac2)
+write.csv(ac,file=faspac,row.names=F)
+}
+ac=read.csv(faspac)
+
+#spacs=spac%.%group_by(model)%.%filter(dist2<50)%.%
+#  summarize(SCor_mean_50km=median(mean),SCor_sd_50km=diff(range(quantile(mean,c(0.025,0.975)))))
 
 # http://www.bayesian-inference.com/modelfit
 # http://voteview.com/DIC-slides.pdf
@@ -152,6 +187,33 @@ dic=coef[grepl("Deviance",coef$param),]
 dic$pv=(dic$SD^2)/2
 dic$dic=dic$Mean+dic$pv
 dic
+
+## AUC
+aucdat=merge(fdata[,c("presences","trials","cell")],pred,by=c("cell"))
+#aucdat$model=factor(aucdat$model,levels=mods$model,ordered=T)
+
+feval=function(x){
+  e=evaluate(p=x$pred[x$presences>0],a=x$pred[x$presences==0])
+  data.frame(nPresence=e@np,nTrials=e@na,auc=e@auc,cor=e@cor)
+}
+
+restable=do.call(rbind.data.frame,by(aucdat,INDICES=aucdat$modelname,FUN=feval))
+restable$species=sp2
+restable$model=dic$model[match(rownames(restable),dic$modelname)]
+restable$Deviance=dic$Mean[match(restable$model,dic$model)]
+restable$Pv=dic$pv[match(restable$model,dic$model)]
+restable$DIC=dic$dic[match(restable$model,dic$model)]
+##
+restable[,c("MoransI","GearyC")]=spac[match(restable$model,spac$model),c("MoransI","GearyC")]
+
+restable=restable[order(restable$model),
+                  c("species","model","nPresence","nTrials","Deviance","Pv","DIC","auc","cor","MoransI","GearyC")]
+
+write.csv(restable,file=paste0(outputdir,sp2,"_summary.csv"),row.names=F)
+
+print(xtable(restable,caption="Evaluation of distribution models using interpolated precipitation or cloud product"), 
+      include.rownames = FALSE,"html",file=paste0(outputdir,sp2,"_summary.html"))
+
 
 #colnames(coef)[grepl("X",colnames(coef))]=paste0("Q",sub("X","",colnames(coef)[grepl("X",colnames(coef))]))
 #res$param=sub("beta[.]","",rownames(res))
@@ -169,12 +231,6 @@ gplot(senv) + geom_tile(aes(fill = value)) +
   scale_fill_gradientn(colours=c('white','blue','red'),na.value="transparent") +
   coord_equal()
 
-ggplot(coef[coef$param=="Deviance",], aes(ymin = X2.5.,ymax=X97.5.,y=X50., x = param,colour=modelname)) + 
-  geom_point(position = position_dodge(.5))+
-  geom_linerange(position = position_dodge(.5),lwd=1)+
-  ylab("Value")+xlab("Parameter")+
-  coord_flip()
-
 ggplot(coef[!coef$param%in%c("Vrho","Deviance"),], aes(ymin = X2.5.,ymax=X97.5.,y=X50., x = param,colour=modelname)) + 
   geom_hline(yintercept=0)+
   geom_point(position = position_dodge(.5))+
@@ -182,12 +238,15 @@ ggplot(coef[!coef$param%in%c("Vrho","Deviance"),], aes(ymin = X2.5.,ymax=X97.5.,
   ylab("Value")+xlab("Parameter")+
   coord_flip()
 
-#ggplot(coef[coef$param%in%c("Vrho"),], aes(ymin = X2.5.,ymax=X97.5.,y=X50., x = param,colour=modelname)) + 
-#  geom_hline(yintercept=0)+
-#  geom_point(position = position_dodge(.5))+
-#  geom_linerange(position = position_dodge(.5),lwd=1)+
-#  ylab("Value")+xlab("Parameter")+
-#  coord_flip()
+ggplot(ac, aes(x=dist2, y=mean, group=model))+
+  geom_line(aes(colour=model))+
+  geom_pointrange(aes(ymax = max, ymin=min, group=model,colour=model))+
+  geom_line(col="black")+
+  scale_x_continuous(trans = log10_trans(),
+                     breaks = trans_breaks("log10", function(x) 10^x),
+                     labels = trans_format("log10", math_format(10^.x)))+
+  ylab("Autocorrelation")+xlab("Distance (km)")+
+  theme(legend.position=c(.25, .25))
 
 ggplot(pred) + geom_tile(aes(x=x,y=y,fill = pred)) +
   facet_wrap(~modelname,ncol=1) +
@@ -213,8 +272,8 @@ p1=ggplot(pred) + geom_tile(aes(x=x,y=y,fill = pred)) +
   theme(panel.background = element_rect(fill='transparent'),legend.key.width = unit(1.5, "cm"))+
   xlab(label="Longitude")+ylab("Latitude")
   
-p2=gplot(env[["alt"]],maxpixels=5e6) + geom_tile(aes(fill = value)) +
-  facet_grid(~variable,labeller=function(...) return("Protea cynaroides occurrence")) +
+p2=gplot(env[["ALT"]],maxpixels=5e6) + geom_tile(aes(fill = value)) +
+  facet_grid(~variable,labeller=function(...) return("Protea cynaroides occurrences")) +
     scale_fill_gradientn(colours=c('darkgreen','yellow','red'),na.value="transparent",
                        name="Elevation (m)") +
   coord_equal()+
@@ -239,55 +298,3 @@ dev.off()
 gplot(rprot[["presences"]]) + geom_tile(aes(fill = value)) +
   scale_fill_gradientn(colours=c('white','blue','red'),na.value="transparent") +
   coord_equal()
-
-## Fit a simple GLM to the data
-obs=as.matrix(data[,c("presences","trials")])
-m_glm=lapply(1:nrow(mods),function(i) glm(paste0("obs",mods$formula[i]),data=data,family="binomial"))
-
-screenreg(m_glm,custom.model.names=as.character(mods$name),format="markdown")
-
-#= Parameter estimates
-summary(res[[1]])
-xyplot(mod1$mcmc)
-#= Predictions
-summary(mod1$theta.latent)
-summary(mod1$theta.pred)
-plot(theta,mod1$theta.pred)
-
-### Check Convergence
-xyplot(mod1$mcmc, main="Beta",strip=strip.custom(factor.levels=c("intercept",vars)))
-gelman.diag(mod1$mcmc,confidence = 0.95,autoburnin=F,multivariate=T)
-
-
-
-densityplot(mod1$mcmc)#, main="Posterior Distributions",
-            strip=strip.custom(factor.levels=c("intercept",vars)),
-            scales=list(relation="same"),layout=c(1,7))+
-  layer(panel.abline(v=0))
-HPDinterval(ps.beta[[1]], prob = 0.95)
-
-## Predict model to the grid
-
-```{r,predictmodel}
-## First subset area to speed up predictions
-pext=extent(c(-50,-48,-26.5,-24))
-penv=crop(senv,pext)
-
-## if you want to make predictions for the full grid, run this line:
-#penv=senv
-
-## Calculate posterior estimates of p(occurrence) for each cell
-## This extracts the posterior coefficients, performs the regression, 
-## calculates the quantiles, and takes the inverse logit to get p(occurrence)
-
-## niter will use a reduced number of posterior samples to generate the summaries
-pred=calc(penv,function(x,niter=30) {
-  mu1=apply(apply(ps.beta[[1]][1:niter,],1,function(y) y*c(1,x)),2,sum,na.rm=T)
-  mu2=quantile(mu1,c(0.025,0.5,0.975),na.rm=T)  
-  p=1/(1+exp(-mu2))
-  return(p)
-})
-names(pred)=c("Lower_CI_2.5","Median","Upper_CI_97.5")
-## Write out the predictions
-writeRaster(pred,file="Prediction.tif",overwrite=T)
-```

@@ -211,7 +211,6 @@ writeRaster(predr*100,file=paste0(outputdir,sp2,".tif"),overwrite=T)
 
 
 ##### Autocorrelation
-
 ac1=acor_table(predr[[1]],verbose=T)
 ac1$model=names(predr)[1]
 ac2=acor_table(predr[[2]],verbose=T)
