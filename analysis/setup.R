@@ -9,6 +9,8 @@ library(caTools)
 library(rgeos)
 library(raster)
 library(dplyr)
+library(ggplot2)
+library(scales)
 library(knitr)
 require(knitcitations)
 ## read in global coasts for nice plotting
