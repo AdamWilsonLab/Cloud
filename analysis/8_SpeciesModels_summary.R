@@ -13,6 +13,8 @@ print(xtable(ds,caption="Evaluation of distribution models using interpolated pr
       include.rownames = FALSE,"html",file="manuscript/modeltable.html",digits=2)
 
 
+list.files("output/sdm/",pattern=".nc",full=T,recursive=T)
+
 ## Make a plot to explore the data
 pdf(file=paste0("manuscript/figures/SDM_",paste(sp,collapse="_"),".pdf"),width=11,height=7)
 
