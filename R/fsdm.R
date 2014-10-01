@@ -1,12 +1,6 @@
 ## function to fit SDM and write out results and evaluations as a netcdf file to enable better archiving and faster post-processing
 
-fsdm<-function(fdata,data,model="~PPTJAN+PPTJUL+PPTSEAS+MAT",modelname="Precipitation",nchains=3){
-  
-  # mcmcparams
-  burnin=1000
-  mcmc=1000
-  thin=10
-  
+fsdm<-function(fdata,data,model,burnin=10000,mcmc=10000,thin=10,nchains=3,...){
   require(ncdf4)
   tres1=foreach(ch=1:nchains) %dopar% {
     tres2=hSDM.ZIB(
@@ -26,7 +20,9 @@ fsdm<-function(fdata,data,model="~PPTJAN+PPTJUL+PPTSEAS+MAT",modelname="Precipit
       seed=round(runif(1,0,1000)))
   }
 
-  hSDM.nc(results=tres1,species=sp2,data=data,fdata=fdata,modelname=modelname,outputdir=outputdir,verbose=T,autocor=T) 
+  #hSDM.nc(results=tres1,species=sp2,data=data,fdata=fdata,modelname=modelname,outputdir=outputdir,verbose=T,autocor=T) 
+  hSDM.nc(results=tres1,data=data,fdata=fdata,model=model,...) 
+  
 }
 
 
