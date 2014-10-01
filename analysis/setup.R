@@ -19,6 +19,16 @@ library(rgdal)
 library(coda)
 library(hSDM)
 #library(spgrass6)
+#install_github(repo="Rdatatable/data.table")
+library(data.table)
+library(AUC)
+library(dismo)
+library(redshift)
+
+
+#library(devtools)
+#install_github("adammwilson/rasterAutocorr")
+library(rasterAutocorr)
 
 ## install rasterAutocorr
 #library(devtools) 
@@ -27,9 +37,13 @@ library(rasterAutocorr)
 
 ## register parallel backend
 library(doMC)
-registerDoMC(10)
+ncores=12
+registerDoMC(ncores)
 
-rasterOptions(progress="text",maxmemory=1e6,tmpdir="data/tmp/")
+rasterOptions(progress="text",maxmemory=1e6,tmpdir="data/tmp/",datatype="FLT4S")
+
+## source all R files in R directory
+sapply(list.files(pattern="[.]R$", path="R/", full.names=TRUE), source)
 
 ## increase the amount of memory for gdal to speed up processing
 Sys.setenv(GDAL_CACHEMAX=5000,CPL_LOG_ERRORS="ON")
