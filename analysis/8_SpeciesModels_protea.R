@@ -1,6 +1,14 @@
 # Load the libraries and set working directory
 source("analysis/setup.R")
 
+sp="PRCYNA"
+sp2="Protea_cynaroides"
+
+## create output folder
+outputdir=paste0("output/sdm/",sp2,"/")
+if(!file.exists(outputdir)) dir.create(outputdir,recursive=T)
+fmodelinput=paste0(outputdir,"/",sp2,"_modelinput.nc")
+
 ## load region boundary
 cfr=readOGR("data/src/CFR","CFR")
 ereg=extent(cfr)
@@ -9,15 +17,8 @@ cf=stack(c("data/MCD09/MCD09_mean_01.tif","data/MCD09/MCD09_mean_07.tif","data/M
 names(cf)=c("CLDJAN","CLDJUL","CLDSEAS")
 NAvalue(cf)=0
 cf=crop(cf,cfr)
-cf=mask(cf,cfr)
 gain(cf)=.01
 
-sp="PRCYNA"
-sp2="Protea_cynaroides"
-
-## create output folder
-outputdir=paste0("output/sdm/",sp2,"/")
-if(!file.exists(outputdir)) dir.create(outputdir,recursive=T)
 
 ## Load protea data
 prot=readOGR("data/src/proteaatlas/","prot")
@@ -43,55 +44,42 @@ env=stack(tenv[[c("prec_1","prec_7","bio_15","bio_1","alt")]],cf[[c("CLDJAN","CL
 names(env)=c("PPTJAN","PPTJUL","PPTSEAS","MAT","ALT","CLDJAN","CLDJUL","CLDSEAS")
 
 env=crop(env,ereg)
-env=mask(env,cfr)
-
-cmeans=cellStats(env,"mean")
-csd=cellStats(env,"sd")
-senv=scale(env)
+#env=mask(env,cfr)
 
 
-## rasterize protea data to grid and return a raster of presences and trials
 fprot=function(prot,rast=cf,sp="PRACAU"){
-  tpres=unique(prot@data[prot$pro==sp,c("obs","londd","latdd")])
-  coordinates(tpres)=c("londd","latdd")
-  ttrials=unique(prot@data[,c("obs","londd","latdd")])
-  coordinates(ttrials)=c("londd","latdd")
-  presences=rasterize(tpres,cf,fun="count",field="obs",background=0)
-  trials=rasterize(ttrials,cf,fun="count",field="obs",background=0)
-  td=mask(stack(presences,trials),cfr)
-  names(td)=c("presences","trials")
-  return(td)
+  obs=unique(prot@data[,c("obs","londd","latdd")])
+  obs$trial=1
+  obs$presence=ifelse(obs$obs%in%prot$obs[prot$pro==sp],1,0)
+  coordinates(obs)=c("londd","latdd")
+  obs@data[,c("lon","lat")]=coordinates(obs)
+  return(obs)
 }
 
-rprot=fprot(prot,sp=sp)
-
-## build big raster stack
-fit=rprot[["trials"]]>0
-rdata=stack(senv,rprot,fit)
-writeRaster(rdata,file=paste0(outputdir,"/",sp2,"_modelinput.nc"),overwrite=T)#,coordinates(senv),cell=cellFromXY(senv,xy=coordinates(senv)))
-
-system(paste0("ncdump -h ",paste0(outputdir,"/",sp2,"_modelinput.nc")))
-
-data=cbind.data.frame(values(stack(senv,rprot)),coordinates(senv),cell=cellFromXY(senv,xy=coordinates(senv)))
-data=as.data.frame(data[!is.na(data[,"presences"]),])
-data$trials=as.integer(data$trials)
-data$presences=as.integer(data$presences)
-data=na.omit(data)
-data$fit=ifelse(data$trials>0,1,0)
+pprot=fprot(prot,sp=sp)
 
 
 
-## create 'fitting' dataset where there are observations
-fdata=data[data$fit==1,]
+## define metadata that will be embeded in output object
+meta=list(institution="Map of Life, Yale University, New Haven, CT",
+          source="Species Distributions",
+          comment="Adam M. Wilson (adam.wilson@yale.edu)",
+          species=sp2)
 
+hSDM.ncWriteInput(env,points=pprot,ncfile=fmodelinput,overwrite=T,meta=meta)
 
-### Save model input data
-save(env,senv,data,fdata,sp,sp2,file=paste0(outputdir,"modelinput.Rdata"))
 
 ##############################################################
-load(paste0(outputdir,"modelinput.Rdata"))
+## import data
+data=hSDM.ncReadInput(fmodelinput)
+## select data for fitting
+data$fit=ifelse(data$trials>0,1,0)
+## create 'fitting' dataset where there are observations
+fdata=data[data$fit>0,]
+
 
 nchains=3
+registerDoMC(ncores)
 
 mods=data.frame(
   model=c("m1","m2"),
@@ -103,21 +91,33 @@ mods=data.frame(
 
 registerDoMC(ncores)
 
+burnin=10000
+mcmc=10000
+thin=10
 
 foreach(m=1:nrow(mods)) %dopar% { 
-      fsdm(fdata=fdata,data=data,model=mods$formula[m],modelname=mods$name[m],nchains=nchains,
-           species=sp2,outputdir=outputdir,verbose=T,autocor=T)    
+  tm=P.hSDM.ZIB(
+    suitability=as.character(mods$formula[m]),
+    presences=fdata$presences,
+    observability=~1,
+    mugamma=0, Vgamma=1.0E6,
+    gamma.start=0,
+    trials=fdata$trials,
+    data=fdata,
+    burnin=burnin, mcmc=mcmc, thin=thin,
+    beta.start=0,
+    suitability.pred=data,
+    mubeta=0, Vbeta=1.0E6,
+    save.p=0,
+    verbose=1,
+    seed=round(runif(1,0,1e6)))
+
+  meta=list(modelname=as.character(mods$name[m]),species=sp2)
+  outfile=paste0(outputdir,"/",sp2,"_modeloutput_",mods$name[m],".nc")
+ source("/media/data/repos/hsdm-code/R/hSDM.ncWriteOutput.R")     
+  hSDM.ncWriteOutput(results=tm,file=outfile,meta=meta,verbose=T,autocor=T)    
     }
-    
+
 
 ## regional
-p1=ggplot(pred) + geom_tile(aes(x=x,y=y,fill = pred)) +
-  facet_wrap(~modelname,ncol=1) +
-  scale_fill_gradientn(colours=c('white','blue','red'),
-                       name="P(Presence)") +
-  coord_equal()+
-  xlim(c(20,25))+ylim(-34.2,-33.5)+
-#  geom_point(data=prot[prot$pro!=sp,]@data,aes(x=londd,y=latdd),col="grey",alpha=.2,pch=1)+
-#  geom_point(data=prot[prot$pro==sp,]@data,aes(x=londd,y=latdd),pch="+",cex=1)+
-  theme(panel.background = element_rect(fill='transparent'),legend.key.width = unit(1.5, "cm"))+
-  xlab(label="Longitude")+ylab("Latitude")
+#  xlim(c(20,25))+ylim(-34.2,-33.5)+

@@ -1,5 +1,14 @@
-___Process monthly precipitation climatologies from the GHCN monthly database___
-Adam M. Wilson
+---
+title: Process monthly precipitation climatologies from the GHCN monthly database
+author: Adam M. Wilson
+output:
+  knitrBootstrap::bootstrap_document:
+    title: "GHCN Compare"
+    theme: amelia
+    highlight: sunburst
+    theme.chooser: TRUE
+    highlight.chooser: TRUE
+---    
 
 
 ```{r setup,echo=F,message=F}
@@ -81,6 +90,7 @@ pds$biome=pts$teow[match(pds$id,pts$id)]
 write.csv(pds,file=fpds,row.names=F)
 }
 pds=read.csv(fpds)
+pds$elevation[pds$elevation==-999]=NA
 pds$variable=factor(pds$variable,levels=month.name,ordered=T)
 ```
 
@@ -157,10 +167,12 @@ ggplot(na.omit(pds[pds$biome%in%names(tb)[tb>100],]),aes(x=cld,y=mmp+1))+
 
 ```{r modeleval,results='asis'}
 m1=lm(cld~mmp,data=pds)
-m2=lm(cld~log(mmp+1),data=pds)
+m2=lm(cld~elevation,data=pds)
 m3=lm(cld~log(mmp+1)+elevation,data=pds)
-m4=lm(cld~log(mmp+1)+biomename,data=pds)
+m4=lm(cld~log(mmp+1)+elevation,data=pds)
+m5=lm(cld~log(mmp+1)+biomename,data=pds)
 
-#screenreg(list(m1,m2,m3,m4),ci.force=T,single.row=T,omit.coef="biome")
-htmlreg(list(m1,m2,m3,m4),ci.force=T,single.row=T,doctype=F,omit.coef="biome")
+#
+screenreg(list(m1,m2,m3,m4,m5),ci.force=T,single.row=T,omit.coef="biome")
+htmlreg(list(m1,m2,m3,m4,m5),ci.force=T,single.row=T,doctype=F,omit.coef="biome")
 ```
