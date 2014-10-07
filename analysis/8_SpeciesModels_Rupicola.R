@@ -13,6 +13,15 @@ fam="Cotingidae (Cotingas)"
 
 sp2=paste0(sp,collapse="_")
 
+## create output folder
+outputdir=paste0("output/sdm/",sp2,"/")
+if(!file.exists(outputdir)) dir.create(outputdir,recursive=T)
+
+## file to hold model input data
+fmodelinput=paste0(outputdir,"/",sp2,"_modelinput.nc")
+
+##########################################################
+
 ### Load eBird data for 
 ## ebird data downloaded and unzipped from http://ebirddata.ornith.cornell.edu/downloads/erd/ebird_all_species/erd_western_hemisphere_data_grouped_by_year_v5.0.tar.gz
 ebirddir="/mnt/data/jetzlab/Data/specdist/global/ebird/"
@@ -30,9 +39,6 @@ sptaxon=taxon$TAXON_ORDER2[taxon$gensp%in%sp2]
 ## Select list of taxon ids for use as 'non-detection/absence'
 nulltaxon=taxon$TAXON_ORDER2[taxon$TAXON_ORDER2!=sptaxon]
 
-## create output folder
-outputdir=paste0("output/sdm/",sp2,"/")
-if(!file.exists(outputdir)) dir.create(outputdir,recursive=T)
 
 ## load region boundary
 download.file(paste0("http://mol.cartodb.com/api/v2/sql?",
@@ -80,34 +86,23 @@ write.csv(tcor,file=paste0(outputdir,sp2,"_covariatecorrelation.csv"),row.names=
 env=stack(tenv[[c("prec_1","prec_7","bio_15","bio_1","alt")]],cf[[c("CLDJAN","CLDJUL","CLDSEAS")]])
 names(env)=c("PPTJAN","PPTJUL","PPTSEAS","MAT","ALT","CLDJAN","CLDJUL","CLDSEAS")
 
-## rasterize species data to environmental grid
-presences=rasterize(spd[spd$presence==1,],cf,fun="count",field="presence",background=0)
-trials=rasterize(spd[spd$presence==0,],cf,fun="count",field="presence",background=0)
-spr=stack(presences,trials)
-names(spr)=c("presences","trials")
+## define metadata that will be embeded in output object
+meta=list(institution="Map of Life, Yale University, New Haven, CT",
+          source="Species Distributions",
+          comment="Adam M. Wilson (adam.wilson@yale.edu)",
+          species=sp2)
 
-senv=scale(env)
+hSDM.ncWriteInput(env,points=spd,ncfile=fmodelinput,overwrite=T,meta=meta)
 
-
-data=cbind.data.frame(values(stack(senv,spr)),coordinates(senv),cell=cellFromXY(senv,xy=coordinates(senv)))
-data=as.data.frame(data[!is.na(data[,"presences"]),])
-data$trials=as.integer(data$trials)
-data$presences=as.integer(data$presences)
-data=na.omit(data)
-
+##############################################################
+## import data
+data=hSDM.ncReadInput(fmodelinput)
+## select data for fitting
+## due to opportunistic observations, there are a few sites with more presences than trials,
+data$fit=ifelse(data$trials>0&data$trials>=data$presences,1,0)
 ## create 'fitting' dataset where there are observations
-fdata=data[data$trials>0,]
-fdata=data[data$trials>0&data$trials>=data$presences,]
+fdata=data[data$fit>0,]
 
-## due to opportunistic observations, there are a few sites with more presences than trials, update those records so presences=trials
-fdata$trials[fdata$presences>fdata$trials]=fdata$presences[fdata$presences>fdata$trials]
-
-### Save model input data
-save(env,senv,spr,data,fdata,file=paste0(outputdir,"modelinput.Rdata"))
-
-#####################################################################################
-#####################################################################################
-load(paste0(outputdir,"modelinput.Rdata")))
 
 nchains=3
 
@@ -118,30 +113,32 @@ mods=data.frame(
   name=c("Precipitation",
          "Cloud"))
 
-## file to save output
-fres=paste0(outputdir,"modeloutput.Rdata")
-
 registerDoMC(ncores)
 
-if(!file.exists(fres)){
-res=foreach(m=1:nrow(mods)) %dopar% { 
-  tres1=foreach(ch=1:nchains) %dopar% {
-    tres2=hSDM.ZIB(
-      suitability=as.character(mods$formula[m]),
-      presences=fdata$presences,
-      observability=~1,
-      mugamma=0, Vgamma=1.0E6,
-      gamma.start=0,
-      trials=fdata$trials,
-      data=fdata,
-      burnin=10000, mcmc=10000, thin=10,
-      beta.start=0,
-      suitability.pred=data,
-      mubeta=0, Vbeta=1.0E6,
-      save.p=0,
-      verbose=1,
-      seed=round(runif(1,0,1000)))
+burnin=10000
+mcmc=10000
+thin=10
+
+foreach(m=1:nrow(mods)) %dopar% { 
+  tm=P.hSDM.ZIB(
+    suitability=as.character(mods$formula[m]),
+    presences=fdata$presences,
+    observability=~1,
+    mugamma=0, Vgamma=1.0E6,
+    gamma.start=0,
+    trials=fdata$trials,
+    data=fdata,
+    burnin=burnin, mcmc=mcmc, thin=thin,
+    beta.start=0,
+    suitability.pred=data,
+    mubeta=0, Vbeta=1.0E6,
+    save.p=0,
+    verbose=1,
+    seed=round(runif(1,0,1e6)))
+  
+  meta=list(modelname=as.character(mods$name[m]),species=sp2)
+  outfile=paste0(outputdir,"/",sp2,"_modeloutput_",mods$name[m],".nc")
+  source("/media/data/repos/hsdm-code/R/hSDM.ncWriteOutput.R")  
+    hSDM.ncWriteOutput(results=tm,file=outfile,meta=meta,verbose=T,autocor=T)    
 }
-
-
-
+ 

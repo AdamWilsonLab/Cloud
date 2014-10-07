@@ -17,23 +17,25 @@ require(knitcitations)
 library(maptools)
 library(rgdal)
 library(coda)
-library(hSDM)
 #library(spgrass6)
 #install_github(repo="Rdatatable/data.table")
 library(data.table)
 library(AUC)
 library(dismo)
 library(redshift)
+library(ncdf4)
 
 
 #library(devtools)
+
+## install rasterAutocorr
+library(devtools) 
 #install_github("adammwilson/rasterAutocorr")
 library(rasterAutocorr)
 
-## install rasterAutocorr
-#library(devtools) 
-#install_github("adammwilson/rasterAutocorr")
-library(rasterAutocorr)
+## update hSDM
+#install_git("http://git.code.sf.net/p/hsdm/code", branch = "dev")
+library(hSDM)
 
 ## register parallel backend
 library(doMC)
@@ -74,9 +76,9 @@ bgr=function(x,n=100,br=0,c1=c("darkblue","blue","grey"),c2=c("grey","red","purp
 }
 
 ## set plotting parameters
-my.theme = trellis.par.get()
-my.theme$strip.background=list(col="transparent")
-trellis.par.set(my.theme)
+#my.theme = trellis.par.get()
+#my.theme$strip.background=list(col="transparent")
+#trellis.par.set(my.theme)
 
 
 ## Set polar rotation for polar plot of color values
