@@ -4,7 +4,7 @@ author: Adam M. Wilson
 output:
   knitrBootstrap::bootstrap_document:
     title: "GHCN Compare"
-    theme: amelia
+    theme: cerulean
     highlight: sunburst
     theme.chooser: TRUE
     highlight.chooser: TRUE

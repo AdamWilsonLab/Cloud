@@ -16,9 +16,12 @@ library(ggplot2)
 ## extract environmental data
 finputs=list.files("output/sdm/",pattern="modelinput.*.nc$",full=T,recursive=T)
 env=hSDM.ncExtract(files=finputs,what="envdata",unscale=T)
+idata=filter(hSDM.ncExtract(files=finputs,what="spdata"),trials>0)
+idata$value=ifelse(idata$presences>1,1,0)
+idata$variable="observations"
 
 ## rescale CLD data to 0-1
-env[,grepl("CLD",colnames(env))]=env[,grepl("CLD",colnames(env))]/1000
+env[,grepl("CLD",colnames(env))]=env[,grepl("CLD",colnames(env))]/100
 
 ## extract model results and evaluation
 fresults=list.files("output/sdm/",pattern="modeloutput.*.nc",full=T,recursive=T)
@@ -27,21 +30,22 @@ eval=hSDM.ncExtract(files=fresults,what="eval")
 coef=hSDM.ncExtract(files=fresults,what="coef")
 ac=hSDM.ncExtract(files=fresults,what="autocor")
 pred=hSDM.ncExtract(files=fresults,what="predictions")
+pred$modelname2=ifelse(pred$modelname=="Cloud","Cloud Model","Precipitation Model")
 
 
-pd1=melt(env,id.vars=c("species","x","y","cell"),measure.vars=c("PPTJUL","CLDJUL"))
+## combine to a single dataframe
+pd=rbind.data.frame(melt(env,id.vars=c("species","x","y","cell"),measure.vars=c("PPTJUL","CLDJUL")),
+                    select(pred,c(species,x,y,cell,variable=modelname2,value=pred)),
+                    select(idata,c(species,x,y,cell,variable,value)))
 
-pd2=filter(pd1,species=="Protea_cynaroides"&x>=20&x<=25&y>=-34&y<=-32.5|
-              species=="Rupicola_peruvianus"&x>=-80&x<=-70&y>=1&y<=5)
+## identify regions for each species
+pd=mutate(pd,reg=ifelse(species=="Protea_cynaroides"&x>=20&x<=25&y>=-34.8&y<=-33.3|
+                          species%in%c("Rupicola_peruvianus","Lepidocolaptes_lacrymiger")&x>=-78&x<=-73&y>=4&y<=5.5,1,0))
 
-pred2=filter(pred,species=="Protea_cynaroides"&x>=20&x<=25&y>=-34&y<=-32.5|species=="Rupicola_peruvianus"&x>=-80&x<=-70&y>=1&y<=5)
-
-#pd=rbind.data.frame(pd1,select(pred,c(species,x,y,cell,variable=modelname,pred)))
 #                    left_join(x=pd1,y=select(pred,c(species,cell,modelname,pred)),by=c("species","cell"))
 
 ## Graphical Output
 pdf(file=paste0("manuscript/figures/SDM_",paste(sp,collapse="_"),".pdf"),width=11,height=7)
-
 
 
 library(grid) # needed for arrow function
@@ -51,38 +55,95 @@ library(scales)
 ## Make a plot to explore the data
 #fcoast=fortify(crop(coast,ereg))
 
-penv1=ggplot(pd2[pd2$species=="Protea_cynaroides",],aes(x=x,y=y,fill=value)) + geom_tile() +
+## characterize species data
+
+
+penv1=ggplot(filter(pd2,species=="Protea_cynaroides"),aes(x=x,y=y,fill=value)) + geom_tile() +
               facet_grid(variable~species) +
               scale_fill_gradientn(colours=c('white','blue','red'),na.value="transparent")+
               coord_equal(ratio=1.2)+ theme(legend.position="right")+
               ylab("")+xlab("")
 
-penv2=ggplot(pd2[pd2$species=="Rupicola_peruvianus",],aes(x=x,y=y,fill=value)) + geom_tile() +
+penv2=ggplot(filter(pd2,species=="Rupicola_peruvianus"),aes(x=x,y=y,fill=value)) + geom_tile() +
   facet_grid(variable~species) +
   scale_fill_gradientn(colours=c('white','blue','red'),na.value="transparent")+
   coord_equal(ratio=1.2)+ theme(legend.position="right")+
   ylab("")+xlab("")
 
-ggplot(pd2,aes(x=x,y=y,fill=value)) + geom_tile() +
-  facet_grid(variable~species,scales="free") +
+ppred1=
+  ggplot(filter(pred2,species=="Protea_cynaroides"),aes(x=x,y=y,fill=pred)) + geom_tile() +
+  facet_grid(~modelname) +
   scale_fill_gradientn(colours=c('white','blue','red'),na.value="transparent")+
   coord_equal(ratio=1.2)+ theme(legend.position="right")+
-  ylab("")+xlab("")
+  ylab("")+xlab("")+
+  geom_point(data=filter(idata,trials>1&presences==0&species=="Protea_cynaroides"&x>=20&x<=25&y>=-34.8&y<=-33.3),
+             aes(x=x,y=y,fill=1),pch=16,col="green",cex=.1,lwd=2)+
+  geom_point(data=filter(idata,trials>1&presences==1&species=="Protea_cynaroides"&x>=20&x<=25&y>=-34.8&y<=-33.3),
+             aes(x=x,y=y,fill=1),pch=3,cex=1,lwd=3)+
+    labs(fill = "p(presence)")  
 
-png(file=paste0("manuscript/figures/SDM_summary_%03d.png"),width=1000,height=1000)
-grid.arrange(penv1,penv2,nrow=1,ncol=2)
+ppred2=ggplot(filter(pred2,species=="Rupicola_peruvianus"),aes(x=x,y=y,fill=pred)) + geom_tile() +
+  facet_grid(species~modelname) +
+  scale_fill_gradientn(colours=c('white','blue','red'),na.value="transparent")+
+  coord_equal(ratio=1.2)+ theme(legend.position="right")+
+  ylab("")+xlab("")+
+  geom_point(data=filter(idata,trials>1&presences==0&species=="Rupicola_peruvianus"&x>=-78&x<=-73&y>=4&y<=5.5),
+             aes(x=x,y=y,fill=1),pch=16,col="green",cex=1,lwd=2)+
+  geom_point(data=filter(idata,trials>1&presences==1&species=="Rupicola_peruvianus"&x>=-78&x<=-73&y>=4&y<=5.5),
+             aes(x=x,y=y,fill=1),pch=3,cex=3,lwd=3)+
+  labs(fill = "p(presence)")  
+
+
+ppred2=ggplot(filter(pred,species=="Rupicola_peruvianus"),aes(x=x,y=y,fill=pred)) + geom_tile() +
+  facet_grid(species~modelname) +
+  scale_fill_gradientn(colours=c('white','blue','red'),na.value="transparent")+
+  coord_equal(ratio=1.2)+ theme(legend.position="right")+
+  ylab("")+xlab("")+
+  geom_point(data=filter(idata,trials>1&presences==0&species=="Rupicola_peruvianus"),
+             aes(x=x,y=y,fill=1),pch=16,col="green",cex=1,lwd=2)+
+  geom_point(data=filter(idata,trials>1&presences==1&species=="Rupicola_peruvianus"),
+             aes(x=x,y=y,fill=1),pch=3,cex=3,lwd=3)+
+  labs(fill = "p(presence)")  
+
+
+### make one monster?
+gs=unique(select(pd,species,variable))
+gs$variable=factor(gs$variable,levels=c("PPTJUL","CLDJUL","observations","Precipitation Model","Cloud Model"),ordered=T)
+gs=gs[order(gs$variable,gs$species),]
+gs$col=as.numeric(as.factor(gs$species))
+gs$row=as.numeric(as.factor(gs$variable))
+gs$variable=as.character(gs$variable)
+
+plts=lapply(1:nrow(gs),function(i){
+  ggplot(filter(pd,reg==1,species==gs$species[i]&variable==gs$variable[i]),aes(x=x,y=y,fill=value)) + geom_tile() +
+    facet_grid(species~variable) +
+    scale_fill_gradientn(colours=c('white','blue','red'),na.value="transparent")+
+    coord_equal(ratio=1.2)+ theme(legend.position="right")+
+    ylab("")+xlab("")+
+    labs(fill = "")+
+    theme(text=element_text(size=48))
+})
+
+gs
+
+png(file=paste0("manuscript/figures/SDM_summary_reg.png"),width=3000,height=3000,pointsize=48)
+do.call("grid.arrange", c(plts, ncol=max(gs$col)))
 dev.off()
 
 
-p1=
-  useOuterStrips(combineLimits(levelplot(value~x*y|species+variable,data=pd2,scales=list(relation="free"),
-                         ),margin.x=2,margin.y=NA))
+plts_full=lapply(1:nrow(gs),function(i){
+  ggplot(filter(pd,species==gs$species[i]&variable==gs$variable[i]),aes(x=x,y=y,fill=value)) + geom_tile() +
+    facet_grid(species~variable) +
+    scale_fill_gradientn(colours=c('white','blue','red'),na.value="transparent")+
+    coord_equal(ratio=1.2)+ theme(legend.position="right")+
+    ylab("")+xlab("")+
+    labs(fill = "")+
+    theme(text=element_text(size=48))
+})
 
-p2=levelplot(pred~x*y|species,data=pred2,layout=c(2,1),scales=list(relation="free"))
-
-print(p1, position=c(0,.33,1,1), panel.width=list(.4,"npc"),more = TRUE, newpage = TRUE)
-print(p2, position=c(0,0,1,.33), panel.width=list(.4,"npc"), more = FALSE, newpage = TRUE)
-
+png(file=paste0("manuscript/figures/SDM_summary_full.png"),width=3000,height=3000,pointsize=48)
+do.call("grid.arrange", c(plts_full, ncol=max(gs$col)))
+dev.off()
 
 
 ## compare predictions
