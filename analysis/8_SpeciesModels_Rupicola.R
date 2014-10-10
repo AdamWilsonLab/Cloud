@@ -4,18 +4,19 @@ source("analysis/setup.R")
 ncores=12
 registerDoMC(ncores)
 
-#sp=c("Lepidocolaptes","lacrymiger")
-#fam="Furnariidae (Ovenbirds and Woodcreepers)"
+sp=c("Lepidocolaptes","lacrymiger")
+fam="Furnariidae (Ovenbirds and Woodcreepers)"
 
 ## cock of the rock
-sp=c("Rupicola","peruvianus")
-fam="Cotingidae (Cotingas)"
+#sp=c("Rupicola","peruvianus")
+#fam="Cotingidae (Cotingas)"
 
 sp2=paste0(sp,collapse="_")
 
 ## create output folder
 outputdir=paste0("output/sdm/",sp2,"/")
 if(!file.exists(outputdir)) dir.create(outputdir,recursive=T)
+
 
 ## file to hold model input data
 fmodelinput=paste0(outputdir,"/",sp2,"_modelinput.nc")
@@ -27,16 +28,27 @@ fmodelinput=paste0(outputdir,"/",sp2,"_modelinput.nc")
 ebirddir="/mnt/data/jetzlab/Data/specdist/global/ebird/"
 
 ## select species for presences and 'absences'
-taxon=read.csv(paste0(ebirddir,"/doc/taxonomy.csv"),na.strings="?")
-taxon$TAXON_ORDER2=round(taxon$TAXON_ORDER)
+taxon=read.csv(paste0(ebirddir,"/doc/taxonomy.csv"),na.strings="?",stringsAsFactors=F)
+taxon$TAXON_ORDER2=floor(taxon$TAXON_ORDER)
 ## some duplicate species names marked with "/"
-## Many SPECIES_NAME and GENUS_NAME are null but SCI_NAME is not
-taxon$gensp=apply(do.call(rbind,lapply(strsplit(as.character(taxon$SCI_NAME),split="_|/"),function(x) x[1:2])),1,paste,collapse="_")
-taxon=taxon%.%filter(FAMILY_NAME==fam)
+## Many SPECIES_NAME and GENUS_NAME are null but SCI_NAME is not, merge them (dropping subspecies,etc)
+## take first word of SCI_NAME (before "_") and call that genus
+taxon$GENUS_NAME[is.na(taxon$GENUS_NAME)]=do.call(rbind,lapply(
+  strsplit(as.character(taxon$SCI_NAME[is.na(taxon$GENUS_NAME)]),split="_|/"),function(x) x[1]))
+## take second word of SCI_NAME (before "_") and call that species
+taxon$SPECIES_NAME[is.na(taxon$SPECIES_NAME)]=do.call(rbind,lapply(
+  strsplit(as.character(taxon$SCI_NAME[is.na(taxon$SPECIES_NAME)]),split="_|/"),function(x) x[2]))
+## put them together
+taxon$gensp=paste(taxon$GENUS_NAME,taxon$SPECIES_NAME,sep="_")
+
+# Filter by family?
+#taxon=taxon%.%filter(FAMILY_NAME==fam)
 
 ## Select list (or single) taxon ids for use as 'presence'
+taxon[taxon$gensp%in%sp2,]
 sptaxon=taxon$TAXON_ORDER2[taxon$gensp%in%sp2]
-## Select list of taxon ids for use as 'non-detection/absence'
+
+## Select list of taxon ids for use as 'non-detection/absence' - if desired
 nulltaxon=taxon$TAXON_ORDER2[taxon$TAXON_ORDER2!=sptaxon]
 
 
@@ -56,14 +68,35 @@ ereg=extent(reg)
 ## adjust bbox if desired
 ereg@xmin=-81.4
 
+
+
 ## get species data
-t1=system.time(spd<<-getebird(con=conn,sptaxon=sptaxon,nulltaxon=nulltaxon,region=reg))
+t1=system.time(spd_all<<-getebird(con=conn,sptaxon=sptaxon,nulltaxon=NULL,region=reg))
+writeLines(paste("eBird extraction for",sp2," took ",round(t1[[3]]/60,2),"seconds and returned",nrow(spd_all),"records"))
+
+## trim observations by observer effort, distance travelled, etc.
+cdur=4*60
+cdis=5
+care=500
+
+ggplot(spd_all,aes(y=duration_minutes,x=effort_distance_km,colour=as.factor(presence),order=as.factor(presence)))+
+  geom_point()+scale_x_log10()+
+  geom_vline(xintercept=cdis)+geom_hline(yintercept=cdur)
+
+#spd_woodcreeper=spd
+spd=filter(spd_all,duration_minutes<=cdur&(effort_distance_km<=cdis|effort_area_ha<=care))
+
+table(presence=spd_all$presence>0,distance=cut(spd_all$effort_distance_km,c(0,1,5,10,50,100,Inf)))
+table(presence=spd_all$presence>0,time=cut(spd_all$duration_minutes,c(0,30,60,120,240,480,1440)))
+table(durationNA=is.na(spd_all$duration_minutes),distanceNA=is.na(spd_all$effort_distance_km),areaNA=is.na(spd_all$effort_area_ha))
+
+table(presence=spd_all$presence,filter=spd_all$duration_minutes>cdur&(spd_all$effort_distance_km>cdis|spd_all$effort_area_ha>care))
+
+
 coordinates(spd)=c("longitude","latitude")
 projection(spd)="+proj=longlat +datum=WGS84 +ellps=WGS84"
 spd@data[,c("lon","lat")]=coordinates(spd)  
 
-## print a little summary
-writeLines(paste(sp2," has ",nrow(spd),"rows"))
 
 #########  Environmental Data
 cf=stack(c("data/MCD09/MCD09_mean_01.tif","data/MCD09/MCD09_mean_07.tif","data/MCD09_deriv/intra.tif"))
