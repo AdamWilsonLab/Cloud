@@ -1,9 +1,5 @@
 
  # install_github("pingles/redshift-r")
-  
-require(redshift)
-conn <- redshift.connect("jdbc:postgresql://mol-points.c98tkbi1cfwj.us-east-1.redshift.amazonaws.com:5439/mol?tcpKeepAlive=true",username="mol",password="Apu5apu5")
-
 getebird=function(con, sptaxon, nulltaxon=NULL,region){
   print(paste("Extracting data, this can take a few minutes..."))
   if(!is.null(nulltaxon)){  #return only species in list as 'non-detection'

@@ -49,7 +49,7 @@ taxon[taxon$gensp%in%sp2,]
 sptaxon=taxon$TAXON_ORDER2[taxon$gensp%in%sp2]
 
 ## Select list of taxon ids for use as 'non-detection/absence' - if desired
-nulltaxon=taxon$TAXON_ORDER2[taxon$TAXON_ORDER2!=sptaxon]
+#nulltaxon=taxon$TAXON_ORDER2[taxon$TAXON_ORDER2!=sptaxon]
 
 
 ## load region boundary
@@ -71,6 +71,9 @@ ereg@xmin=-81.4
 
 
 ## get species data
+require(redshift)
+conn <- redshift.connect("jdbc:postgresql://mol-points.c98tkbi1cfwj.us-east-1.redshift.amazonaws.com:5439/mol?tcpKeepAlive=true",username="mol",password="Apu5apu5")
+
 t1=system.time(spd_all<<-getebird(con=conn,sptaxon=sptaxon,nulltaxon=NULL,region=reg))
 writeLines(paste("eBird extraction for",sp2," took ",round(t1[[3]]/60,2),"seconds and returned",nrow(spd_all),"records"))
 
