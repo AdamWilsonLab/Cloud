@@ -11,6 +11,9 @@ library(raster)
 library(dplyr)
 library(ggplot2)
 library(scales)
+
+library(magrittr)
+library(tidyr)
 library(knitr)
 require(knitcitations)
 ## read in global coasts for nice plotting
@@ -24,6 +27,9 @@ library(AUC)
 library(dismo)
 library(redshift)
 library(ncdf4)
+
+library(dismo)
+library(grid) # needed for arrow function
 
 
 #library(devtools)

@@ -50,17 +50,34 @@ bprods=c("data/MCD09_deriv/inter.tif",
 ### loop over products and summarize by biome
 foreach(m=bprods)%dopar%{
   ## set file names
+  tcloud=paste0("data/tmp/rescale_",sub("tif","vrt",basename(m)))
   tbiome=paste0("data/tmp/teow_",basename(m))
   tcloudbiome=paste0("data/out/biomesummaries/teow_",sub(".tif",".txt",basename(m)))
-
+  tcloudhist=paste0("data/out/biomesummaries/teowhist_",sub(".tif",".txt",basename(m)))
+  
   ## mask biome raster using missing data in cloud dataset
   nas=sub("^.*=","",system(paste0("gdalinfo ",m," | grep NoData"),intern=T))  #get NA for image
-  system(paste("pksetmask -i data/out/teow.tif -m ",m," -ot UInt16 ",
+  system(paste("pksetmask -i data/out/teow.tif -m ",m," -ot Byte ",
                "--operator='=' --msknodata ",nas," --nodata 0  -co COMPRESS=LZW -co PREDICTOR=2 -o ",tbiome))
+##select only one biome
+  system(paste("pksetmask -i data/out/teow.tif -ot Byte  ",
+              " -m ",m," --operator='=' --msknodata ",nas," --nodata 0 ",
+               " -m ",m," --operator='>' --msknodata 10000 --nodata 0 ",
+               " -m data/out/teow.tif --operator='=' --msknodata 18 --nodata 70 ",
+               " -m data/out/teow.tif --operator='=' --msknodata 29 --nodata 70 ",
+               " -m data/out/teow.tif --operator='=' --msknodata 65 --nodata 70 ",
+               " -m data/out/teow.tif --operator='=' --msknodata 69 --nodata 70 ",
+               " -co COMPRESS=LZW -co PREDICTOR=2 -o ",tbiome))
+  
   ## calculate biome-level summary metrics
   system(paste("oft-stat -i ",m," -o ",tcloudbiome," -um ",tbiome," -mm"))
-  ## clean up
-  file.remove(tbiome)
+  ## calculate biome-level histograms for monthly data
+
+  system(paste("gdal_translate  -scale 0 10000 0 100 -ot Byte -of vrt  ",m,tcloud))
+  system(paste("oft-his -i ",tcloud," -o ",tcloudhist," -um ",tbiome," -hr -maxval 100 "))
+               
+               ## clean up
+  file.remove(tbiome,tcloud)
 }    
 
 bs=do.call(rbind.data.frame,lapply(bprods,function(m){
@@ -76,6 +93,22 @@ bs=do.call(rbind.data.frame,lapply(bprods,function(m){
   return(td)
   }))
 write.csv(bs,file="data/out/biomesummary.csv",row.names=F)
+
+## summarize histograms
+fhist=list.files("data/out/biomesummaries/",pattern="teowhist_MCD09_mean_.*txt",full=T)
+bsf=do.call(rbind.data.frame,lapply(fhist,
+            function(tcloudbiome){
+  print(tcloudbiome)
+  td=read.table(tcloudbiome)
+  colnames(td)=c("icode","n","band",paste("v",0:100,sep=""))
+  td$product=sub(".tif","",basename(tcloudbiome))
+  td=merge(td,bcode,by="icode")
+  td$month=as.numeric(sub(".txt","",sub("^.*teowhist_MCD09_mean_","",tcloudbiome)))
+  #  file.remove(tcloudbiome)
+  return(td)
+}))
+write.csv(bsf,file="data/out/biomesummaryhist.csv",row.names=F)
+
 
 ###################################################################
 ### summary by biome
@@ -142,4 +175,26 @@ bs[which.max(bs$seasintra),]
 bs[which.min(bs$mean),]
 
 
+### images of seasonality
+bsfl=melt(select(bsf,c(-product,-band)),id.vars=c("icode","n","code","realm","biome","month","area"),value.name="count")
+bsfl$value=as.numeric(sub("v","",as.character(bsfl$variable)))
+## convert area to percentage
+bsfl$ncount=bsfl$count/bsfl$n
+
+ggplot(bsfl,aes(x=month,y=value,fill=ncount))+
+  geom_tile()+facet_grid(biome~realm)+
+  scale_fill_gradientn(values=c(0,.4,1),colours=c('white','blue','red'),na.value="transparent")
+
+
+### Convert to quantiles
+fquantile=function(vals,freq,quant) {
+  ord <- order(vals)
+  freq2=freq/sum(freq)
+  cs <- cumsum(freq2[ord])
+  do.call(c,lapply(quant,function(tquant) vals[max(which(cs<tquant))+1] ))
+  }
+
+fquantile(vals=x$value,freq=x$count,c(0.0000000000001,0.025,0.25,0.5,0.75,.975,1))
+
+qs=by(bsfl,list(bsfl$biome,bsfl$realm,bsfl$month),function(x) fquantile(vals=x$value,freq=x$count,c(0.01,0.025,0.25,0.5,0.75,.975,1)))
 

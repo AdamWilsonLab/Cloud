@@ -1,23 +1,11 @@
 # Load the libraries and set working directory
 source("analysis/setup.R")
 
-library(dismo)
-library(grid) # needed for arrow function
-library(ggplot2)
-
-
-#### load summary tables
-#ds=do.call(rbind.data.frame,lapply(list.files("output/sdm/",pattern="summary.csv",full=T,recursive=T)[2:3],read.csv))
-#ds$species=sub("_"," ",ds$species)
-#print(xtable(ds,caption="Evaluation of distribution models using interpolated precipitation or cloud product"), 
-#      include.rownames = FALSE,"html",file="manuscript/modeltable.html",digits=2)
-
-
 ## extract environmental data
 finputs=list.files("output/sdm/",pattern="modelinput.*.nc$",full=T,recursive=T)
 finputs=finputs[1:2]
 env=hSDM.ncExtract(files=finputs,what="envdata",unscale=T)
-idata=filter(hSDM.ncExtract(files=finputs,what="spdata"),trials>0)
+idata=hSDM.ncExtract(files=finputs,what="spdata")%>%filter(trials>0)
 idata$value=ifelse(idata$presences>1,1,0)
 idata$variable="observations"
 
@@ -31,8 +19,21 @@ fresults=fresults[1:4]
 eval=hSDM.ncExtract(files=fresults,what="eval")
 coef=hSDM.ncExtract(files=fresults,what="coef")
 ac=hSDM.ncExtract(files=fresults,what="autocor")
-pred=hSDM.ncExtract(files=fresults,what="predictions")
+pred=hSDM.ncExtract(files=fresults,what="predictions")%>%filter(!is.na(pred))
 pred$modelname2=ifelse(pred$modelname=="Cloud","Cloud Model","Precipitation Model")
+
+## add predicted p(presence) to idata
+pred=left_join(pred,select(idata,species,cell,presences,trials), by=c("species", "cell"),copy=T)
+## add binary presence/absence field
+pred$pa=factor(pred$presences>0,labels=c("Absent","Present"))
+
+
+## Write out evaluation summary table
+print(
+  xtable(
+    select(eval,c(species,modelname,nPresence,nTrials,auc,cor,DIC,GlobalGelmanMPSRF,MoransI,GearyC)),
+    caption="Evaluation of distribution models using interpolated precipitation or cloud product"), 
+      include.rownames = FALSE,"html",file="manuscript/modeltable.html",digits=2)
 
 
 ## combine to a single dataframe
@@ -83,6 +84,8 @@ penv2=ggplot(filter(pd2,species=="Lepidocolaptes_lacrymiger"),aes(x=x,y=y,fill=v
 
 
 predscale=scale_fill_gradientn(values=c(0,.4,1),colours=c('white','blue','red'),na.value="transparent")
+tsize=20
+
 blanktheme=theme(legend.position="none")+theme(axis.line=element_blank(),
                                                axis.text.x=element_blank(),
                                                axis.text.y=element_blank(),
@@ -94,7 +97,9 @@ blanktheme=theme(legend.position="none")+theme(axis.line=element_blank(),
                                                panel.border=element_rect(fill="transparent",linetype = "solid", colour = "black"),
                                                panel.grid.major=element_blank(),
                                                panel.grid.minor=element_blank(),
-                                               plot.background=element_blank())
+                                               plot.background=element_blank(),
+                                               text = element_text(size=tsize))
+
 tsp1="Protea_cynaroides"
 tsp2="Lepidocolaptes_lacrymiger"
 
@@ -109,11 +114,12 @@ ps1=
 #                              axis.title.x=element_blank(),
 #                                axis.title.y=element_blank(),
                                 strip.text.x=element_blank(),
-                                strip.background = element_blank())+
+                                strip.background = element_blank(),
+                                text = element_text(size=tsize))+
   geom_point(data=filter(idata,trials>1&presences==0&species==tsp1),
              aes(x=x,y=y,fill=1),pch=16,col="green",cex=.2,lwd=2,alpha=.3)+
   geom_point(data=filter(idata,trials>1&presences==1&species==tsp1),
-             aes(x=x,y=y,fill=1),pch=3,cex=.5,lwd=3,alpha=.3)+
+             aes(x=x,y=y,fill=1),pch=3,cex=1.5,lwd=3,alpha=.8)+
   ylab("Latitude")+xlab("Longitude")+
   annotate("rect",
            xmin=spregs[[tsp1]]$xmin,xmax=spregs[[tsp1]]$xmax,ymin=spregs[[tsp1]]$ymin,ymax=spregs[[tsp1]]$ymax,
@@ -145,12 +151,14 @@ ps2=
   predscale+
   coord_equal(ratio=1.3)+ theme(legend.position="right",                             
                                 plot.margin=unit(c(0,0,0,0), "cm"),
+                                panel.margin=unit(.75, "cm"),
                                 legend.margin=unit(0, "cm"),
                                 legend.key.width = unit(0.25, "cm"),
                                 axis.title.x=element_blank(),
 #                                axis.title.y=element_blank(),
                                 strip.text.x=element_blank(),
-                                strip.background = element_blank())+
+                                strip.background = element_blank(),
+                                text=element_text(size=tsize))+
   geom_point(data=filter(idata,trials>1&presences==0&species==tsp2),
              aes(x=x,y=y,fill=1),pch=16,col="green",cex=.8,lwd=2,alpha=.5)+
   geom_point(data=filter(idata,trials>1&presences==1&species==tsp2),
@@ -195,7 +203,8 @@ pac1=ggplot(ac, aes(x=dist2, y=mean,group=interaction(modelname,species),linetyp
   ylab("Spatial Autocorrelation")+xlab("Distance (km)")+
   theme(legend.position="none",
         panel.grid.minor = element_blank(),
-        plot.margin=unit(c(0,0,0,0), "cm"))+
+        plot.margin=unit(c(0,0,0,0), "cm"),
+        text=element_text(size=tsize))+
   annotation_logticks(sides = "b")+
   scale_colour_manual(name = "Model",
                       values = c("blue", "red")) +   
@@ -203,7 +212,17 @@ pac1=ggplot(ac, aes(x=dist2, y=mean,group=interaction(modelname,species),linetyp
                      values = c(1,3)) +   
   scale_linetype_manual(name = "Species",
                         values = c("solid","dashed"))+
-  guides(colour = guide_legend(nrow=2))
+  guides(colour = guide_legend(nrow=1),
+         linetype = guide_legend(nrow=1))
+
+## boxplots
+ggplot(filter(pred,!is.na(pred$pa)), aes(x=modelname, y=pred,fill=pa))+ 
+  scale_fill_manual(name = "Model",values = c(grey(.4), "darkgreen")) +   
+  geom_boxplot(notch=T,outlier.colour=grey(.3),outlier.size=1)+
+  facet_wrap(~species)+
+  xlab("Model Type")+ylab("p(presence)")
+
+
 
 ## make single plot with two species and autocorrelation
 png(file=paste0("figure/SDM_overview.png"),width=2700,height=4000,pointsize=38,res=300)
@@ -214,12 +233,25 @@ print(ps1r2, vp = viewport(width = .35, height = .25, x = .85, y = 0.42))
 
 print(ps2, vp = viewport(width = 1, height = .55, x=.55,y=.74))
 print(ps2r1, vp = viewport(width = .37, height = .25, x = .38, y = 0.8))
-print(ps2r2, vp = viewport(width = .37, height = .25, x = .73, y = 0.8))
+print(ps2r2, vp = viewport(width = .37, height = .25, x = .75, y = 0.8))
 
 print(pac1, vp = viewport(width = 1, height = .25, x = .5, y = 0.122))
 
+## add panel labels
+pushViewport(viewport())
+tgp=gpar(cex = .5, col = "black")
+grid.text(label = "a" ,x = 0.08,y = .98,gp = tgp)
+grid.text(label = "b" ,x = 0.55,y = .98,gp = tgp)
+grid.text(label = "c" ,x = 0.08,y = .48,gp = tgp)
+grid.text(label = "d" ,x = 0.55,y = .48,gp = tgp)
+grid.text(label = "e" ,x = 0.08,y = .26,gp = tgp)
 dev.off()
 
+
+
+
+######################################
+### Old stuff below here
 
 ### make one monster?
 gs=unique(select(pd,species,variable))
@@ -241,7 +273,7 @@ plts=lapply(1:nrow(gs),function(i){
 
 gs
 
-png(file=paste0("manuscript/figures/SDM_summary_reg.png"),width=3000,height=3000,pointsize=48)
+png(file=paste0("figure/SDM_all.png"),width=3000,height=3000,pointsize=48)
 do.call("grid.arrange", c(plts, ncol=max(gs$col)))
 dev.off()
 
