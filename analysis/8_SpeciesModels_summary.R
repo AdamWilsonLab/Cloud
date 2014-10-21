@@ -25,7 +25,7 @@ pred$modelname2=ifelse(pred$modelname=="Cloud","Cloud Model","Precipitation Mode
 ## add predicted p(presence) to idata
 pred=left_join(pred,select(idata,species,cell,presences,trials), by=c("species", "cell"),copy=T)
 ## add binary presence/absence field
-pred$pa=factor(pred$presences>0,labels=c("Absent","Present"))
+pred$pa=factor(pred$presences>0,labels=c("Undetected","Present"))
 
 
 ## Write out evaluation summary table
@@ -55,18 +55,25 @@ pred=mutate(pred,reg=ifelse(species=="Protea_cynaroides"&x>=20&x<=21.&y>=-34.1&y
 idata=mutate(idata,reg=ifelse(species=="Protea_cynaroides"&x>=20&x<=21.&y>=-34.1&y<=-33.7|
                               species%in%c("Rupicola_peruvianus","Lepidocolaptes_lacrymiger")&x>=-78&x<=-73&y>=4&y<=5.5,1,0))
 
-#                    left_join(x=pd1,y=select(pred,c(species,cell,modelname,pred)),by=c("species","cell"))
+ranges=by(pred,list(pred$species),function(x) c(range(x$x),range(x$y)))
 
-## Graphical Output
-pdf(file=paste0("manuscript/figures/SDM_",paste(sp,collapse="_"),".pdf"),width=11,height=7)
+
+## create cropped "fortified" data for ggplot
+fcoast1=fortify(crop(coast,extent(ranges[[2]])))
+fcoast2=fortify(crop(coast,extent(ranges[[1]])))
 
 
 library(grid) # needed for arrow function
 library(gridExtra)
 library(ggplot2)
 library(scales)
-## Make a plot to explore the data
-#fcoast=fortify(crop(coast,ereg))
+
+## load species icons
+library(png)
+iprot <- rasterGrob(readPNG("figure/ProteaCynaroides.png"))
+ilacr <- rasterGrob(readPNG("figure/lacrymigerLacrymiger.png"))
+
+
 
 ## characterize species data
 
@@ -83,7 +90,10 @@ penv2=ggplot(filter(pd2,species=="Lepidocolaptes_lacrymiger"),aes(x=x,y=y,fill=v
   ylab("")+xlab("")
 
 
-predscale=scale_fill_gradientn(values=c(0,.4,1),colours=c('white','blue','red'),na.value="transparent")
+#predscale=scale_fill_gradientn(values=c(0,.4,1),colours=c('white','blue','red'),na.value="transparent")
+predscale=scale_fill_gradientn(values=c(0,.5,1),colours=c('white','darkgreen','green'),na.value="transparent")
+
+
 tsize=20
 
 blanktheme=theme(legend.position="none")+theme(axis.line=element_blank(),
@@ -101,10 +111,16 @@ blanktheme=theme(legend.position="none")+theme(axis.line=element_blank(),
                                                text = element_text(size=tsize))
 
 tsp1="Protea_cynaroides"
+csp1="darkred"
+
 tsp2="Lepidocolaptes_lacrymiger"
+csp2="darkblue"
+
+csbs=grey(.7)
 
 ps1=
-  ggplot(filter(pred,species==tsp1),aes(x=x,y=y,fill=pred)) + geom_tile() +
+  ggplot(filter(pred,species==tsp1),aes(x=x,y=y,fill=pred)) + 
+  geom_tile(colour=pred) +
   facet_grid(~modelname) +
   predscale+
   coord_equal(ratio=1.2)+ theme(legend.position="none",
@@ -117,36 +133,42 @@ ps1=
                                 strip.background = element_blank(),
                                 text = element_text(size=tsize))+
   geom_point(data=filter(idata,trials>1&presences==0&species==tsp1),
-             aes(x=x,y=y,fill=1),pch=16,col="green",cex=.2,lwd=2,alpha=.3)+
+             aes(x=x,y=y,fill=1),pch=1,col=csbs,cex=.2,lwd=2,alpha=.3)+
   geom_point(data=filter(idata,trials>1&presences==1&species==tsp1),
-             aes(x=x,y=y,fill=1),pch=3,cex=1.5,lwd=3,alpha=.8)+
+             aes(x=x,y=y,fill=1),pch=3,col=csp1,cex=.2,lwd=3,alpha=.8)+
   ylab("Latitude")+xlab("Longitude")+
   annotate("rect",
            xmin=spregs[[tsp1]]$xmin,xmax=spregs[[tsp1]]$xmax,ymin=spregs[[tsp1]]$ymin,ymax=spregs[[tsp1]]$ymax,
-           fill=NA,col="black")
+           fill=NA,col="black")+
+  geom_path(data=fcoast1,aes(x=long,y=lat,group = group,fill=1),lwd=.2)
+
+
 ps1r1=
-  ggplot(filter(pred,modelname=="Cloud"&species=="Protea_cynaroides"),aes(x=x,y=y,fill=pred)) + geom_tile() +
+  ggplot(filter(pred,modelname=="Cloud"&species=="Protea_cynaroides"),aes(x=x,y=y,fill=pred)) + 
+  geom_tile(colour=pred) +
   predscale+blanktheme+
   coord_equal(ratio=1.2)+
   geom_point(data=filter(idata,reg==1&trials>1&presences==0&species==tsp1),
-             aes(x=x,y=y,fill=1),pch=16,col="green",cex=.5,lwd=1)+
+             aes(x=x,y=y,fill=1),pch=1,col=csbs,cex=.5,lwd=1)+
   geom_point(data=filter(idata,reg==1&trials>1&presences==1&species==tsp1),
-             aes(x=x,y=y,fill=1),pch=3,cex=1,lwd=1)+
+             aes(x=x,y=y,fill=1),pch=3,col=csp1,cex=1,lwd=1)+
   ylim(unlist(spregs[[tsp1]][,c("ymin","ymax")]))+  xlim(unlist(spregs[[tsp1]][,c("xmin","xmax")]))
 
 ps1r2=
-  ggplot(filter(pred,modelname=="Precipitation"&species==tsp1),aes(x=x,y=y,fill=pred)) + geom_tile() +
+  ggplot(filter(pred,modelname=="Precipitation"&species==tsp1),aes(x=x,y=y,fill=pred)) + 
+  geom_tile(colour=pred) +
   predscale+blanktheme+
   coord_equal(ratio=1.2)+
   geom_point(data=filter(idata,reg==1&trials>1&presences==0&species==tsp1),
-             aes(x=x,y=y,fill=1),pch=16,col="green",cex=.5,lwd=1)+
+             aes(x=x,y=y,fill=1),pch=1,col=csbs,cex=.5,lwd=1)+
   geom_point(data=filter(idata,reg==1&trials>1&presences==1&species==tsp1),
-             aes(x=x,y=y,fill=1),pch=3,cex=1,lwd=1)+
+             aes(x=x,y=y,fill=1),pch=3,col=csp1,cex=1,lwd=1)+
   ylim(unlist(spregs[[tsp1]][,c("ymin","ymax")]))+  xlim(unlist(spregs[[tsp1]][,c("xmin","xmax")]))
 
 ## second species
 ps2=
-  ggplot(filter(pred,species==tsp2),aes(x=x,y=y,fill=pred)) + geom_tile() +
+  ggplot(filter(pred,species==tsp2),aes(x=x,y=y,fill=pred)) + 
+  geom_raster(colour=pred) +
   facet_grid(~modelname) +
   predscale+
   coord_equal(ratio=1.3)+ theme(legend.position="right",                             
@@ -160,39 +182,47 @@ ps2=
                                 strip.background = element_blank(),
                                 text=element_text(size=tsize))+
   geom_point(data=filter(idata,trials>1&presences==0&species==tsp2),
-             aes(x=x,y=y,fill=1),pch=16,col="green",cex=.8,lwd=2,alpha=.5)+
+             aes(x=x,y=y,fill=1),pch=1,col=csbs,cex=.8,lwd=2,alpha=.5)+
   geom_point(data=filter(idata,trials>1&presences==1&species==tsp2),
-             aes(x=x,y=y,fill=1),pch=3,cex=1,lwd=3,alpha=.5)+
+             aes(x=x,y=y,fill=1),pch=3,col=csp2,cex=2,lwd=3,alpha=1)+
   annotate("rect",
            xmin=spregs[[tsp2]]$xmin,xmax=spregs[[tsp2]]$xmax,ymin=spregs[[tsp2]]$ymin,ymax=spregs[[tsp2]]$ymax,
            fill=NA,col="black")+
   labs(fill = "p(pres)")+
-  ylab("Latitude")
+  ylab("Latitude")+
+  geom_path(data=fcoast2,aes(x=long,y=lat,group = group,fill=1),lwd=.5)
+
 
 
 ps2r1=
-  ggplot(filter(pred,modelname=="Cloud"&species==tsp2),aes(x=x,y=y,fill=pred)) + geom_tile() +
+  ggplot(filter(pred,modelname=="Cloud"&species==tsp2),aes(x=x,y=y,fill=pred)) + 
+  geom_tile(colour=pred) +
   predscale+blanktheme+
   coord_equal(ratio=1.3)+
   geom_point(data=filter(idata,reg==1&trials>1&presences==0&species==tsp2),
-             aes(x=x,y=y,fill=1),pch=16,col="green",cex=1,lwd=2)+
+             aes(x=x,y=y,fill=1),pch=1,col=csbs,cex=1,lwd=2)+
   geom_point(data=filter(idata,reg==1&trials>1&presences==1&species==tsp2),
-             aes(x=x,y=y,fill=1),pch=3,cex=1,lwd=3)+
-  ylim(unlist(spregs[[tsp2]][,c("ymin","ymax")]))+  xlim(unlist(spregs[[tsp2]][,c("xmin","xmax")]))
+             aes(x=x,y=y,fill=1),pch=3,col=csp2,cex=2,lwd=3)+
+  ylim(unlist(spregs[[tsp2]][,c("ymin","ymax")]))+  xlim(unlist(spregs[[tsp2]][,c("xmin","xmax")]))+
+  geom_path(data=fcoast2,aes(x=long,y=lat,group = group,fill=1),lwd=.2)
 
 ps2r2=
-  ggplot(filter(pred,modelname=="Precipitation"&species==tsp2),aes(x=x,y=y,fill=pred)) + geom_tile() +
+  ggplot(filter(pred,modelname=="Precipitation"&species==tsp2),aes(x=x,y=y,fill=pred)) + 
+  geom_tile(colour=pred) +
   predscale+blanktheme+
   coord_equal(ratio=1.3)+
   geom_point(data=filter(idata,reg==1&trials>1&presences==0&species==tsp2),
-             aes(x=x,y=y,fill=1),pch=16,col="green",cex=1,lwd=2)+
+             aes(x=x,y=y,fill=1),pch=1,col=csbs,cex=1,lwd=2)+
   geom_point(data=filter(idata,reg==1&trials>1&presences==1&species==tsp2),
-             aes(x=x,y=y,fill=1),pch=3,cex=1,lwd=3)+
-  ylim(unlist(spregs[[tsp2]][,c("ymin","ymax")]))+  xlim(unlist(spregs[[tsp2]][,c("xmin","xmax")]))
+             aes(x=x,y=y,fill=1),pch=3,col=csp2,cex=2,lwd=3)+
+  ylim(unlist(spregs[[tsp2]][,c("ymin","ymax")]))+  xlim(unlist(spregs[[tsp2]][,c("xmin","xmax")]))+
+  geom_path(data=fcoast2,aes(x=long,y=lat,group = group,fill=1),lwd=.2)
+
 
 
 ## autocorrelation
-pac1=ggplot(ac, aes(x=dist2, y=mean,group=interaction(modelname,species),linetype=species,colour=modelname))+
+pac1=
+  ggplot(ac, aes(x=dist2, y=mean,group=interaction(modelname,species),linetype=modelname,colour=species))+
   geom_linerange(aes(ymax = mean+sd, ymin=mean-sd),linetype="solid",alpha=.2,shape=NA)+
   #geom_point(alpha=.5)+
   geom_line(lwd=.5)+
@@ -200,32 +230,43 @@ pac1=ggplot(ac, aes(x=dist2, y=mean,group=interaction(modelname,species),linetyp
   scale_x_continuous(trans = log10_trans(),
                      breaks = trans_breaks("log10", function(x) 10^x),
                      labels = trans_format("log10", math_format(10^.x)))+
-  ylab("Spatial Autocorrelation")+xlab("Distance (km)")+
+  ylab("Spatial\nAutocorrelation")+xlab("Distance (km)")+
   theme(legend.position="none",
         panel.grid.minor = element_blank(),
         plot.margin=unit(c(0,0,0,0), "cm"),
         text=element_text(size=tsize))+
   annotation_logticks(sides = "b")+
-  scale_colour_manual(name = "Model",
-                      values = c("blue", "red")) +   
+  scale_y_continuous(breaks=seq(0, 1, .5))+
+  scale_colour_manual(name = "Species",
+                      values = c(csp2,csp1)) +   
   scale_shape_manual(name = "Species",
                      values = c(1,3)) +   
-  scale_linetype_manual(name = "Species",
+  scale_linetype_manual(name = "Model",
                         values = c("solid","dashed"))+
   guides(colour = guide_legend(nrow=1),
          linetype = guide_legend(nrow=1))
 
 ## boxplots
-ggplot(filter(pred,!is.na(pred$pa)), aes(x=modelname, y=pred,fill=pa))+ 
-  scale_fill_manual(name = "Model",values = c(grey(.4), "darkgreen")) +   
-  geom_boxplot(notch=T,outlier.colour=grey(.3),outlier.size=1)+
+pbox=
+  ggplot(filter(pred,pred$trials>=5), aes(x=pa=="Present", y=pred,fill=species,linetype=modelname))+ 
+  theme(legend.position="none",
+        panel.grid.minor = element_blank(),
+        plot.margin=unit(c(0,0,0,0), "cm"),
+#        panel.margin=unit(c(0,0,0,0), "cm"),
+#        axis.title.x=element_blank(),
+        text=element_text(size=tsize),
+#        axis.text.x = element_text(angle = 20, hjust = 1),
+        strip.background = element_blank(), strip.text = element_blank())+
+  scale_fill_manual(name = "Model",values = c(csp2,csp1)) +   
+  geom_boxplot(notch=T,varwidth=T,outlier.colour=grey(.8),outlier.size=.8,position=position_dodge(.8),lwd=.8,col="black")+
   facet_wrap(~species)+
-  xlab("Model Type")+ylab("p(presence)")
-
+  scale_y_continuous(breaks=seq(0, 1, .5))+
+  xlab("Species Observed")+ylab("p(presence)")
 
 
 ## make single plot with two species and autocorrelation
-png(file=paste0("figure/SDM_overview.png"),width=2700,height=4000,pointsize=38,res=300)
+
+png(file=paste0("figure/SDM_overview.png"),width=2800,height=4100,pointsize=38,res=300)
 
 print(ps1, vp = viewport(width = 1, height = .3, x=.5,y=.375))
 print(ps1r1, vp = viewport(width = .35, height = .25, x = .385, y = 0.42))
@@ -235,16 +276,29 @@ print(ps2, vp = viewport(width = 1, height = .55, x=.55,y=.74))
 print(ps2r1, vp = viewport(width = .37, height = .25, x = .38, y = 0.8))
 print(ps2r2, vp = viewport(width = .37, height = .25, x = .75, y = 0.8))
 
-print(pac1, vp = viewport(width = 1, height = .25, x = .5, y = 0.122))
+
+pushViewport(viewport(width = .09, height = .09, x=.2,y=.97))
+print(grid.draw(ilacr))
+popViewport()
+
+pushViewport(viewport(width = .07, height = .07, x=.14,y=.44))
+grid.draw(grid.draw(iprot))
+popViewport()
+
+print(pac1, vp = viewport(width = .45, height = .24, x = .25, y = 0.122))
+print(pbox, vp = viewport(width = .5, height = .25, x = .75, y = 0.129))
+
 
 ## add panel labels
 pushViewport(viewport())
 tgp=gpar(cex = .5, col = "black")
-grid.text(label = "a" ,x = 0.08,y = .98,gp = tgp)
+grid.text(label = "a" ,x = 0.06,y = .98,gp = tgp)
 grid.text(label = "b" ,x = 0.55,y = .98,gp = tgp)
-grid.text(label = "c" ,x = 0.08,y = .48,gp = tgp)
+grid.text(label = "c" ,x = 0.06,y = .48,gp = tgp)
 grid.text(label = "d" ,x = 0.55,y = .48,gp = tgp)
-grid.text(label = "e" ,x = 0.08,y = .26,gp = tgp)
+grid.text(label = "e" ,x = 0.06,y = .24,gp = tgp)
+grid.text(label = "f" ,x = 0.55,y = .24,gp = tgp)
+
 dev.off()
 
 
