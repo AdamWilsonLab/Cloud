@@ -115,6 +115,11 @@ write.csv(bsf,file="data/out/biomesummaryhist.csv",row.names=F)
 bs=read.csv(file="data/out/biomesummary.csv")
 bs$realm=factor(bs$realm,ordered=T,levels=c("Antarctic","Australasia","Oceania","Afrotropics","IndoMalay", "Neotropics","Palearctic","Nearctic" ))
 
+bsf=read.csv(file="data/out/biomesummaryhist.csv")
+bsfl=melt(select(bsf,c(-product,-band)),id.vars=c("icode","n","code","realm","biome","month","area"),value.name="count")
+bsfl$value=as.numeric(sub("v","",as.character(bsfl$variable)))
+## convert area to percentage
+bsfl$ncount=bsfl$count/bsfl$n
 
 ## filter to get monthly timeseries for plotting
 bsm=bs[grep("MCD09",bs$product),]
@@ -176,10 +181,6 @@ bs[which.min(bs$mean),]
 
 
 ### images of seasonality
-bsfl=melt(select(bsf,c(-product,-band)),id.vars=c("icode","n","code","realm","biome","month","area"),value.name="count")
-bsfl$value=as.numeric(sub("v","",as.character(bsfl$variable)))
-## convert area to percentage
-bsfl$ncount=bsfl$count/bsfl$n
 
 ggplot(bsfl,aes(x=month,y=value,fill=ncount))+
   geom_tile()+facet_grid(biome~realm)+
@@ -191,10 +192,67 @@ fquantile=function(vals,freq,quant) {
   ord <- order(vals)
   freq2=freq/sum(freq)
   cs <- cumsum(freq2[ord])
-  do.call(c,lapply(quant,function(tquant) vals[max(which(cs<tquant))+1] ))
-  }
+  tx=do.call(c,lapply(quant,function(tquant) vals[max(which(cs<tquant))+1] ))
+  names(tx)=paste0("Q",quant)
+  return(tx)
+}
 
-fquantile(vals=x$value,freq=x$count,c(0.0000000000001,0.025,0.25,0.5,0.75,.975,1))
+#fquantile(vals=bsfl$value,freq=bsfl$count,c(0.0000000000001,0.025,0.25,0.5,0.75,.975,1))
+group_by(bsfl,biome)%.%summarize(area=sum(log(area)))
 
-qs=by(bsfl,list(bsfl$biome,bsfl$realm,bsfl$month),function(x) fquantile(vals=x$value,freq=x$count,c(0.01,0.025,0.25,0.5,0.75,.975,1)))
+paste(levels(bsfl$biome),collapse="','")
+biomebin=matrix(c(
+  'Boreal Forests/Taiga',                                    'Other',
+  'Deserts & Xeric Shrublands',                 'Deserts & Xeric Shrublands',    
+  'Flooded Grasslands & Savannas',                         'Other',
+  'Lake',                                                   'Other',
+  'Mangroves',                                              'Other',
+  'Mediterranean Forests, Woodlands & Scrub',  'Mediterranean Forests, Woodlands & Scrub',
+  'Montane Grasslands & Shrublands',          'Montane Grasslands & Shrublands',
+  'Rock & Ice',                                             'Other',
+  'Temperate Broadleaf & Mixed Forests',      'Temperate Forests',
+  'Temperate Conifer Forests',           'Temperate Forests',
+  'Temperate Grasslands, Savannas & Shrublands', 'Temperate Grasslands, Savannas & Shrublands',
+  'Tropical & Subtropical Coniferous Forests','Tropical & Subtropical Coniferous and Dry Broadleaf Forests',
+  'Tropical & Subtropical Dry Broadleaf Forests','Tropical & Subtropical Coniferous and Dry Broadleaf Forests',
+  'Tropical & Subtropical Grasslands, Savannas & Shrublands', 'Tropical & Subtropical Grasslands, Savannas & Shrublands',
+  'Tropical & Subtropical Moist Broadleaf Forests', 'Tropical & Subtropical Moist Broadleaf Forests',
+  'Tundra',                                                   'Other'),ncol=2,byrow=T) 
+colnames(biomebin)=c("old","new")
 
+bsfl$biome2= biomebin[match(bsfl$biome,biomebin[,"old"]),"new"]
+
+
+## calculate quantiles by biome
+qs=group_by(bsfl,biome2,realm,month)%.% summarize(
+  Q0=min(value[count>0],na.rm=T),
+  Q02.5=fquantile(vals=value,freq=count,0.025),
+  Q25=fquantile(vals=value,freq=count,0.25),
+  Q50=fquantile(vals=value,freq=count,0.5),
+  Q75=fquantile(vals=value,freq=count,0.75),
+  Q97.5=fquantile(vals=value,freq=count,0.975),
+  Q100=fquantile(vals=value,freq=count,1),
+  areakm=sum(area[variable=="v0"])) 
+
+pbiome=
+
+  ggplot(qs) +
+  geom_ribbon(mapping=aes(x=month, ymin=Q0,ymax=Q100),fill=grey(.7))+
+  geom_ribbon(mapping=aes(x=month, ymin=Q02.5,ymax=Q97.5),fill=grey(.5))+
+  geom_ribbon(mapping=aes(x=month, ymin=Q25,ymax=Q75),fill=grey(.2))+
+  geom_line(mapping=aes(x=month, y=Q50),col="red")+
+  geom_point(aes(x=12,y=0,size = areakm),colour="darkblue")+
+  scale_size(trans="log10",guide=
+               guide_legend(title="Area (km)",direction="horizontal",label.position="bottom"))+
+  facet_grid(biome2~realm)+
+  scale_y_continuous(breaks=seq(0, 100, 50))+
+  scale_x_continuous(breaks=c(3,6,9))+
+  theme_bw()+
+  theme(strip.text.y = element_text(angle = 0),legend.position=c(1.45,1.05))+
+  theme(strip.text.x = element_text(angle = 90))+
+  ylab("Cloud Frequency (%)")+
+  xlab("Month")
+
+png(file=paste0("figure/biome_overview.png"),width=3000,height=3000,pointsize=24,res=300)
+print(pbiome)
+dev.off()
