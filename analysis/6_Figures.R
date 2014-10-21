@@ -47,7 +47,7 @@ cellStats(cf_1deg_mean,mean)
 cellStats(cf_1deg_mean,max)
 
 
-levelplot(cf_1deg_mean,col.regions=bgr(0:30,n,br=3)$col,cuts=99,at=seq(0,30,length=100),margin=F,maxpixels=res,
+levelplot(cf_1deg_mean,col.regions=bgr(0:22,n,br=3)$col,cuts=99,at=seq(0,22,length=100),margin=F,maxpixels=res,
           panel=panel.levelplot.raster,ylim=greg$ylim,ylab="",xlab="",
           colorkey=list(title="SD Cloud Frequency", space="right",height=.75),useRaster=T,
           main=textGrob("        c       Spatial Variability (SD)", x = 0, hjust = 0,gp=gpar(fontface="bold")))+
