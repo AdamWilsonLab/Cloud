@@ -70,22 +70,34 @@ pds=as.data.frame(pds)
 ## drop stations not in inventory data
 pds=pds[!is.na(pds$latitude),]
 
+pts=unique(pds[,c("id","latitude","longitude")])
+coordinates(pts)=c("longitude","latitude")
+
 ## extract cloud data
 cf=stack(list.files("data/MCD09/",pattern="MCD09_mean_",full=T))
 NAvalue(cf)=0
 gain(cf)=.01
 
-pts=unique(pds[,c("id","latitude","longitude")])
-coordinates(pts)=c("longitude","latitude")
+## add worldclim data
+wc=stack(list.files("/mnt/data/jetzlab/Data/environ/global/worldclim/",pattern="prec_.*bil$",full=T)[c(1,4:11,2:3)])
 
 biome=raster("data/out/teow.tif")
 pts=raster::extract(biome,pts,sp=T)
-
 pts=raster::extract(cf,pts,sp=T)
+pts=raster::extract(wc,pts,sp=T)
+
 ptsl=melt(pts@data,id.var=c("id","teow"))
-ptsl$month=as.numeric(do.call(rbind,strsplit(as.character(ptsl$variable),"_"))[,3])
-pds$cld=ptsl$value[match(paste(pds$id,pds$month),paste(ptsl$id,ptsl$month))]
+ptsl$variable=sub("MCD09_mean","MCD09",ptsl$variable)
+ptsl[,c("type","month")]=do.call(rbind,strsplit(as.character(ptsl$variable),"_"))
+ptsl$month=as.numeric(ptsl$month)
+ptsl2=dcast(ptsl,id+teow+month~type,value=value)
+
+pds$cld=ptsl2$MCD09[match(paste(pds$id,pds$month),paste(ptsl2$id,ptsl2$month))]
+pds$wcprec=ptsl2$prec[match(paste(pds$id,pds$month),paste(ptsl2$id,ptsl2$month))]
+
 pds$biome=pts$teow[match(pds$id,pts$id)]
+
+
 
 write.csv(pds,file=fpds,row.names=F)
 }
@@ -123,7 +135,7 @@ ggplot(na.omit(pds),aes(x=cld,y=mmp+1))+
 
 ## Mean monthly precipitation vs. cloud frequency by biome
 
-Global Spearman's Correlation between mean monthly temperature and precipitation:
+Global Spearman's Correlation between mean monthly CF and precipitation:
 ```{r globalcor,results='asis'}
 t1=cor.test(pds$mmp[pds$era=="1950-2014"] , pds$cld[pds$era=="1950-2014"] , method = "spearman",use="complete")
 t1n=nrow(na.omit(data.frame(pds$mmp[pds$era=="1950-2014"] , pds$cld[pds$era=="1950-2014"])))
@@ -175,4 +187,21 @@ m5=lm(cld~log(mmp+1)+biomename,data=pds)
 #
 screenreg(list(m1,m2,m3,m4,m5),ci.force=T,single.row=T,omit.coef="biome")
 htmlreg(list(m1,m2,m3,m4,m5),ci.force=T,single.row=T,doctype=F,omit.coef="biome")
+```
+
+Comparison of CF and WorldClim for estimating precipitation
+```{r modeleval2,results='asis'}
+t1=with(filter(pds, era=="1950-2014"), cor.test(mmp, cld, method = "spearman",use="complete"))
+t1n=nrow(na.omit(select(filter(pds, era=="1950-2014"),mmp,cld)))
+
+t2=with(filter(pds, era=="1950-2014"), cor.test(mmp ,wcprec, method = "spearman",use="complete"))
+t2n=nrow(na.omit(select(filter(pds, era=="1950-2014"),mmp,wcprec)))
+
+td=data.frame(Data=c("CF","WorldClim"),
+              "SpearmanRho"=c(t1$estimate,t2$estimate),
+              'p-value'=c(t1$p.value,t2$p.value),
+              n=c(t1n,t2n))
+kable(td)
+
+
 ```
