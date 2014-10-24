@@ -12,6 +12,11 @@ idata$variable="observations"
 ## rescale CLD data to 0-1
 env[,grepl("CLD",colnames(env))]=env[,grepl("CLD",colnames(env))]/100
 
+
+## create long unscaled environmental data for plotting
+envl=melt(hSDM.ncExtract(files=finputs,what="envdata",unscale=F),
+          id.vars=c("species","x","y","cell"))
+
 ## extract model results and evaluation
 fresults=list.files("output/sdm/",pattern="modeloutput.*.nc",full=T,recursive=T)
 fresults=fresults[1:4]
@@ -75,22 +80,6 @@ ilacr <- rasterGrob(readPNG("figure/lacrymigerLacrymiger.png"))
 
 
 
-## characterize species data
-
-penv1=ggplot(filter(pd2,species=="Protea_cynaroides"),aes(x=x,y=y,fill=value)) + geom_tile() +
-              facet_grid(variable~species) +
-              scale_fill_gradientn(colours=c('white','blue','red'),na.value="transparent")+
-              coord_equal(ratio=1.2)+ theme(legend.position="right")+
-              ylab("")+xlab("")
-
-penv2=ggplot(filter(pd2,species=="Lepidocolaptes_lacrymiger"),aes(x=x,y=y,fill=value)) + geom_tile() +
-  facet_grid(variable~species) +
-  scale_fill_gradientn(colours=c('white','blue','red'),na.value="transparent")+
-  coord_equal(ratio=1.2)+ theme(legend.position="right")+
-  ylab("")+xlab("")
-
-
-#predscale=scale_fill_gradientn(values=c(0,.4,1),colours=c('white','blue','red'),na.value="transparent")
 predscale=scale_fill_gradientn(values=c(0,.5,1),colours=c('white','darkgreen','green'),na.value="transparent")
 
 
@@ -116,7 +105,7 @@ csp1="darkred"
 tsp2="Lepidocolaptes_lacrymiger"
 csp2="darkblue"
 
-csbs=grey(.7)
+csbs="black"#grey(.7)
 
 ps1=
   ggplot(filter(pred,species==tsp1),aes(x=x,y=y,fill=pred)) + 
@@ -133,7 +122,7 @@ ps1=
                                 strip.background = element_blank(),
                                 text = element_text(size=tsize))+
   geom_point(data=filter(idata,trials>1&presences==0&species==tsp1),
-             aes(x=x,y=y,fill=1),pch=1,col=csbs,cex=.2,lwd=2,alpha=.3)+
+             aes(x=x,y=y,fill=1),pch=1,col=csbs,cex=.2,lwd=2,alpha=.1)+
   geom_point(data=filter(idata,trials>1&presences==1&species==tsp1),
              aes(x=x,y=y,fill=1),pch=3,col=csp1,cex=.2,lwd=3,alpha=.8)+
   ylab("Latitude")+xlab("Longitude")+
@@ -149,7 +138,7 @@ ps1r1=
   predscale+blanktheme+
   coord_equal(ratio=1.2)+
   geom_point(data=filter(idata,reg==1&trials>1&presences==0&species==tsp1),
-             aes(x=x,y=y,fill=1),pch=1,col=csbs,cex=.5,lwd=1)+
+             aes(x=x,y=y,fill=1),pch=1,col=csbs,cex=.5,lwd=1,alpha=.2)+
   geom_point(data=filter(idata,reg==1&trials>1&presences==1&species==tsp1),
              aes(x=x,y=y,fill=1),pch=3,col=csp1,cex=1,lwd=1)+
   ylim(unlist(spregs[[tsp1]][,c("ymin","ymax")]))+  xlim(unlist(spregs[[tsp1]][,c("xmin","xmax")]))
@@ -160,7 +149,7 @@ ps1r2=
   predscale+blanktheme+
   coord_equal(ratio=1.2)+
   geom_point(data=filter(idata,reg==1&trials>1&presences==0&species==tsp1),
-             aes(x=x,y=y,fill=1),pch=1,col=csbs,cex=.5,lwd=1)+
+             aes(x=x,y=y,fill=1),pch=1,col=csbs,cex=.5,lwd=1,alpha=.2)+
   geom_point(data=filter(idata,reg==1&trials>1&presences==1&species==tsp1),
              aes(x=x,y=y,fill=1),pch=3,col=csp1,cex=1,lwd=1)+
   ylim(unlist(spregs[[tsp1]][,c("ymin","ymax")]))+  xlim(unlist(spregs[[tsp1]][,c("xmin","xmax")]))
@@ -182,7 +171,7 @@ ps2=
                                 strip.background = element_blank(),
                                 text=element_text(size=tsize))+
   geom_point(data=filter(idata,trials>1&presences==0&species==tsp2),
-             aes(x=x,y=y,fill=1),pch=1,col=csbs,cex=.8,lwd=2,alpha=.5)+
+             aes(x=x,y=y,fill=1),pch=1,col=csbs,cex=.8,lwd=2,alpha=.3)+
   geom_point(data=filter(idata,trials>1&presences==1&species==tsp2),
              aes(x=x,y=y,fill=1),pch=3,col=csp2,cex=2,lwd=3,alpha=1)+
   annotate("rect",
@@ -200,7 +189,7 @@ ps2r1=
   predscale+blanktheme+
   coord_equal(ratio=1.3)+
   geom_point(data=filter(idata,reg==1&trials>1&presences==0&species==tsp2),
-             aes(x=x,y=y,fill=1),pch=1,col=csbs,cex=1,lwd=2)+
+             aes(x=x,y=y,fill=1),pch=1,col=csbs,cex=1,lwd=2,alpha=.3)+
   geom_point(data=filter(idata,reg==1&trials>1&presences==1&species==tsp2),
              aes(x=x,y=y,fill=1),pch=3,col=csp2,cex=2,lwd=3)+
   ylim(unlist(spregs[[tsp2]][,c("ymin","ymax")]))+  xlim(unlist(spregs[[tsp2]][,c("xmin","xmax")]))+
@@ -212,7 +201,7 @@ ps2r2=
   predscale+blanktheme+
   coord_equal(ratio=1.3)+
   geom_point(data=filter(idata,reg==1&trials>1&presences==0&species==tsp2),
-             aes(x=x,y=y,fill=1),pch=1,col=csbs,cex=1,lwd=2)+
+             aes(x=x,y=y,fill=1),pch=1,col=csbs,cex=1,lwd=2,alpha=.3)+
   geom_point(data=filter(idata,reg==1&trials>1&presences==1&species==tsp2),
              aes(x=x,y=y,fill=1),pch=3,col=csp2,cex=2,lwd=3)+
   ylim(unlist(spregs[[tsp2]][,c("ymin","ymax")]))+  xlim(unlist(spregs[[tsp2]][,c("xmin","xmax")]))+
@@ -276,33 +265,90 @@ print(ps2, vp = viewport(width = 1, height = .55, x=.55,y=.74))
 print(ps2r1, vp = viewport(width = .37, height = .25, x = .38, y = 0.8))
 print(ps2r2, vp = viewport(width = .37, height = .25, x = .75, y = 0.8))
 
+## topleft
+pushViewport(viewport(width = .09, height = .09, x=.21,y=.97))
+print(grid.draw(ilacr))
+popViewport()
+## top right
+pushViewport(viewport(width = .09, height = .09, x=.57,y=.97))
+print(grid.draw(ilacr))
+popViewport()
+## top left
+pushViewport(viewport(width = .07, height = .07, x=.14,y=.44))
+print(grid.draw(iprot))
+popViewport()
+# top right
+pushViewport(viewport(width = .07, height = .07, x=.6,y=.44))
+print(grid.draw(iprot))
+popViewport()
 
-pushViewport(viewport(width = .09, height = .09, x=.2,y=.97))
+### bottom row of plots (ac and boxplot)
+print(pac1, vp = viewport(width = .45, height = .24, x = .25, y = 0.122))
+print(pbox, vp = viewport(width = .5, height = .25, x = .75, y = 0.129))
+
+## ac plot
+pushViewport(viewport(width = .09, height = .09, x=.42,y=.21))
 print(grid.draw(ilacr))
 popViewport()
 
-pushViewport(viewport(width = .07, height = .07, x=.14,y=.44))
-grid.draw(grid.draw(iprot))
+pushViewport(viewport(width = .09, height = .09, x=.22,y=.15))
+print(grid.draw(iprot))
 popViewport()
 
-print(pac1, vp = viewport(width = .45, height = .24, x = .25, y = 0.122))
-print(pbox, vp = viewport(width = .5, height = .25, x = .75, y = 0.129))
+## boxplot
+
+pushViewport(viewport(width = .09, height = .09, x=.65,y=.21))
+print(grid.draw(ilacr))
+popViewport()
+
+pushViewport(viewport(width = .09, height = .09, x=.85,y=.21))
+print(grid.draw(iprot))
+popViewport()
 
 
 ## add panel labels
 pushViewport(viewport())
 tgp=gpar(cex = .5, col = "black")
 grid.text(label = "a" ,x = 0.06,y = .98,gp = tgp)
-grid.text(label = "b" ,x = 0.55,y = .98,gp = tgp)
+grid.text(label = "b" ,x = 0.52,y = .98,gp = tgp)
 grid.text(label = "c" ,x = 0.06,y = .48,gp = tgp)
 grid.text(label = "d" ,x = 0.55,y = .48,gp = tgp)
 grid.text(label = "e" ,x = 0.06,y = .24,gp = tgp)
 grid.text(label = "f" ,x = 0.55,y = .24,gp = tgp)
+popViewport()
 
 dev.off()
 
 
+## Model input data
+penv1=ggplot(filter(envl,species=="Protea_cynaroides"),aes(x=x,y=y,fill=value)) + 
+  geom_raster() +
+  facet_wrap(~variable,nrow=2) +
+  scale_fill_gradientn(colours=c('blue','white','red'),breaks=c(-3,0,3,6),
+                       na.value="transparent")+
+  coord_equal(ratio=1.2)+ 
+  theme(legend.position="bottom",
+      legend.margin=unit(0, "cm"),
+      legend.key.height = unit(0.5, "cm"))+
+  ylab("")+xlab("")+labs(fill = "Standardized Value")+
+  geom_path(data=fcoast1,aes(x=long,y=lat,group = group,fill=1),lwd=.2)
 
+penv2=ggplot(filter(envl,species=="Lepidocolaptes_lacrymiger"),aes(x=x,y=y,fill=value)) + 
+  geom_raster() +
+  facet_wrap(~variable,nrow=2) +
+  scale_fill_gradientn(colours=c('blue','white','red'),breaks=c(-3,0,3,6),
+                       na.value="transparent",name="Standardized Value")+
+  coord_equal(ratio=1.2)+ 
+  theme(legend.position="none",
+      legend.margin=unit(0, "cm"),
+      legend.key.height = unit(0.5, "cm"))+
+  ylab("")+xlab("")+labs(fill = "Standardized Value")+
+  geom_path(data=fcoast2,aes(x=long,y=lat,group = group,fill=1),lwd=.2)
+
+png(file=paste0("figure/SDM_inputs.png"),width=3000,height=3000,pointsize=38,res=300)
+print(penv1,vp = viewport(width = 1, height = .5, x=.5,y=.25))
+print(penv2,vp = viewport(width = 1, height = .6, x=.5,y=.75))
+dev.off()
 
 ######################################
 ### Old stuff below here
