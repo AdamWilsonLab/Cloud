@@ -82,9 +82,9 @@ bgr=function(x,n=100,br=0,c1=c("darkblue","blue","grey"),c2=c("grey","red","purp
 }
 
 ## set plotting parameters
-#my.theme = trellis.par.get()
-#my.theme$strip.background=list(col="transparent")
-#trellis.par.set(my.theme)
+my.theme = trellis.par.get()
+my.theme$strip.background=list(col="transparent")
+trellis.par.set(my.theme)
 
 
 ## Set polar rotation for polar plot of color values

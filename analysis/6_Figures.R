@@ -10,67 +10,90 @@ greg=list(ylim=c(-60,84),xlim=c(-180,180))
 #- Annual average
 n=100
 colR(n)
-#cellStats(cf_mean,median)
+
+#quantile(cf_mean,c(0,0.01,0.1,0.25,.50,.75,.90,.99,1),na.rm=T)
+
 p_mean=levelplot(cf_mean,col.regions=bgr(1:100,n,br=50.9)$col,cuts=99,at=seq(0,100,len=n),
-                 colorkey=list(space="right",height=.75),
-                 main=textGrob("        a       Mean Cloud Frequency (%)", x = 0, hjust = 0,gp=gpar(fontface="bold")),
-                 scales=list(x=list(draw=F)),
-          panel=panel.levelplot.raster,margin=F,maxpixels=res,ylab="",xlab="",useRaster=T,ylim=greg$ylim)+
+                 colorkey=list(space="left",height=.75,labels=list(at=c(0, 50, 100))),
+                 main=textGrob("    a       Mean Cloud Frequency (%)", x = 0, hjust = 0,gp=gpar(fontface="bold")),
+                 scales=list(draw=F),
+                 panel=panel.levelplot.raster,margin=F,maxpixels=res,ylab="",xlab="",useRaster=T,ylim=greg$ylim)+
 #    layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col="white"),under=T)#+
     latticeExtra::layer(sp.lines(coast,lwd=.5,),under=F)
 
-#p_intra=levelplot(intra,col.regions=bgr(1:55,n,br=8)$col,cuts=99,at=seq(0,55,length=n),margin=F,maxpixels=res,
-#                  panel=panel.levelplot.raster,ylim=greg$ylim,colorkey=list(space="right",height=.75),useRaster=T)+
-#    layer(panel.polygon(x=c(-180,-180,180,180),y=c(-61,86,86,-61),col="black"),under=T)#+
-#    layer(sp.lines(coast,col="black",lwd=.5),under=F)
+#quantile(spatial,c(0,0.01,0.1,0.25,.50,.75,.90,.99,1),na.rm=T)
+#50%   75%   90%   99%  100% 
+#0.45  0.84  2.01  6.29 54.54 
 
-#
-# cellStats(inter,quantile,c(.50,.75,.90,.99,1),na.rm=T)
+c_spatial=bgr(log10(seq(.01,7,len=n)),n,br=log10(0.45))
+p_spatial=levelplot(spatial,margin=F,maxpixels=res,
+                    col.regions=c_spatial$col,at=c_spatial$at,
+                    panel=panel.levelplot.raster,ylim=greg$ylim,ylab="",xlab="",zscaleLog=T,
+                    colorkey=list(title="SD Cloud Frequency", space="right",height=.75,
+                                  labels=list(
+#                                    at=log10(c(0.01,seq(0.02,0.08,by=.02),0.1,seq(0.2,0.8,by=.2),1,seq(2,8,by=2),10,seq(20,80,by=20),100)),
+#                                              labels=c(0.01,rep("",4),0.1,rep("",4),1,rep("",4), 10,rep("",4), 100))),
+                    at=log10(c(0.01,0.1,1,6)),
+                    labels=  c(0.01,0.1,1,6))),
+                    scales=list(draw=F),useRaster=T,
+                    main=textGrob("    b       Spatial Variability (SD)", x = 0, hjust = 0,gp=gpar(fontface="bold")))+
+  latticeExtra::layer(sp.lines(coast,col="black",lwd=.5),under=F)
 
-p_inter=levelplot(inter,col.regions=bgr(1:30,n,br=11)$col,cuts=99,at=seq(0,30,length=100),margin=F,maxpixels=res,
-                  panel=panel.levelplot.raster,ylim=greg$ylim,ylab="",xlab="",
-                  colorkey=list(title="Cloud Frequency (%)", space="right",height=.75),useRaster=T,
-                  scales=list(x=list(draw=F)),
-                  main=textGrob("        b       Inter-annual Variability (SD)", x = 0, hjust = 0,gp=gpar(fontface="bold")))+
+# quantile(intra,c(.50,.75,.90,.99,1),na.rm=T)
+#50%   75%   90%   99%  100% 
+#10.59 15.26 23.11 36.30 98.43 
+
+c_intra=bgr(log10(seq(1,37,len=n)),n,br=log10(10.59))
+c_intra=bgr(seq(1,40,len=n),n,br=10.59)
+
+p_intra=levelplot(intra,
+                  col.regions=c_intra$col,at=c_intra$at,cuts=n-1,
+                  margin=F,maxpixels=res,ylab="",xlab="",
+#                  zscaleLog=10,
+                  panel=panel.levelplot.raster,ylim=greg$ylim,
+                  colorkey=list(space="left",height=.75),
+#                                labels=list(at=log10(c(1,5,10,36)),
+#                                            labels=c(1,5,10,36))),
+                  useRaster=T,scales=list(draw=F),
+                  main=textGrob("    c       Intra-annual Variability (SD)", x = 0, hjust = 0,gp=gpar(fontface="bold")))+
+  #latticeExtra::layer(panel.polygon(x=c(-180,-180,180,180),y=c(-61,86,86,-61),col="black"),under=T)#+
+  latticeExtra::layer(sp.lines(coast,col="black",lwd=.5),under=F)
+
+quantile(inter,c(.50,.75,.90,.99,1),na.rm=T)
+#50%    75%    90%    99%   100% 
+#11.39  13.31  16.20  20.61 140.77 
+
+c_inter=bgr(log10(seq(1,21,len=n)),n,br=log10(11.39))
+# 
+p_inter=levelplot(inter,cuts=n-1,margin=F,maxpixels=res,
+                  col.regions=c_inter$col,at=c_inter$at,
+                  panel=panel.levelplot.raster,ylim=greg$ylim,ylab="",xlab="",zscaleLog=10,
+                  colorkey=list(title="Cloud Frequency (%)", space="right",height=.75,
+#                                labels=list(at=log10(c(1,seq(2,8,by=2),10,seq(20,80,by=20),100)),
+#                                            labels=c(1,rep("",4), 10,rep("",4), 100))),useRaster=T,
+                  labels=list(at=log10(c(1,5,10,21)),
+                              labels=c(1,5,10,21))),useRaster=T,
+                  scales=list(draw=F),
+                  main=textGrob("    d       Inter-annual Variability (SD)", x = 0, hjust = 0,gp=gpar(fontface="bold")))+
   #    layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col="black"),under=T)#+
   latticeExtra::layer(sp.lines(coast,col="black",lwd=.5),under=F)
 
+ndif=.03
 
-####################################################################
-###  Summary Aggregations
-cf_30km_mean=aggregate(cf_mean,fact=30,sd,filename="data/MCD09_deriv/30km_meanannual_sd.tif")
-cellStats(cf_30km_mean,mean)
-cellStats(cf_30km_mean,max)
+png("manuscript/figures/MeanInter2.png",width=4100,height=2000,res=600,pointsize=42,bg="white")
+#trellis.par.set(my.theme)
+print(p_mean,position=c(0,.5-ndif,.5+ndif,1),more=T)
+print(p_spatial,position=c(.5-ndif,.5-ndif,1,1),more=T)
+print(p_intra,position=c(0,0,.5+ndif,.5+ndif),more=T)
+print(p_inter,position=c(.5-ndif,0,1,.5+ndif),more=F)
 
-cf_1deg_mean=aggregate(cf_mean,fact=120,sd,filename="data/MCD09_deriv/1deg_meanannual_sd.tif")
-cellStats(cf_1deg_mean,mean)
-cellStats(cf_1deg_mean,max)
-
-
-levelplot(cf_1deg_mean,col.regions=bgr(0:22,n,br=3)$col,cuts=99,at=seq(0,22,length=100),margin=F,maxpixels=res,
-          panel=panel.levelplot.raster,ylim=greg$ylim,ylab="",xlab="",
-          colorkey=list(title="SD Cloud Frequency", space="right",height=.75),useRaster=T,
-          main=textGrob("        c       Spatial Variability (SD)", x = 0, hjust = 0,gp=gpar(fontface="bold")))+
-  latticeExtra::layer(sp.lines(coast,col="black",lwd=.5),under=F)
-
-
-p_spatial=levelplot(cf_30km_mean,col.regions=bgr(0:30,n,br=3)$col,cuts=99,at=seq(0,30,length=100),margin=F,maxpixels=res,
-          panel=panel.levelplot.raster,ylim=greg$ylim,ylab="",xlab="",
-          colorkey=list(title="SD Cloud Frequency", space="right",height=.75),useRaster=T,
-  main=textGrob("        c       Spatial Variability (SD)", x = 0, hjust = 0,gp=gpar(fontface="bold")))+
-  latticeExtra::layer(sp.lines(coast,col="black",lwd=.5),under=F)
-
-
-#pdf("manuscript/figures/Figures.pdf",width=11,height=8.5,pointsize=14)
-png("manuscript/figures/MeanInter.png",width=2100,height=2000,res=300,pointsize=42,bg="white")
-trellis.par.set(my.theme)
-#p3=c("Mean Cloud Frequency (%)"=p_mac,"Max Cloud Frequency (%)"=p_max,"Interannual Variability (sd)"=p_inter,"Intraannual Variability (sd)"=p_intra,x.same=T,y.same=F,merge.legends=T,layout=c(2,2))
-#p3=c("Mean Cloud Frequency (%)"=p_mean,"Inter-annual Variability (SD)"=p_inter,"Intra-annual Variability (SD)"=p_intra,x.same=T,y.same=T,merge.legends=T,layout=c(1,3))
-print(p_mean,position=c(0,.67,1,1),more=T)
-print(p_inter,position=c(0,.37,1,.7),more=T)
-print(p_spatial,position=c(0,0,1,.38),more=F)
 dev.off()
 
+## Scatterplots of variables
+png("manuscript/figures/scatterplot.png",width=2100,height=2000,res=300,pointsize=42,bg="white")
+trellis.par.set(my.theme)
+splom(stack(cf_mean,inter,intra,spatial),maxpixels=1e3)
+dev.off()
 
 
 
@@ -157,6 +180,24 @@ grid.text("b",x=0.35,y=.995,just=c("left","top"),gp=gp)
 grid.text("c",x=0.05,y=.5,just=c("left","top"),gp=gp)
 grid.text("d",x=0.51,y=.5,just=c("left","top"),gp=gp)
 dev.off()
+
+####################################################################
+###  Map of hotspots
+if(!file.exists("data/MCD09_deriv/hotspots.tif")){
+  registerDoMC(12)
+  qs=c(0.01,0.05,0.1,0.25,0.75,0.9,0.95,0.99)
+  ## combine products into a single stack and crop to region of interest (removing antarctica)
+  qprods=crop(stack(cf_mean,inter,intra,spatial),extent(c(greg$xlim,greg$ylim)))
+  
+  qsr=foreach(i=1:nlayers(qprods),.combine=rbind.data.frame)%dopar%{  
+    cbind.data.frame(name=names(qprods)[i],t(quantile(qprods[[i]],probs=qs,ncells=NULL,na.rm=T,names=T)))
+  }
+
+  system(paste0("pksetmask -i ",tfile1a5," -m ",tfile1a3," --operator='>' --msknodata 10000 --nodata 32767 -o ",tfile1a6))
+  
+  
+}
+
 
 
 ####################################################################
