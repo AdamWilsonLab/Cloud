@@ -187,23 +187,6 @@ system(paste("gdal_translate -ot UInt16 -co COMPRESS=DEFLATE -co ZLEVEL=9 -co BI
              " data/MCD09_deriv/meanannual_uncompressed.tif data/MCD09_deriv/meanannual.tif"))
 file.remove("data/MCD09_deriv/meanannual_uncompressed.tif")
 
-## 100km spatial SD
-dmeanannual=raster("data/MCD09_deriv/meanannual.tif")
-## get diameter of circle (in pixels) for a 1 degree circle
-fw=focalWeight(dmeanannual, d=0.5, type='circle')
-dim(fw)
-
-#dspatialsd=focal(dmeanannual,fun=sd,na.rm=T,
-#                 w=focalWeight(dmeanannual, d=0.5, type='circle'),
-#                 pad=T,file="data/MCD09_deriv/mean_100kmsd_uncompressed.tif",
-#                 overwrite=T,dataType='INT2U',NAflag=65535)
-
-system(paste("pkfilter  -dx 121 -dy 121 -f stdev -circ TRUE ",
-              " -i data/MCD09_deriv/meanannual.tif -o data/MCD09_deriv/mean_1deg_sd_uncompressed.tif"))
-system(paste("gdal_translate -ot UInt16 -co COMPRESS=DEFLATE -co ZLEVEL=9 -co BIGTIFF=YES -co COMPRESS=LZW -co PREDICTOR=2",
-       " data/MCD09_deriv/mean_100kmsd_uncompressed.tif data/MCD09_deriv/mean_1deg_sd.tif"))
-file.remove("data/MCD09_deriv/mean_100kmsd_uncompressed.tif")
-
 
 #################################################
 ### Calculate Markham's Seasonality
@@ -315,15 +298,6 @@ system(paste("gdal_translate -co COMPRESS=LZW -a_nodata 65535 -co PREDICTOR=2 -o
 
 ## expand to RGB for EarthEngine
 system(paste("gdal_translate -a_nodata 255 -expand rgba -co COMPRESS=LZW -co PREDICTOR=2 -of GTIFF -ot Byte ",seasvrt,"  data/MCD09_deriv/seas_rgb.tif")) 
-
-
-################################################################################
-################################################################################
-### Find cloud hotspots
-cf_mean=raster("data/MCD09_deriv/meanannual.tif")
-inter=raster("data/MCD09_deriv/inter.tif")
-intra=raster("data/MCD09_deriv/intra.tif")
-
 
 
 ################################################################################

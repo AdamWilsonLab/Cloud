@@ -58,22 +58,10 @@ rmr=function(x){
 ###  Subset equitorial region to correct orbital banding
 
 
-### build table of tiles to process
-extf=function(xmin=-180,xmax=180,ymin=-30,ymax=30,size=10,overlap=0.5){
-    xmins=unique(sort(c(seq(xmin,xmax-size,by=size),seq(xmin+(overlap*size),xmax-size,by=size))))
-    ymins=unique(sort(c(seq(ymin,ymax-size,by=size),seq(ymin+(overlap*size),ymax-size,by=size))))
-    exts=expand.grid(xmin=xmins,ymin=ymins)
-    exts$ymax=exts$ymin+size
-    exts$xmax=exts$xmin+size
-    exts$tile=1:nrow(exts)
-    return(exts)
-}
-
-
 i=1
 ti=7
 ### Build the tiles to process
-exts=extf(xmin=-180,xmax=180,ymin=-30,ymax=30,size=60,overlap=0)
+exts=tilebuilder(xmin=-180,xmax=180,ymin=-30,ymax=30,size=60,overlap=0)
 
 ## add an extra tile to account for regions of reduced data availability for each sensor
 modexts=cbind.data.frame(sensor="MOD09",rbind.data.frame(

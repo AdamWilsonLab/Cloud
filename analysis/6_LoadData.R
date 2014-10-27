@@ -14,8 +14,11 @@ intra=raster("data/MCD09_deriv/intra.tif")
 gain(intra)=.01
 NAvalue(inter)=0
 
-
-
+## load spatial variability raster
+spatial=raster("data/MCD09_deriv/mean_1deg_sd.tif")
+gain(spatial)=0.01
+NAvalue(spatial)=0
+names(spatial)="Spatial"
 
 ########################################
 ### Some stats 
