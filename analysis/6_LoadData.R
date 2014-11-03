@@ -5,6 +5,7 @@
 print("Loading raster layers")
 cf_mean=raster("data/MCD09_deriv/meanannual.tif")
 gain(cf_mean)=.01
+
 cf_visseas=raster("data/MCD09_deriv/seas_visct.tif")
 NAvalue(cf_visseas)=65534
 
