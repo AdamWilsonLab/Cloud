@@ -82,16 +82,186 @@ source("analysis/setup.R")
   
  
 ## find which combinations actually exist
-  hs=stack(list.files(paste0("data/MCD09_deriv/"),pattern="hotspots",full=T))
+hinter=raster("data/MCD09_deriv//inter_hotspots.tif")
+NAvalue(hinter)=255
+hintra=raster("data/MCD09_deriv//intra_hotspots.tif")
+NAvalue(hintra)=255
+gain(hintra)=10
+hmean=raster("data/MCD09_deriv//meanannual_hotspots.tif")
+NAvalue(hmean)=255
+gain(hmean)=100
+  
+hotspot=hinter+hintra+hmean
+writeRaster(hotspot,file="data/MCD09_deriv/combined_hotspots2.tif",overwrite=T,
+            datatype="INT2U",options=c("COMPRESS=LZW","PREDICTOR=2"))
+
+hotspot=raster("data/MCD09_deriv/combined_hotspots2.tif")
+NAvalue(hotspot)=0
+#hotspot=ratify(hotspot)
+
+uvals=data.frame(table(values(hotspot)))
+colnames(uvals)=c("class","count")
+
+uvals$mean=substr(uvals$class,1,1)
+uvals$intra=substr(uvals$class,2,2)
+uvals$inter=substr(uvals$class,3,3)
+write.csv(uvals,"output/hotspot_colors.csv",row.names=F)
+
+
+
+## read it back in
+uvals=read.csv("output/hotspot_colors.csv")
+uvals$twos=apply(uvals[,c("inter","intra","mean")],1,function(x)sum(x!=2))
+uvals$ninter=factor(uvals$inter,labels=c("Low","","High"))
+uvals$nintra=factor(uvals$intra,labels=c("Low","","High"))
+uvals$nmean=factor(uvals$mean,labels=c("Low","Medium","High"))
+
+uvals[,c("h","s","v")]=t(rgb2hsv(r=uvals$mean/1.5,b=uvals$inter,g=uvals$intra,max=3))
+uvals$s=uvals$twos/3
+uvals$v=uvals$mean/3
+uvals$col=hsv(h=uvals$h,s=uvals$s,v=uvals$v)
+uvals$col[uvals$class==122]=grey(0.2)
+uvals$col[uvals$class==222]=grey(0.5)
+uvals$col[uvals$class==322]=grey(0.65)
+
+## build color table
+cols=rep(grey(0.2),2^16)
+cols[uvals$class+1]=uvals$col #add 1 to account for 0-base
+cols[0]=rgb(1,1,1,0)
+hotspot@legend@colortable=cols
+
+
+## hotspot map
+
+tsize=20
+
+blanktheme=theme(legend.position="none")+theme(axis.line=element_blank(),
+                                               axis.text.x=element_blank(),
+                                               axis.text.y=element_blank(),
+                                               axis.ticks=element_blank(),
+                                               axis.title.x=element_blank(),
+                                               axis.title.y=element_blank(),
+                                               legend.position="none",
+                                               panel.background = element_rect(fill = 'white', colour = 'white'),
+                                               panel.border=element_rect(fill="transparent",linetype = "solid", colour = "transparent"),
+                                               panel.grid.major=element_blank(),
+                                               panel.grid.minor=element_blank(),
+                                               plot.background=element_blank(),
+                                               plot.margin=unit(c(0,0,0,0), "npc"),
+                                               text=element_text(size=tsize),
+                                               strip.background = element_blank(),
+                                               strip.text = element_blank(),
+                                               text = element_text(size=tsize))
+
+p_hot=gplot(hotspot,maxpixels=2e6)+geom_raster(aes(fill=value))+
+  scale_fill_gradientn(colours=cols,guide=F,na.value="black",
+                       values = 0:(length(cols)-1), 
+                       rescaler = function(x, ...) x, oob = identity)+
+  coord_equal()+ylim(c(-60,89))+ylab("")+xlab("")+blanktheme
+
+p_key=  
+  ggplot(uvals,
+       aes(x=ninter,y=nintra,colour=col))+
+#  geom_raster()+
+  geom_point(aes(size=count),)+scale_size_area(trans="log",max_size=10,breaks=c(0,1e2,1e4,1e6,1e8),name="Count")+scale_color_identity()+
+  facet_grid(~nmean)+scale_fill_identity() +
+  labs(title = "Mean Annual Cloud Cover", 
+       y="Intra-annual\nVariability",
+      x="Inter-annual Variability")+
+  theme(strip.text = element_text(size=8),
+        plot.title=element_text(size=12),
+        plot.background=element_blank(),
+        plot.margin=unit(c(0,.10,0,0), "npc"))
+
+  
+
+png("manuscript/figures/Hotspots.png",width=3500,height=2500,
+    res=600,bg="white")
+print(p_key,vp=viewport(x=0,y=0,width=1,height=.45,just=c("left","bottom")))
+print(p_hot,vp=viewport(x=0,y=.4,width=1,height=.6,just=c("left","bottom")))
+## panel labels
+pushViewport(viewport())
+tgp=gpar(cex = 1, col = "black")
+grid.text(label = "a" ,x = 0.06,y = .98,gp = tgp)
+grid.text(label = "b" ,x = 0.06,y = .4,gp = tgp)
+dev.off()
+
+
+ggplot(uvals,aes(x=inter,y=intra,fill=count))+
+  geom_tile()+ scale_fill_gradient(low="blue",high="red", trans = 'log' ) +
+  facet_grid(~mean)+
+  coord_equal()#+
+
+
+
+
 
 ## build category table
 cnames=factor(c(1,2,3),ordered=T) #,labels=c("low","mid","high")
-cgrid=expand.grid(inter=cnames,intra=cnames,spatial=cnames,mean=cnames)
+cgrid=expand.grid(inter=cnames,intra=cnames,mean=cnames) #spatial=cnames,
 
-# function to assign each gric cell to row in cgrid
-getid=function(x) which(apply(cgrid, 1, function(y) all(y == x)))
 
-calc(hs,fun=getid,file="data/MCD09_deriv/combined_hotspots.tif")
 
-  
+
+
+
+
+
+
+
+
+##### Old junk below
+# function to assign each grid cell to row in cgrid
+getid=function(x) ifelse(any(is.na(x)),NA,which(apply(cgrid, 1, function(y) all(y == x))))
+fgetid=function(x,...) calc(x,getid,...)
+
+hs2=stack(crop(hs,regs[["Venezuela"]]))
+NAvalue(hs2)=255
+
+beginCluster(10)
+
+clusterR(hs2,fun=fgetid,file="data/MCD09_deriv/combined_hotspots.tif",overwrite=T)
+
+endCluster(10)
+#levelplot(hs2)
+
+
+tr=raster("data/MCD09_deriv/combined_hotspots.tif")
+plot(tr)
+
+table(values(tr))
+
 }
+
+
+### Build the tiles to process
+jobs=tilebuilder(xmin=-180,xmax=180,ymin=-90,ymax=90,size=30,overlap=0)
+
+
+file="data/MCD09_deriv/combined_hotspots.tif"
+if(!file.exists(paste0(datadir,"/mcd09focal"))) dir.create(paste0(datadir,"/mcd09focal"))
+
+registerDoMC(20)
+
+foreach( i=1:nrow(jobs), .options.multicore=list(preschedule=FALSE)) %dopar% {
+  
+  toutfile1=paste(datadir,"/mcd09focal/", sub(".tif","",basename(file)),"_",jobs$tile[i],"_region.vrt",sep="")
+  toutfile3=paste(datadir,"/mcd09focal/", sub(".tif","",basename(file)),"_",jobs$tile[i],"_.tif",sep="")
+  
+  if(file.exists(toutfile2)) {writeLines(paste(toutfile,"Exists, moving on"));return(NULL)}
+  writeLines(paste("Starting: ",basename(toutfile1)," tile:",jobs$tile[i]," ( ",i," out of ",nrow(jobs),")"))
+  ## crop to buffered region
+  system(paste("gdalwarp -of vrt -ot Int16 -srcnodata 65535 -dstnodata -32768 -te ",
+               paste(select(jobs,xminb,yminb,xmaxb,ymaxb)[i,],collapse=" "),file,toutfile1))
+  calc(hs,fun=getid,file="data/MCD09_deriv/combined_hotspots.tif",overwrite=T)
+  
+  ## remove temporary files
+  file.remove(toutfile1,toutfile2)
+  print(paste("Finished Temporary File: ",basename(toutfile1)))
+}
+
+
+system(paste0("gdalwarp ",datadir,"/mcd09focal/*_sdcrop.tif data/MCD09_deriv/mean_1deg_sd_uncompressed.tif"))
+system(paste("gdal_translate -co COMPRESS=DEFLATE -co ZLEVEL=9 -co BIGTIFF=YES -co COMPRESS=LZW -co PREDICTOR=2",
+             " data/MCD09_deriv/mean_1deg_sd_uncompressed.tif data/MCD09_deriv/mean_1deg_sd.tif"))
+
