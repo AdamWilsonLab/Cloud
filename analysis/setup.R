@@ -99,6 +99,7 @@ write.table(cols,"data/out/grasscols.txt",col.names=F,row.names=F,quote=F)
 
 ## read in coast line
 coast=readOGR("data/gshhs/","coast")
+fcoast=fortify(coast)
 
 ### 
 knitsDoc <- function(name) {
