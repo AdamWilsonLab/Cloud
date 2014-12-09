@@ -10,6 +10,8 @@ library(rgeos)
 library(raster)
 library(dplyr)
 library(ggplot2)
+library(gridExtra)
+library(GGally)
 library(scales)
 
 library(magrittr)
