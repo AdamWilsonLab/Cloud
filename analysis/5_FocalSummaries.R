@@ -52,6 +52,8 @@ system(paste0("gdalwarp ",datadir,"/mcd09focal/*_sdcrop.tif data/MCD09_deriv/mea
 system(paste("gdal_translate -co COMPRESS=DEFLATE -co ZLEVEL=9 -co BIGTIFF=YES -co COMPRESS=LZW -co PREDICTOR=2",
              " data/MCD09_deriv/mean_1deg_sd_uncompressed.tif data/MCD09_deriv/mean_1deg_sd.tif"))
 
+file.copy("data/MCD09_deriv/mean_1deg_sd.tif","data/MCD09_EarthEngineUpload/mean_1deg_sd.tif")
+
 
 #file.remove(list.files(paste0(datadir,"/mcd09focal"),full=T))
 

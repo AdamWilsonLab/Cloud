@@ -117,19 +117,20 @@ regs=list(
   Hawaii=extent(c(-156.5,-154,18.75,20.5)),
   Boliva=extent(c(-71,-63,-20,-15)),
   Venezuela=extent(c(-69,-59,0,7)),
-  Venezuela2=extent(c(-85,-60,0,12)),
+  Venezuela2=extent(c(-85,-55,0,12)),
   Venezuela3=extent(c(-85,-53,-7,11)),
   SouthAmerica=extent(c(-84,-33,-55,14)),
   Indonesia=extent(c(93.2,140,-14,12)),
   CFR=extent(c(17.5,29,-35,-29)),
-  CFR2=extent(c(15,33,-35,-25)),
+  CFR2=extent(c(15,33,-35,-27.8)),
   Madagascar=extent(c(46,52,-17,-12))
 )
 
 fratio=function(ext) abs(ext@xmax-ext@xmin)/abs(ext@ymax-ext@ymin)
 
+abs(-180-180)/abs(84--60)
 fratio(regs[["CFR2"]])
-fratio(regs[["Indonesia"]])
+fratio(regs[["Venezuela2"]])
 
 
 ## udpate paths because initGRASS gets it wrong for grass70...

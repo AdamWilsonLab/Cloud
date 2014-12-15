@@ -165,46 +165,61 @@ k1=xyplot(y~x,col=col$val[col$exists],data=col[col$exists,],pch=16,cex=1.2,
        xlab="",ylab="",scales=list(draw=F),ylim=lims,xlim=lims,asp=1,
 #          main="Seasonal Cloud Concentration"
        par.settings = list(axis.line = list(col = "transparent")))+
-  layer(panel.polygon(pCirc(r=20,n=100),border="grey"))+
-  layer(panel.polygon(pCirc(r=40,n=100),border="grey"))+
-  layer(panel.polygon(pCirc(r=60,n=100),border="grey"))+
-  layer(panel.segments(0,0,60*cos(mangle-(15*pi/180)),60*sin(mangle-(15*pi/180)),col="grey"))+ #draw angles
-  layer(panel.text(x=ladj*cos(mangle[lmons]),y=ladj*sin(mangle[lmons]),mon[lmons],pos=4,cex=1,offset=0,srt=(mangle[lmons])*180/pi))+ #add left months))
-  layer(panel.text(x=ladj*cos(mangle[rmons]),y=ladj*sin(mangle[rmons]),mon[rmons],pos=2,cex=1,offset=0,srt=((mangle[rmons])*180/pi)-180))+ # add right months
-  layer(panel.text(x=-2,y=c(-20,-40,-60),c(20,40,60),pos=4,cex=1,col=c("white","black","black"))) #add scale text
+  latticeExtra::layer(panel.polygon(pCirc(r=20,n=100),border="grey"))+
+  latticeExtra::layer(panel.polygon(pCirc(r=40,n=100),border="grey"))+
+  latticeExtra::layer(panel.polygon(pCirc(r=60,n=100),border="grey"))+
+  latticeExtra::layer(panel.segments(0,0,60*cos(mangle-(15*pi/180)),60*sin(mangle-(15*pi/180)),col="grey"))+ #draw angles
+  #latticeExtra::layer(panel.text(x=ladj*cos(mangle[lmons]),y=ladj*sin(mangle[lmons]),mon[lmons],
+  #                               pos=4,cex=1,offset=0,srt=(mangle[lmons])*180/pi))+ #add left months))
+  #latticeExtra::layer(panel.text(x=ladj*cos(mangle[rmons]),y=ladj*sin(mangle[rmons]),mon[rmons],
+  #                               pos=2,cex=1,offset=0,srt=((mangle[rmons])*180/pi)-180))+ # add right months
+  latticeExtra::layer(panel.text(x=ladj*cos(mangle[lmons[-1]]),y=ladj*sin(mangle[lmons[-1]]),mon[lmons[-1]],
+                                 pos=4,cex=1,offset=0,srt=(mangle[lmons[-1]])*180/pi))+ #add left months))
+  latticeExtra::layer(panel.text(x=ladj*cos(mangle[rmons[c(1,2,6,7)]]),y=ladj*sin(mangle[rmons[c(1,2,6,7)]]),mon[rmons[c(1,2,6,7)]],
+                                 pos=2,cex=1,offset=0,srt=((mangle[rmons[c(1,2,6,7)]])*180/pi)-180))+ # add right months
+    latticeExtra::layer(panel.text(x=-2,y=c(-20,-40,-60),c(20,40,60),pos=4,cex=1,col=c("white","black","black"))) #add scale text
 
 
 g1=levelplot(cf_visseas,col.regions=cf_visseas@legend@colortable,cuts=length(cf_visseas@legend@colortable),at=0:length(cf_visseas@legend@colortable),
              colorkey=F,panel=panel.levelplot.raster,margin=F,maxpixels=res,ylab="",xlab="",useRaster=T,ylim=c(-60,70),
-             scales=list(cex=1,y=list(at=c(-40,0,40))))+
-  layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col="black"),under=T)+
-  layer(sp.polygons(as(regs[["CFR2"]],'SpatialPolygons'),col="red",lwd=1.5),under=F)+
-  layer(sp.polygons(as(regs[["Venezuela2"]],'SpatialPolygons'),col="red",lwd=1.5),under=F)+
-  layer(sp.lines(coast,col="white",lwd=.5),under=F)
+             asp=1,scales=list(draw=F))+#cex=1,y=list(at=c(-40,0,40))))+
+  latticeExtra::layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col="black"),under=T)+
+  latticeExtra::layer(sp.polygons(as(regs[["CFR2"]],'SpatialPolygons'),col="red",lwd=1.5),under=F)+
+  latticeExtra::layer(sp.polygons(as(regs[["Venezuela2"]],'SpatialPolygons'),col="red",lwd=1.5),under=F)+
+  latticeExtra::layer(sp.lines(coast,col="white",lwd=.5),under=F)
 
 ## regional plots
-r_cfr=crop(cf_visseas,regs[["CFR"]],datatype="INT2U")
-r1=levelplot(r_cfr,col.regions=cf_visseas@legend@colortable,cuts=length(cf_visseas@legend@colortable),at=0:length(cf_visseas@legend@colortable),
-                colorkey=F,panel=panel.levelplot.raster,margin=F,maxpixels=res,ylab="",xlab="",useRaster=T,scales=list(cex=1,y=list(at=c(-34,-30,-26))),asp=1)+
-  layer(sp.lines(coast,col="white",lwd=.5),under=F)
-r_ven=crop(cf_visseas,regs[["Venezuela2"]],datatype="INT2U")
-r2=levelplot(r_ven,col.regions=cf_visseas@legend@colortable,cuts=length(cf_visseas@legend@colortable),at=0:length(cf_visseas@legend@colortable),
-                colorkey=F,panel=panel.levelplot.raster,margin=F,maxpixels=res,ylab="",xlab="",useRaster=T,scales=list(cex=1,y=list(at=c(2,6,10))),asp=1)+
-  layer(sp.lines(coast,col="white",lwd=.5),under=F)
+r_cfr=crop(cf_visseas,regs[["CFR2"]],datatype="INT2U")
+r1=levelplot(r_cfr,col.regions=cf_visseas@legend@colortable,
+             cuts=length(cf_visseas@legend@colortable),
+             at=0:length(cf_visseas@legend@colortable),
+             colorkey=F,panel=panel.levelplot.raster,margin=F,
+             maxpixels=res,ylab="",xlab="",useRaster=T,asp=1,
+             scales=list(cex=1,y=list(at=c(-34,-30,-26))))+
+  latticeExtra::layer(sp.lines(coast,col="white",lwd=.5),under=F)
 
+r_ven=crop(cf_visseas,regs[["Venezuela2"]],datatype="INT2U")
+r2=levelplot(r_ven,col.regions=cf_visseas@legend@colortable,
+             cuts=length(cf_visseas@legend@colortable),
+             at=0:length(cf_visseas@legend@colortable),
+             asp=1,colorkey=F,panel=panel.levelplot.raster,margin=F,
+             maxpixels=res,ylab="",xlab="",useRaster=T,asp=1,
+             scales=list(cex=1,y=list(at=c(2,6,10))))+
+  latticeExtra::layer(sp.lines(coast,col="white",lwd=.5),under=F)
 
 ## draw it
-png(width=2400,height=1600,res=200,pointsize=12,type="cairo-png",file="manuscript/figures/Seasonality.png")
-print(k1,position=c(0,.5,.35,1),more=T) #legend
-print(g1,position=c(0.35,.5,1,1),more=T) #global
-print(r1,position=c(.46,0,1,.5),more=T)
-print(r2,position=c(0,0,.48,.5),more=F)
+png(width=2400,height=1600,res=300,pointsize=16,
+    type="cairo-png",file="manuscript/figures/Seasonality.png")
+print(g1,position=c(0.4,.5,1,1),more=T) #global
+print(r1,position=c(.51,-0.05,1,.7),more=T)
+print(r2,position=c(0,-.05,.55,.7),more=T)
+print(k1,position=c(-.10,.4,.55,1.1),just=c("left","top"),more=T) #legend
 ## add panel labels
-gp=gpar(fontsize=18, col="black",fontface="bold")
-grid.text("a",x=0.05,y=.995,just=c("left","top"),gp=gp)
-grid.text("b",x=0.35,y=.995,just=c("left","top"),gp=gp)
-grid.text("c",x=0.05,y=.5,just=c("left","top"),gp=gp)
-grid.text("d",x=0.51,y=.5,just=c("left","top"),gp=gp)
+gp=gpar(fontsize=16, col="black",fontface="bold")
+grid.text("a",x=0.01,y=.995,just=c("left","top"),gp=gp)
+grid.text("b",x=0.42,y=.995,just=c("left","top"),gp=gp)
+grid.text("c",x=0.05,y=.52,just=c("left","top"),gp=gp)
+grid.text("d",x=0.57,y=.52,just=c("left","top"),gp=gp)
 dev.off()
 
 
@@ -224,43 +239,63 @@ names(gewex)="PATMOS-x GEWEX AVHRR"
 #MOD_gewex=gewex
 #MOD_gewex@data@values=1:length(MOD_gewex@data@values)
 #MOD_gewex2=zonal(mod09a,MOD_gewex,fun='mean')
-res=1e7
+res=1e4
 
 r="Venezuela2"
+
+cf_r=crop(cf_mean,regs[[r]])
+tmap=crop(wc_map,regs[[r]])
+
+
 # ylab.right = "Cloud Frequency (%)",par.settings = list(layout.widths = list(axis.key.padding = 0.1,axis.left=0.6,ylab.right = 3,right.padding=2)),
 pars=list(layout.heights=list(key.bottom=2,key.top=1),layout.widths = list(axis.key.padding = 3,axis.left=1))
-cf_r=crop(cf_mean,regs[[r]])
 p1=levelplot(cf_r,col.regions=colR(n),at=seq(0,100,len=99),
-             ylab="",xlab="",
-    colorkey=F,
+             ylab="",xlab="", scales=list(draw=F),
+             colorkey=list(space="left",width=1,height=.75,labels=list(labels=c(0,50,100),at=c(0,50,100))),
     cuts=99,margin=F,maxpixels=1e7,par.settings = pars)+
-  layer(sp.lines(coast,col="black",lwd=.5),under=F)
+  latticeExtra::layer(sp.lines(coast,col="black",lwd=.5),under=F)
 
 p2=levelplot(crop(gewex,regs[[r]]),col.regions=colR(n),at=seq(0,1,len=99),cuts=99,margin=F,max.pixels=1e6,
              ylab="",xlab="",
-             colorkey=list(space="top",width=1,height=.75,labels=list(labels=c(0,50,100),at=c(.0,.5,1))),
+             colorkey=F,scales=list(y=list(draw=F),x=list(draw=T)),
+#             colorkey=list(space="right",width=1,height=.75,labels=list(labels=c(0,50,100),at=c(.0,.5,1))),
     par.settings = pars)+
-  layer(sp.lines(coast,col="black",lwd=.5),under=F)
+  latticeExtra::layer(sp.lines(coast,col="black",lwd=.5),under=F)
 
-tmap=crop(wc_map,regs[[r]])
-p3=levelplot(tmap,col.regions=rev(terrain.colors(n)),cuts=100,at=seq(tmap@data@min,tmap@data@max,len=100),margin=F,maxpixels=1e6,
-    colorkey=list(space="bottom",height=.75,width=1),xlab="",ylab="",main=names(regs)[r],useRaster=T,
+p3=levelplot(tmap,col.regions=rev(terrain.colors(n)),cuts=100,
+             at=seq(tmap@data@min,tmap@data@max,len=100),margin=F,maxpixels=1e6,
+             scales=list(draw=F),
+             colorkey=list(space="right",height=.5,width=1,
+                           labels=list(labels=c(2000,6000,10000),at=c(2000,6000,10000))),
+                           xlab="",ylab="",
+             useRaster=T,
     par.settings = pars)+
-  layer(sp.lines(coast,col="black",lwd=.5),under=F)
+  latticeExtra::layer(sp.lines(coast,col="black",lwd=.5),under=F)
 
-p4=levelplot(crop(wc_dem,regs[[r]]),col.regions=terrain.colors(n),cuts=99,margin=F,max.pixels=1e6,
+p4=levelplot(crop(wc_dem,regs[[r]]),col.regions=terrain.colors(n),
+             cuts=99,margin=F,max.pixels=1e6,
              ylab="",xlab="",maxpixels=1e7,
-             colorkey=list(space="bottom",height=.75,width=1,labels=list(labels=c(0,2500,5000),at=c(0,2500,5000))),
+#             scales=list(draw=F),
+             colorkey=list(space="right",height=.5,width=1,
+                           labels=list(labels=c(0,2500,5000),
+                           at=c(0,2500,5000))),
     par.settings = pars,scales=list(y=list(at=c(2,6,10))))+
-  layer(sp.lines(coast,col="black",lwd=.5),under=F)
+  latticeExtra::layer(sp.lines(coast,col="black",lwd=.5),under=F)
 
+## combine
+lside=c("a    MODCF (%)"=p1,"c     PATMOS-x GEWEX (%)"=p2,
+        layout=c(1,2),merge.legends=T,x.same=T,y.same=T)
+rside=c("b    WorldClim Precip (mm)"=p3,"d    Elevation (m)"=p4,
+        layout=c(1,2),x.same=T,y.same=T,merge.legends=T)
+      
 
-png("manuscript/figures/Resolution.png",width=1000,height=2000,res=300,pointsize=47,bg="white")
-
+png("manuscript/figures/Resolution2.png",width=3000,height=1500,res=300,pointsize=47,bg="white")
 trellis.par.set(my.theme)
 #pdf("output/mod09_resolution.pdf",width=11,height=8.5)
-#print(c("a    MODCF (%)"=p1,"b     PATMOS-x GEWEX (%)"=p2,"c    WorldClim Precip (mm)"=p3,"d    Elevation (m)"=p4,x.same=T,y.same=T,merge.legends=T,layout=c(2,2)))
-print(c("a     PATMOS-x GEWEX (%)"=p2,"b    MODCF (%)"=p1,"c    Elevation (m)"=p4,x.same=T,y.same=T,merge.legends=T,layout=c(1,3)))
+#print(c("b    WorldClim Precip (mm)"=p3,"d    Elevation (m)"=p4,x.same=T,y.same=T,merge.legends=T,layout=c(1,2))
+      #print(c("a     PATMOS-x GEWEX (%)"=p2,"b    MODCF (%)"=p1,"c    Elevation (m)"=p4,x.same=T,y.same=T,merge.legends=T,layout=c(1,3)))
+print(lside,position=c(0,0,.5,1),more=T)
+print(rside,position=c(0.48,0,1,1),more=F)
 dev.off()
 
 ###  Spatial Autocorrelation

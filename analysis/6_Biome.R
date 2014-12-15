@@ -45,10 +45,11 @@ bprods=c("data/MCD09_deriv/inter.tif",
          "data/MCD09_deriv/seasconc.tif",
          "data/MCD09_deriv/seastheta.tif",
          "data/MCD09_deriv/meanannual.tif",
+         "data/MCD09_deriv/mean_1deg_sd.tif",
     paste("data/MCD09/MCD09_mean_",sprintf("%02d",1:12),".tif",sep=""))
 
 ### loop over products and summarize by biome
-foreach(m=bprods)%dopar%{
+foreach(m=bprods)%do%{
   ## set file names
   tcloud=paste0("data/tmp/rescale_",sub("tif","vrt",basename(m)))
   tbiome=paste0("data/tmp/teow_",basename(m))
@@ -57,22 +58,23 @@ foreach(m=bprods)%dopar%{
   
   ## mask biome raster using missing data in cloud dataset
   nas=sub("^.*=","",system(paste0("gdalinfo ",m," | grep NoData"),intern=T))  #get NA for image
+  if(grepl("1deg_sd",m)) nas=0
   system(paste("pksetmask -i data/out/teow.tif -m ",m," -ot Byte ",
                "--operator='=' --msknodata ",nas," --nodata 0  -co COMPRESS=LZW -co PREDICTOR=2 -o ",tbiome))
 ##select only one biome
-  system(paste("pksetmask -i data/out/teow.tif -ot Byte  ",
-              " -m ",m," --operator='=' --msknodata ",nas," --nodata 0 ",
-               " -m ",m," --operator='>' --msknodata 10000 --nodata 0 ",
-               " -m data/out/teow.tif --operator='=' --msknodata 18 --nodata 70 ",
-               " -m data/out/teow.tif --operator='=' --msknodata 29 --nodata 70 ",
-               " -m data/out/teow.tif --operator='=' --msknodata 65 --nodata 70 ",
-               " -m data/out/teow.tif --operator='=' --msknodata 69 --nodata 70 ",
-               " -co COMPRESS=LZW -co PREDICTOR=2 -o ",tbiome))
+   system(paste("pksetmask -i data/out/teow.tif -ot Byte  ",   
+                " -m data/out/teow.tif --operator='=' --msknodata 18 --nodata 70 ",
+                " -m data/out/teow.tif --operator='=' --msknodata 29 --nodata 70 ",
+                " -m data/out/teow.tif --operator='=' --msknodata 65 --nodata 70 ",
+                " -m data/out/teow.tif --operator='=' --msknodata 69 --nodata 70 ",
+                " -m ",m," --operator='=' --msknodata ",nas," --nodata 0 ",
+#                " -m ",m," --operator='>' --msknodata 10000 --nodata 0 ",
+                " -co COMPRESS=LZW -co PREDICTOR=2 -o ",tbiome))
+
   
   ## calculate biome-level summary metrics
   system(paste("oft-stat -i ",m," -o ",tcloudbiome," -um ",tbiome," -mm"))
   ## calculate biome-level histograms for monthly data
-
   system(paste("gdal_translate  -scale 0 10000 0 100 -ot Byte -of vrt  ",m,tcloud))
   system(paste("oft-his -i ",tcloud," -o ",tcloudhist," -um ",tbiome," -hr -maxval 100 "))
                
@@ -170,6 +172,10 @@ bs%.%filter(product=="inter")%.% arrange(mean) %.%head(5)
 bs%.%filter(product=="seasconc")%.% arrange(desc(mean)) %.%head(5)
 bs%.%filter(product=="seastheta")%.% arrange(desc(mean)) %.%head(5)
 
+## Spatial
+bs%.%filter(product=="mean_1deg_sd")%.% arrange(desc(mean)) %.%head(5)
+bs%.%filter(product=="mean_1deg_sd")%.% arrange(mean) %.%head(5)
+
 
 bs[which.max(bs$mean),]
 
@@ -178,13 +184,6 @@ bs[which.max(bs$seasintra),]
 
 
 bs[which.min(bs$mean),]
-
-
-### images of seasonality
-
-ggplot(bsfl,aes(x=month,y=value,fill=ncount))+
-  geom_tile()+facet_grid(biome~realm)+
-  scale_fill_gradientn(values=c(0,.4,1),colours=c('white','blue','red'),na.value="transparent")
 
 
 ### Convert to quantiles
@@ -256,3 +255,12 @@ pbiome=
 png(file=paste0("figure/biome_overview.png"),width=3000,height=3000,pointsize=24,res=300)
 print(pbiome)
 dev.off()
+
+
+
+### Spatial plot using shapefile
+bsw=dcast(bs,code~product,value.var="mean")
+biome2=biome
+biome2@data[,colnames(bsw)[-1]]=bsw[match(biome2$code,bsw$code),-1]
+
+spplot(biome2,zcol="meanannual")

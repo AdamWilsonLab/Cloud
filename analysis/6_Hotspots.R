@@ -219,7 +219,7 @@ blanktheme=theme(legend.position="none")+theme(axis.line=element_blank(),
                                                text = element_text(size=tsize))
 
 p_hot=
-  gplot(hotspot,maxpixels=2e4)+geom_raster(aes(fill=value))+
+  gplot(hotspot,maxpixels=2e6)+geom_raster(aes(fill=value))+
   scale_fill_gradientn(colours=cols,guide=F,na.value="white",
                        values = 0:(length(cols)-1), 
                        rescaler = function(x, ...) x, oob = identity)+
@@ -262,18 +262,19 @@ p_hot=
 #    guides(col = guide_legend(nrow = 4))
 
 #ggpairs(d1[1:3])
-d3=d2[sample(1:nrow(d2),100000),]
+d3=d2[sample(1:nrow(d2),10000000),]
 
 ginter=
   ggplot(d3,aes(y=inter/100,x=mean/100))+
   geom_point(aes(colour=uvals$col[match(class,uvals$class)],
                  order = uvals$mean[match(class,uvals$class)]),size=.3)+
   scale_y_continuous(breaks=c(0,20,40),limits=c(0,40),labels=NULL)+
+  scale_x_continuous(breaks=c(0,50,100))+
   scale_colour_identity()+
   guides(colour=FALSE)+
   # stat_bin2d()+coord_equal()+
   geom_hline(yintercept=qsr[2,"Q0.1"]/100,size=.2)+
-  geom_hline(yintercept=qsr[2,"Q0.9"]/100,size=.2)+
+#  geom_hline(yintercept=qsr[2,"Q0.9"]/100,size=.2)+
   geom_vline(xintercept=qsr[1,"Q0.1"]/100,size=.2)+
   geom_vline(xintercept=qsr[1,"Q0.9"]/100,size=.2)+
   labs(y="Inter-annual",
@@ -291,10 +292,11 @@ gintra=
                  order = uvals$mean[match(class,uvals$class)]),size=.3)+
   scale_colour_identity() +
   scale_y_continuous(breaks=c(0,20,40),limits=c(0,40),labels=NULL)+
+  scale_x_continuous(breaks=c(0,50,100))+
   guides(colour=FALSE)+
   # stat_bin2d()+coord_equal()+
   geom_hline(yintercept=qsr[3,"Q0.1"]/100,size=.2)+
-  geom_hline(yintercept=qsr[3,"Q0.9"]/100,size=.2)+
+# geom_hline(yintercept=qsr[3,"Q0.9"]/100,size=.2)+
   geom_vline(xintercept=qsr[1,"Q0.1"]/100,size=.2)+
   geom_vline(xintercept=qsr[1,"Q0.9"]/100,size=.2)+
   labs(y="Intra-annual",
@@ -315,12 +317,13 @@ p_key=
                  order = uvals$mean[match(class,uvals$class)]),size=.3)+
   scale_colour_identity() +
   scale_y_continuous(breaks=c(0,20,40),limits=c(0,40))+
-    guides(colour=FALSE)+
+  scale_x_continuous(breaks=c(0,15,30))+
+  guides(colour=FALSE)+
   # stat_bin2d()+coord_equal()+
   geom_hline(yintercept=qsr[3,"Q0.1"]/100,size=.2)+
-  geom_hline(yintercept=qsr[3,"Q0.9"]/100,size=.2)+
+#  geom_hline(yintercept=qsr[3,"Q0.9"]/100,size=.2)+
   geom_vline(xintercept=qsr[2,"Q0.1"]/100,size=.2)+
-  geom_vline(xintercept=qsr[2,"Q0.9"]/100,size=.2)+
+#  geom_vline(xintercept=qsr[2,"Q0.9"]/100,size=.2)+
   labs(y="Intra-annual",
        x="Inter-annual")+
   theme(strip.text = element_text(size=8),
@@ -340,20 +343,17 @@ p_hot_coast=
 
 png("manuscript/figures/Q20_Hotspots3.png",width=3500,height=2000,
     res=600,bg="white")
-#print(p_hot_coast,vp=viewport(x=0,y=.4,width=1,height=.6,just=c("left","bottom")))
-#print(p_key,vp=viewport(x=0,y=0,width=1,height=.45,just=c("left","bottom")))
-print(p_hot_coast,vp=viewport(x=0.05,y=0,width=1,height=1,just=c("left","bottom")))
-#print(p_key,vp=viewport(x=0,y=0,width=0.3,height=.56,just=c("left","bottom")))
-#grid.arrange(p_key, ginter,gintra, ncol=3),
-print(p_key,vp=viewport(x=0,y=0,width=0.33,height=.3,just=c("left","bottom")))
-print(ginter,vp=viewport(x=0.33,y=0,width=0.33,height=.3,just=c("left","bottom")))
-print(gintra,vp=viewport(x=0.66,y=0,width=0.33,height=.3,just=c("left","bottom")))
-
+print(p_hot_coast,vp=viewport(x=0,y=0.28,width=1,height=.7,just=c("left","bottom")))
+print(p_key,vp=viewport(x=0,y=0,width=0.32,height=.3,just=c("left","bottom")))
+print(ginter,vp=viewport(x=0.33,y=0,width=0.32,height=.3,just=c("left","bottom")))
+print(gintra,vp=viewport(x=0.66,y=0,width=0.32,height=.3,just=c("left","bottom")))
 ## panel labels
 pushViewport(viewport())
 tgp=gpar(cex = 1, col = "black")
-grid.text(label = "a" ,x = 0.01,y = .98,gp = tgp)
-grid.text(label = "b" ,x = 0.01,y = .62,gp = tgp)
+grid.text(label = "a" ,x = 0.08,y = .98,gp = tgp)
+grid.text(label = "b" ,x = 0.09,y = .33,gp = tgp)
+grid.text(label = "c" ,x = 0.39,y = .33,gp = tgp)
+grid.text(label = "d" ,x = 0.73,y = .33,gp = tgp)
 dev.off()
 
 
