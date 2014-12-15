@@ -142,6 +142,23 @@ foreach(i=1:length(f2), .options.multicore=list(preschedule=FALSE)) %dopar% {
 f3=list.files(paste("data/MCD09/",sep=""),pattern=paste("MCD09_mean_[0-9].[.]tif$",sep=""),full=T)
 f3sd=list.files(paste("data/MCD09/",sep=""),pattern=paste(".*MCD09_sd_[0-9].[.]tif$",sep=""),full=T)
 
+##############################################################################
+### create a temporary copy without a color table for uploading to earth engine
+dir.create("data/MCD09_EarthEngineUpload")
+
+foreach(f=c(f3,f3sd))%dopar% {
+  tvrt=paste0("data/MCD09_EarthEngineUpload/",sub("tif","vrt",basename(f)))
+  tout=paste0("data/MCD09_EarthEngineUpload/",basename(f))
+  system(paste0("gdal_translate -ot UInt16 -of vrt ",f," ",tvrt))
+  yvrt=scan(tvrt,what="char",)
+  cti=grep("ColorTable",yvrt)
+  yvrt2=c(yvrt[1:(cti[1]-1)],"<ColorInterp>Grey</ColorInterp>",yvrt[(cti[2]+1):length(yvrt)])
+  write.table(yvrt2,file=tvrt,col.names=F,row.names=F,quote=F)              
+  system(paste("gdal_translate -a_nodata 65535 -ot UInt16  -co COMPRESS=LZW -co PREDICTOR=2 ",tvrt," ",tout))  
+  file.remove(tvrt)
+}
+  
+
 dmean=stack(as.list(f3))
 NAvalue(dmean)=65535
 #dmean=crop(dmean,regs[["Venezuela"]])
@@ -187,6 +204,9 @@ system(paste("gdal_translate -ot UInt16 -co COMPRESS=DEFLATE -co ZLEVEL=9 -co BI
              " data/MCD09_deriv/meanannual_uncompressed.tif data/MCD09_deriv/meanannual.tif"))
 file.remove("data/MCD09_deriv/meanannual_uncompressed.tif")
 
+#file.copy("data/MCD09_deriv/meanannual.tif","data/MCD09_EarthEngineUpload/meanannual.tif")
+#file.copy("data/MCD09_deriv/inter.tif","data/MCD09_EarthEngineUpload/inter.tif")
+#file.copy("data/MCD09_deriv/intra.tif","data/MCD09_EarthEngineUpload/intra.tif")
 
 #################################################
 ### Calculate Markham's Seasonality
@@ -299,6 +319,7 @@ system(paste("gdal_translate -co COMPRESS=LZW -a_nodata 65535 -co PREDICTOR=2 -o
 ## expand to RGB for EarthEngine
 system(paste("gdal_translate -a_nodata 255 -expand rgba -co COMPRESS=LZW -co PREDICTOR=2 -of GTIFF -ot Byte ",seasvrt,"  data/MCD09_deriv/seas_rgb.tif")) 
 
+#file.copy("data/MCD09_deriv/seas_rgb.tif","data/MCD09_EarthEngineUpload/seas_rgb.tif")
 
 ################################################################################
 ################################################################################
