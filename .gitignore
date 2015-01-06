@@ -26,3 +26,5 @@ data/tmp
 ## octave stuff
 core
 octave-workspace
+
+data/src
