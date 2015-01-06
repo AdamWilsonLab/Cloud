@@ -109,7 +109,7 @@ csbs="black"#grey(.7)
 
 ps1=
   ggplot(filter(pred,species==tsp1),aes(x=x,y=y,fill=pred)) + 
-  geom_tile(colour=pred) +
+  geom_raster(colour=pred) +
   facet_grid(~modelname) +
   predscale+
   coord_equal(ratio=1.2)+ theme(legend.position="none",
@@ -134,7 +134,7 @@ ps1=
 
 ps1r1=
   ggplot(filter(pred,modelname=="Cloud"&species=="Protea_cynaroides"),aes(x=x,y=y,fill=pred)) + 
-  geom_tile(colour=pred) +
+  geom_raster(colour=pred) +
   predscale+blanktheme+
   coord_equal(ratio=1.2)+
   geom_point(data=filter(idata,reg==1&trials>1&presences==0&species==tsp1),
@@ -145,7 +145,7 @@ ps1r1=
 
 ps1r2=
   ggplot(filter(pred,modelname=="Precipitation"&species==tsp1),aes(x=x,y=y,fill=pred)) + 
-  geom_tile(colour=pred) +
+  geom_raster(colour=pred) +
   predscale+blanktheme+
   coord_equal(ratio=1.2)+
   geom_point(data=filter(idata,reg==1&trials>1&presences==0&species==tsp1),
@@ -185,7 +185,7 @@ ps2=
 
 ps2r1=
   ggplot(filter(pred,modelname=="Cloud"&species==tsp2),aes(x=x,y=y,fill=pred)) + 
-  geom_tile(colour=pred) +
+  geom_raster(colour=pred) +
   predscale+blanktheme+
   coord_equal(ratio=1.3)+
   geom_point(data=filter(idata,reg==1&trials>1&presences==0&species==tsp2),
@@ -197,7 +197,7 @@ ps2r1=
 
 ps2r2=
   ggplot(filter(pred,modelname=="Precipitation"&species==tsp2),aes(x=x,y=y,fill=pred)) + 
-  geom_tile(colour=pred) +
+  geom_raster(colour=pred) +
   predscale+blanktheme+
   coord_equal(ratio=1.3)+
   geom_point(data=filter(idata,reg==1&trials>1&presences==0&species==tsp2),
@@ -254,8 +254,11 @@ pbox=
 
 
 ## make single plot with two species and autocorrelation
+pdf(file=paste0("figure/SDM_overview.pdf"),
+    width=10,height=16,pointsize=24)
 
-png(file=paste0("figure/SDM_overview.png"),width=2800,height=4100,pointsize=38,res=300)
+png(file=paste0("figure/SDM_overview.png"),
+    width=2800,height=4100,pointsize=24,res=300)
 
 print(ps1, vp = viewport(width = 1, height = .3, x=.5,y=.375))
 print(ps1r1, vp = viewport(width = .35, height = .25, x = .385, y = 0.42))
@@ -349,6 +352,26 @@ png(file=paste0("figure/SDM_inputs.png"),width=3000,height=3000,pointsize=38,res
 print(penv1,vp = viewport(width = 1, height = .5, x=.5,y=.25))
 print(penv2,vp = viewport(width = 1, height = .6, x=.5,y=.75))
 dev.off()
+
+#### Separate figures for poster
+png(file=paste0("figure/SDM_overview1_CFR.png"),  width=4000,height=4000,pointsize=38,res=1200)
+print(ps1)
+print(ps1r1, vp = viewport(width = .35, height = .25, x = .385, y = 0.42))
+print(ps1r2, vp = viewport(width = .35, height = .25, x = .85, y = 0.42))
+dev.off()
+
+png(file=paste0("figure/SDM_overview1_SouthAmerica.png"),
+    width=4000,height=4000,background="transparent",pointsize=38,res=1200)
+print(ps2)
+dev.off()
+
+png(file=paste0("figure/SDM_overview1_CFR.png"),width=3000,height=3000,pointsize=38,res=600)
+###  (ac and boxplot)
+print(pac1)
+print(pbox)
+dev.off()
+
+
 
 ######################################
 ### Old stuff below here

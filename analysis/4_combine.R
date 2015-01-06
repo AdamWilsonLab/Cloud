@@ -181,12 +181,24 @@ Rmean=function(x) calc(x,function(x) {
   mean(x,na.rm=T)
 })
 
+## Function to calculate standard deviation of the log-transformed variables and round them to nearest integer
+Rlsd=function(x) calc(x,function(x) {
+  if(all(is.na(x))) return(NA)
+  sd(log(x),na.rm=T)*100
+})
+
+Rlmean=function(x) calc(x,function(x) {
+  mean(log(x),na.rm=T)*100
+})
+
+
 dintra=clusterR(dmean,Rsd,m=4,file="data/MCD09_deriv/intra_uncompressed.tif",
                 #options=c("COMPRESS=LZW","PREDICTOR=2"),
                 overwrite=T,dataType='INT2U',NAflag=65535)
-system("gdal_translate -ot UInt16 -co COMPRESS=DEFLATE -co ZLEVEL=9 -co BIGTIFF=YES -co COMPRESS=LZW -co PREDICTOR=2",
-" data/MCD09_deriv/intra_uncompressed.tif data/MCD09_deriv/intra.tif")
+system(paste("gdal_translate -ot UInt16 -co COMPRESS=DEFLATE -co ZLEVEL=9 -co BIGTIFF=YES -co COMPRESS=LZW -co PREDICTOR=2",
+" data/MCD09_deriv/intra_uncompressed.tif data/MCD09_deriv/intra.tif"))
 file.remove("data/MCD09_deriv/intra_uncompressed.tif")
+
 
 dinter=clusterR(dsd,Rmean,m=4,file="data/MCD09_deriv/inter_uncompressed.tif",
                 #options=c("COMPRESS=LZW","PREDICTOR=2"),
@@ -194,6 +206,22 @@ dinter=clusterR(dsd,Rmean,m=4,file="data/MCD09_deriv/inter_uncompressed.tif",
 system(paste("gdal_translate -ot UInt16 -co COMPRESS=DEFLATE -co ZLEVEL=9 -co BIGTIFF=YES -co COMPRESS=LZW -co PREDICTOR=2",
        " data/MCD09_deriv/inter_uncompressed.tif data/MCD09_deriv/inter.tif"))
 file.remove("data/MCD09_deriv/inter_uncompressed.tif")
+
+
+### calculate sd(log(x))
+dlintra=clusterR(dmean,Rlsd,m=4,file="data/MCD09_deriv/intra_log_uncompressed.tif",
+                #options=c("COMPRESS=LZW","PREDICTOR=2"),
+                overwrite=T,dataType='INT2U',NAflag=65535)
+system(paste("gdal_translate -ot UInt16 -co COMPRESS=DEFLATE -co ZLEVEL=9 -co BIGTIFF=YES -co COMPRESS=LZW -co PREDICTOR=2",
+       " data/MCD09_deriv/intra_log_uncompressed.tif data/MCD09_deriv/intra_log.tif"))
+file.remove("data/MCD09_deriv/intra_log_uncompressed.tif")
+
+dlinter=clusterR(dsd,Rlmean,m=4,file="data/MCD09_deriv/inter_log_uncompressed.tif",
+                #options=c("COMPRESS=LZW","PREDICTOR=2"),
+                overwrite=T,dataType='INT2U',NAflag=65535)
+system(paste("gdal_translate -ot UInt16 -co COMPRESS=DEFLATE -co ZLEVEL=9 -co BIGTIFF=YES -co COMPRESS=LZW -co PREDICTOR=2",
+             " data/MCD09_deriv/inter_log_uncompressed.tif data/MCD09_deriv/inter_log.tif"))
+file.remove("data/MCD09_deriv/inter_log_uncompressed.tif")
 
 
 ## Overall annual mean

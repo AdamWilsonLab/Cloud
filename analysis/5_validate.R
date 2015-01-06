@@ -185,6 +185,9 @@ st$era=factor(st$era,levels=c("Pre-MODIS","Full"),labels=c("Pre-MODIS","Full"),o
 cldm$monthname=factor(cldm$monthname,ordered=T,levels=month.name)
 cldm$seas=factor(cldm$seas,ordered=T,levels=c("DJF","MAM","JJA","SON"))
 
+## add elevation to cldm
+cldm$elev=st$elev[match(cldm$StaID,st$id)]
+
 ## subset cldm to include only stations with full 10 years of data for 2000-2009 and >= 20 years for 1970-2009
 cldm[cldm$cldn<10,c("cld","cldsd")]=NA
 cldm[cldm$cldn_all<20,c("cld_all","cldsd_all")]=NA
@@ -230,6 +233,19 @@ print(xtable(vtable,digits=2,#caption="Summary of validation data by month and s
 "html",format.args=list(big.mark = ",", decimal.mark = "."),include.rownames=F,file="manuscript/validtable.html")
 
 
+      cldm %.% group_by(StaID) %.% summarise(
+        MCD09=mean(MCD09_mean,na.rm=T),
+        cld=mean(cld,na.rm=T),
+        elev=mean(elev,na.rm=T)) %.%
+        summarize(
+        cld_R2=lm_summary(cld,elev,"rs"),
+        MCD09_R2=lm_summary(MCD09,elev,"rs"),
+        cld_rho=cor.test(cld,elev,method="spearman",alternative="two.sided",continuity=T)$estimate,
+        cld_n=nrow(na.omit(cbind(cld,elev))),
+        MCD09_rho=cor.test(MCD09,elev,method="spearman",alternative="two.sided",continuity=T)$estimate,
+        MCD09_n=nrow(na.omit(cbind(MCD09,elev))))
+      
+      
 ########################
 ### Temporal stability
 ### Compare two time periods

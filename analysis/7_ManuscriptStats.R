@@ -15,3 +15,10 @@ res=cor.test(d2$MCD09_meanannual_land,d2$alt,method="spearman",alternative="two.
 res
 
 format(as.numeric(nrow(d)),scientific=2,digits=2)
+
+
+## number of averages
+r=raster("data/MCD09_deriv/MCD09_meanannual_land.tif")
+options( scipen = 10 )
+x=as.numeric(ncell(r)*12*(2014-2000))
+format(x, scientific=T)

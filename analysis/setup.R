@@ -76,7 +76,7 @@ colR=colorRampPalette(c("#08306b","#0d57a1","#2878b8","#4997c9","#72b2d7","#a2cb
 bgr=colorRampPalette(c("#0000ff","#00ff00","#ff0000"))
 bgyrp=colorRampPalette(c("blue","darkgreen","goldenrod","red","purple"))
 
-bgr=function(x,n=100,br=0,c1=c("darkblue","blue","grey"),c2=c("grey","red","magenta")){
+bgr=function(x,n=100,br=0,c1=c("blue","darkblue","grey"),c2=c("grey","darkred","red")){
   at=unique(c(seq(min(x,na.rm=T),max(x,na.rm=T),len=n)))
   #at=unique(c(seq(min(x,na.rm=T),br,len=floor(n/2)),seq(br,max(x,na.rm=T),len=ceiling(n/2))))
   bg=colorRampPalette(c1)
@@ -102,6 +102,9 @@ write.table(cols,"data/out/grasscols.txt",col.names=F,row.names=F,quote=F)
 ## read in coast line
 coast=readOGR("data/gshhs/","coast")
 fcoast=fortify(coast)
+
+## coastline for ggplot
+gcoast <- fortify(map_data("world"))#, plot = FALSE, fill = TRUE)
 
 ### 
 knitsDoc <- function(name) {
