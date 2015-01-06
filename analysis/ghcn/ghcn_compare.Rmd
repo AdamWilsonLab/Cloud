@@ -191,16 +191,23 @@ htmlreg(list(m1,m2,m3,m4,m5),ci.force=T,single.row=T,doctype=F,omit.coef="biome"
 
 Comparison of CF and WorldClim for estimating precipitation
 ```{r modeleval2,results='asis'}
-t1=with(filter(pds, era=="1950-2014"), cor.test(mmp, cld, method = "spearman",use="complete"))
+t1=with(filter(pds, era=="1950-2014"), 
+        cor.test(mmp, cld, method = "spearman",use="complete"))
 t1n=nrow(na.omit(select(filter(pds, era=="1950-2014"),mmp,cld)))
 
-t2=with(filter(pds, era=="1950-2014"), cor.test(mmp ,wcprec, method = "spearman",use="complete"))
+t2=with(filter(pds, era=="1950-2014"), 
+        cor.test(mmp ,wcprec, method = "spearman",use="complete"))
 t2n=nrow(na.omit(select(filter(pds, era=="1950-2014"),mmp,wcprec)))
 
-td=data.frame(Data=c("CF","WorldClim"),
-              "SpearmanRho"=c(t1$estimate,t2$estimate),
-              'p-value'=c(t1$p.value,t2$p.value),
-              n=c(t1n,t2n))
+t3=with(filter(pds, era=="1950-2014"), 
+        cor.test(mmp ,elevation, method = "spearman",use="complete"))
+t3n=nrow(na.omit(select(filter(pds, era=="1950-2014"),mmp,elevation)))
+
+
+td=data.frame(Data=c("CF","WorldClim","Elevation"),
+              "SpearmanRho"=c(t1$estimate,t2$estimate,t3$estimate),
+              'p-value'=c(t1$p.value,t2$p.value,t3$p.value),
+              n=c(t1n,t2n,t3n))
 kable(td)
 
 

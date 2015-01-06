@@ -225,42 +225,6 @@ p_hot=
                        rescaler = function(x, ...) x, oob = identity)+
   coord_equal()+ylim(c(-60,89))+ylab("")+xlab("")+blanktheme
 
-# p_key=  
-#   ggplot(uvals,
-#        aes(x=ninter,y=nintra,colour=col))+
-# #  geom_raster()+
-#   geom_point(aes(size=count))+
-#   scale_size_area(trans="log",max_size=10,breaks=c(0,1e2,1e4,1e6,1e8),name="Count")+
-#   scale_color_identity()+
-#   facet_grid(~nmean)+scale_fill_identity() +
-#   labs(title = "Mean Annual Cloud Cover", 
-#        y="Intra-annual\nVariability",
-#       x="Inter-annual Variability")+
-#   theme(strip.text = element_text(size=8),
-#         plot.title=element_text(size=12),
-#         plot.background=element_blank(),
-#         plot.margin=unit(c(0,.10,0,0), "npc"))
-
-# p_key=  
-#   ggplot(uvals,
-#          aes(x=ninter,y=nintra,fill=col))+
-#     geom_raster()+coord_equal()+
-#   facet_grid(~nmean)+scale_fill_identity() +
-#   labs(title = "Mean Annual Cloud Cover", 
-#        y="Intra-annual\nVariability",
-#        x="Inter-annual Variability")+
-#   theme(strip.text = element_text(size=8),
-#         plot.title=element_text(size=12),
-#         plot.background=element_blank(),
-#         plot.margin=unit(c(0,.10,0,0), "npc"))
-# 
-#  ggplot(uvals,
-#         aes(x=ninter,y=nintra,colour=col))+
-#    geom_point(pch=15,size=5,guide="legend")+
-#    scale_colour_identity(name="Low                        Medium                       High",
-#                          labels=uvals$name2,guide="legend")+
-#    guides(col = guide_legend(nrow = 4))
-
 #ggpairs(d1[1:3])
 d3=d2[sample(1:nrow(d2),10000000),]
 
@@ -335,11 +299,10 @@ p_key=
 
 
 
-fcoast <- fortify(map_data("world"))#, plot = FALSE, fill = TRUE)
 
 p_hot_coast=
   p_hot+
-  geom_polygon(data=fcoast,aes(x=long,y=lat,group=group),col="black",fill="transparent",size=.05)
+  geom_polygon(data=gcoast,aes(x=long,y=lat,group=group),col="black",fill="transparent",size=.05)
 
 png("manuscript/figures/Q20_Hotspots3.png",width=3500,height=2000,
     res=600,bg="white")

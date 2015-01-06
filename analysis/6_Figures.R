@@ -3,10 +3,10 @@ source("analysis/setup.R")
 source("analysis/6_LoadData.R")
 
 n=100
-res=1e6
+res=1e7
 greg=list(ylim=c(-60,84),xlim=c(-180,180))
     
-## Figure 1: 2-panel summaries
+## Figure 1: 4-panel summaries
 #- Annual average
 n=100
 colR(n)
@@ -17,7 +17,7 @@ p_mean=  levelplot(cf_mean,col.regions=bgr(1:100,n,br=50.9)$col,cuts=99,at=seq(0
                  colorkey=list(space="left",width=cwidth,height=.5,labels=list(at=c(0, 50, 100)),border=NA),
                  scales=list(draw=F),
                  panel=panel.levelplot.raster,margin=F,maxpixels=res,ylab="",xlab="",useRaster=T,ylim=greg$ylim)+
-    latticeExtra::layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col="black"),under=T)+
+    latticeExtra::layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col=grey(.2)),under=T)+
   latticeExtra::layer(sp.lines(coast,lwd=.5,),under=F)
  p_mean$strip=strip.custom(factor.levels="a. Mean Cloud Frequency (%)")
  p_mean$par.strip.text=list(cex=1)
@@ -36,7 +36,7 @@ p_spatial=levelplot(spatial,margin=F,maxpixels=res,
                     at=c(0,10,20),
                     labels= c(0,10,20))),
 scales=list(draw=F),useRaster=T)+
-  latticeExtra::layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col="black"),under=T)+
+  latticeExtra::layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col=grey(.2)),under=T)+
   latticeExtra::layer(sp.lines(coast,col="black",lwd=.5),under=F)
 p_spatial$strip=strip.custom(factor.levels="c. Spatial Variability (SD)") #  latticeExtra::layer(sp.lines(coast,lwd=.5,),under=F)
 p_spatial$par.strip.text=list(cex=1)
@@ -48,46 +48,45 @@ p_spatial$par.strip.text=list(cex=1)
 c_intra=bgr(log10(seq(1,37,len=n)),n,br=log10(10.59))
 c_intra=bgr(seq(0,40,len=n),n,br=10.59)
 
-p_intra=levelplot(intra,
-                  col.regions=c_intra$col,at=c_intra$at,cuts=n-1,
-                  margin=F,maxpixels=res,ylab="",xlab="",
-#                  zscaleLog=10,
-                  panel=panel.levelplot.raster,ylim=greg$ylim,
-                  colorkey=list(space="right",height=.5,width=cwidth,
-#                                labels=list(at=log10(c(1,5,10,36)),
-#                                            labels=c(1,5,10,36))),
-                                labels=list(at=c(0,20,40),labels=c(0,20,40))),                  
-                  useRaster=T,scales=list(draw=F))+
-  latticeExtra::layer(panel.polygon(x=c(-180,-180,180,180),y=c(-61,86,86,-61),col="black"),under=T)+
-  latticeExtra::layer(sp.lines(coast,col="black",lwd=.5),under=F)
-p_intra$strip=strip.custom(factor.levels="b. Intra-annual Variability (SD)") 
-p_intra$par.strip.text=list(cex=1)
-                  
-#quantile(inter,c(.50,.75,.90,.99,1),na.rm=T)
-#50%    75%    90%    99%   100% 
-#11.39  13.31  16.20  20.61 140.77 
-
-#c_inter=bgr(log10(seq(1,21,len=n)),n,br=log10(11.39))
-c_inter=bgr(seq(0,25,len=n),n,br=11.39)
-
+# p_intra=levelplot(intra,
+#                   col.regions=c_intra$col,at=c_intra$at,cuts=n-1,
+#                   margin=F,maxpixels=res,ylab="",xlab="",
+#                   panel=panel.levelplot.raster,ylim=greg$ylim,
+#                   colorkey=list(space="right",height=.5,width=cwidth,
+# #                                labels=list(at=log10(c(1,5,10,36)),
+# #                                            labels=c(1,5,10,36))),
+#                                 labels=list(at=c(0,20,40),labels=c(0,20,40))),                  
+#                   useRaster=T,scales=list(draw=F))+
+#   latticeExtra::layer(panel.polygon(x=c(-180,-180,180,180),y=c(-61,86,86,-61),col=grey(.2)),under=T)+
+#   latticeExtra::layer(sp.lines(coast,col="black",lwd=.5),under=F)
+# p_intra$strip=strip.custom(factor.levels="b. Intra-annual Variability (SD)") 
+# p_intra$par.strip.text=list(cex=1)
+#                   
+# #quantile(inter,c(.50,.75,.90,.99,1),na.rm=T)
+# #50%    75%    90%    99%   100% 
+# #11.39  13.31  16.20  20.61 140.77 
 # 
-p_inter=levelplot(inter,cuts=n-1,margin=F,maxpixels=res,
-                  col.regions=c_intra$col,at=c_intra$at,
-                  panel=panel.levelplot.raster,ylim=greg$ylim,ylab="",xlab="",#zscaleLog=10,
-                  colorkey=list(title="Cloud Frequency (%)", space="right",height=.5,width=cwidth,
-#                                labels=list(at=log10(c(1,seq(2,8,by=2),10,seq(20,80,by=20),100)),
-#                                            labels=c(1,rep("",4), 10,rep("",4), 100))),useRaster=T,
-#                  labels=list(at=log10(c(1,5,10,21)),
-#                              labels=c(1,5,10,21))),useRaster=T,
-                  labels=list(at=c(0,10,20)),
-                              labels=c(1,10,20)),useRaster=T,
-
-                  scales=list(draw=F))+
-#                  main=textGrob("    d       Inter-annual Variability (SD)", x = 0, hjust = 0,gp=gpar(fontface="bold")))+
-  latticeExtra::layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col="black"),under=T)+
-  latticeExtra::layer(sp.lines(coast,col="black",lwd=.5),under=F)
-p_inter$strip=strip.custom(factor.levels="d. Inter-annual Variability (SD)") #  latticeExtra::layer(sp.lines(coast,lwd=.5,),under=F)
-p_inter$par.strip.text=list(cex=1)
+# #c_inter=bgr(log10(seq(1,21,len=n)),n,br=log10(11.39))
+# c_inter=bgr(seq(0,25,len=n),n,br=11.39)
+# 
+# # 
+# p_inter=levelplot(inter,cuts=n-1,margin=F,maxpixels=res,
+#                   col.regions=c_intra$col,at=c_intra$at,
+#                   panel=panel.levelplot.raster,ylim=greg$ylim,ylab="",xlab="",#zscaleLog=10,
+#                   colorkey=list(title="Cloud Frequency (%)", space="right",height=.5,width=cwidth,
+# #                                labels=list(at=log10(c(1,seq(2,8,by=2),10,seq(20,80,by=20),100)),
+# #                                            labels=c(1,rep("",4), 10,rep("",4), 100))),useRaster=T,
+# #                  labels=list(at=log10(c(1,5,10,21)),
+# #                              labels=c(1,5,10,21))),useRaster=T,
+#                   labels=list(at=c(0,10,20)),
+#                               labels=c(1,10,20)),useRaster=T,
+# 
+#                   scales=list(draw=F))+
+# #                  main=textGrob("    d       Inter-annual Variability (SD)", x = 0, hjust = 0,gp=gpar(fontface="bold")))+
+#   latticeExtra::layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col=grey(.2)),under=T)+
+#   latticeExtra::layer(sp.lines(coast,col="black",lwd=.5),under=F)
+# p_inter$strip=strip.custom(factor.levels="d. Inter-annual Variability (SD)") #  latticeExtra::layer(sp.lines(coast,lwd=.5,),under=F)
+# p_inter$par.strip.text=list(cex=1)
 
 # 
 p_var=levelplot(stack(inter,intra),cuts=n-1,margin=F,maxpixels=res,
@@ -98,15 +97,16 @@ p_var=levelplot(stack(inter,intra),cuts=n-1,margin=F,maxpixels=res,
                                 labels=c(1,20,40)),useRaster=T,
                   
                   scales=list(draw=F),layout=c(1,2))+
-  latticeExtra::layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col="black"),under=T)+
+  latticeExtra::layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col=grey(.2)),under=T)+
   latticeExtra::layer(sp.lines(coast,col="black",lwd=.5),under=F)
 p_var$strip=strip.custom(factor.levels=c("b. Inter-annual Variability (SD)","d. Intra-annual Variability (SD)")) #  latticeExtra::layer(sp.lines(coast,lwd=.5,),under=F)
 
 
-ndifx=.08
-ndify=.07
+ndifx=.06
+ndify=.06
 
-png("manuscript/figures/MeanInter2.png",width=4100,height=2000,res=600,pointsize=42,bg="white")
+#pdf("manuscript/figures/MeanInter2.pdf",width=8,height=4,pointsize=24,bg="transparent")
+png("manuscript/figures/MeanInter2.png",width=8,height=4,units="in",res=1200,pointsize=24,bg="white")
 #trellis.par.set(my.theme)
 print(p_mean,position=c(0,.5-ndify,.5+ndifx,1),more=T)
 #print(p_intra,position=c(.5-ndify,.5-ndifx,1,1),more=T)
@@ -148,14 +148,6 @@ mon=c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec") #
 ladj=65
 lims=c(-80,80)
 
-png(width=1000,height=1000,pointsize=38,file="manuscript/figures/SeasKey_%0d.png")
-### Create the color key
-xyplot(conc~theta,col=col$val[col$exists],data=col[col$exists,],pch=16,cex=1,
-       scales=list(
-         x=list(labels=c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"),
-                at=seq(15,360,30))),
-       xlab="Month",ylab="Concentration (%)")
-dev.off()
 
 ####################################
 ## Seasonality plot
@@ -183,7 +175,7 @@ k1=xyplot(y~x,col=col$val[col$exists],data=col[col$exists,],pch=16,cex=1.2,
 g1=levelplot(cf_visseas,col.regions=cf_visseas@legend@colortable,cuts=length(cf_visseas@legend@colortable),at=0:length(cf_visseas@legend@colortable),
              colorkey=F,panel=panel.levelplot.raster,margin=F,maxpixels=res,ylab="",xlab="",useRaster=T,ylim=c(-60,70),
              asp=1,scales=list(draw=F))+#cex=1,y=list(at=c(-40,0,40))))+
-  latticeExtra::layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col="black"),under=T)+
+  latticeExtra::layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col=grey(.2)),under=T)+
   latticeExtra::layer(sp.polygons(as(regs[["CFR2"]],'SpatialPolygons'),col="red",lwd=1.5),under=F)+
   latticeExtra::layer(sp.polygons(as(regs[["Venezuela2"]],'SpatialPolygons'),col="red",lwd=1.5),under=F)+
   latticeExtra::layer(sp.lines(coast,col="white",lwd=.5),under=F)
@@ -221,6 +213,18 @@ grid.text("b",x=0.42,y=.995,just=c("left","top"),gp=gp)
 grid.text("c",x=0.05,y=.52,just=c("left","top"),gp=gp)
 grid.text("d",x=0.57,y=.52,just=c("left","top"),gp=gp)
 dev.off()
+
+
+## Draw separate figures for key and full map
+pdf("manuscript/figures/SeasonalityMap.pdf",width=16,height=8,pointsize=24,bg="transparent")
+print(g1) #global
+dev.off()
+
+pdf("manuscript/figures/SeasonalityKey.pdf",width=4,height=4,pointsize=48,bg="transparent")
+#png("manuscript/figures/SeasonalityKey.png",width=2000,height=2000,res=1200,pointsize=48,bg="transparent")
+print(k1) #legend
+dev.off()
+
 
 
 ####################################################################
@@ -331,10 +335,10 @@ dev.off()
 
 ##############
 ### validation stations
-v1=xyplot(lat~lon,groups=era, data=st@data,asp=.75,auto.key=F,
-          ylab="Latitude",xlab="Longitude",
+v1=xyplot(lat~lon,groups=era, data=st@data,asp=.6,auto.key=F,
+          ylab="Latitude",xlab="Longitude",ylim=greg$ylim,
           par.settings=list(superpose.symbol =list(cex=.5,pch=16,col=c("black","red"))))+
-  layer(sp.lines(coast,col="black",lwd=1),under=T)
+  latticeExtra::layer(sp.lines(coast,col="black",lwd=1),under=T)
 
 png("manuscript/figures/ValidationStations.png",width=2000,height=1500,res=300,pointsize=47,bg="white")
 trellis.par.set(my.theme)

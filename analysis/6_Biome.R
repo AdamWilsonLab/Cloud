@@ -202,20 +202,20 @@ group_by(bsfl,biome)%.%summarize(area=sum(log(area)))
 paste(levels(bsfl$biome),collapse="','")
 biomebin=matrix(c(
   'Boreal Forests/Taiga',                                    'Other',
-  'Deserts & Xeric Shrublands',                 'Deserts & Xeric Shrublands',    
+  'Deserts & Xeric Shrublands',                 'Deserts &\nXeric Shrublands',    
   'Flooded Grasslands & Savannas',                         'Other',
   'Lake',                                                   'Other',
   'Mangroves',                                              'Other',
-  'Mediterranean Forests, Woodlands & Scrub',  'Mediterranean Forests, Woodlands & Scrub',
-  'Montane Grasslands & Shrublands',          'Montane Grasslands & Shrublands',
+  'Mediterranean Forests, Woodlands & Scrub',  'Mediterranean Forests,\nWoodlands & Scrub',
+  'Montane Grasslands & Shrublands',          'Montane Grasslands &\nShrublands',
   'Rock & Ice',                                             'Other',
-  'Temperate Broadleaf & Mixed Forests',      'Temperate Forests',
-  'Temperate Conifer Forests',           'Temperate Forests',
-  'Temperate Grasslands, Savannas & Shrublands', 'Temperate Grasslands, Savannas & Shrublands',
-  'Tropical & Subtropical Coniferous Forests','Tropical & Subtropical Coniferous and Dry Broadleaf Forests',
-  'Tropical & Subtropical Dry Broadleaf Forests','Tropical & Subtropical Coniferous and Dry Broadleaf Forests',
-  'Tropical & Subtropical Grasslands, Savannas & Shrublands', 'Tropical & Subtropical Grasslands, Savannas & Shrublands',
-  'Tropical & Subtropical Moist Broadleaf Forests', 'Tropical & Subtropical Moist Broadleaf Forests',
+  'Temperate Broadleaf & Mixed Forests',      'Temperate\nForests',
+  'Temperate Conifer Forests',           'Temperate\nForests',
+  'Temperate Grasslands, Savannas & Shrublands', 'Temperate Grasslands,\nSavannas,\n& Shrublands',
+  'Tropical & Subtropical Coniferous Forests','Tropical & Subtropical\nConiferous and\nDry Broadleaf Forests',
+  'Tropical & Subtropical Dry Broadleaf Forests','Tropical & Subtropical\nConiferous and\nDry Broadleaf Forests',
+  'Tropical & Subtropical Grasslands, Savannas & Shrublands', 'Tropical & Subtropical\nGrasslands, Savannas,\n& Shrublands',
+  'Tropical & Subtropical Moist Broadleaf Forests', 'Tropical & Subtropical\nMoist Broadleaf\nForests',
   'Tundra',                                                   'Other'),ncol=2,byrow=T) 
 colnames(biomebin)=c("old","new")
 
@@ -247,8 +247,8 @@ pbiome=
   scale_y_continuous(breaks=seq(0, 100, 50))+
   scale_x_continuous(breaks=c(3,6,9))+
   theme_bw()+
-  theme(strip.text.y = element_text(angle = 0),legend.position=c(1.45,1.05))+
-  theme(strip.text.x = element_text(angle = 90))+
+  theme(strip.text.x = element_text(angle = 0), plot.margin=unit(c(.05,.05,.1,.05),"npc"))+
+  theme(strip.text.y = element_text(angle = 0),legend.position=c(1.05,-.1))+
   ylab("Cloud Frequency (%)")+
   xlab("Month")
 
