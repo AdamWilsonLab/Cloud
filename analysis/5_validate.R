@@ -176,6 +176,8 @@ st$era=as.factor(mtab$era[match(as.character(st$id),rownames(mtab))])
 write.csv(cld,file="data/validation/cld.csv",row.names=F)
 write.csv(cldm,file="data/validation/cldm.csv",row.names=F)
 writeOGR(st,dsn="data/validation/",layer="stations",driver="ESRI Shapefile",overwrite_layer=T)
+
+
 #########################################################################
 cldm=read.csv("data/validation/cldm.csv")
 st=readOGR("data/validation","stations")
@@ -193,7 +195,7 @@ cldm[cldm$cldn<10,c("cld","cldsd")]=NA
 cldm[cldm$cldn_all<20,c("cld_all","cldsd_all")]=NA
 
 ## compute seasonal means
-cldml=melt(cldm,id.vars=c("StaID","lat","lon","lulcc","biome","seas"),measure.vars=c("cld_all","cldsd_all","cldn_all","cld","cldsd","cldn","MCD09_meanb16","MCD09_meanb5","MCD09_sdb16"))
+cldml=melt(cldm,id.vars=c("StaID","lat","lon","lulcc","biome","seas"),measure.vars=c("cld_all","cldsd_all","cldn_all","cld","cldsd","cldn","MCD09_mean","MCD09_sd"))
 clds=dcast(cldml,StaID+lat+lon+lulcc+biome+seas~variable,value.var="value",fun=mean,na.rm=T)
 
 # get residuals of simple linear model
@@ -230,7 +232,7 @@ colnames(t3)[1]="Month/Season"
 vtable=rbind.data.frame(t3,t2,t1)
 
 print(xtable(vtable,digits=2,#caption="Summary of validation data by month and season"),
-"html",format.args=list(big.mark = ",", decimal.mark = "."),include.rownames=F,file="manuscript/validtable.html")
+"html",format.args=list(big.mark = ",", decimal.mark = "."),include.rownames=F,file="manuscript/validtable.html"))
 
 
       cldm %.% group_by(StaID) %.% summarise(
@@ -249,8 +251,8 @@ print(xtable(vtable,digits=2,#caption="Summary of validation data by month and s
 ########################
 ### Temporal stability
 ### Compare two time periods
-lm_all1=lm(cld_all~MCD09_mean,data=cldm)#[!is.na(cldm$cld_all)&cldm$cldn_all>=10,])
-lm_mod=lm(cld~MCD09_mean,data=cldm)#[!is.na(cldm$cld)&cldm$cldn>=10,])
+lm_all1=lm(cld_all~MCD09_mean,data=cldm)
+lm_mod=lm(cld~MCD09_mean,data=cldm)
 
 mods=list("1970-2009"=lm_all1,"2000-2009"=lm_mod)
 
