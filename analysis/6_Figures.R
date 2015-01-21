@@ -45,8 +45,11 @@ p_spatial$par.strip.text=list(cex=1)
 #50%   75%   90%   99%  100% 
 #10.59 15.26 23.11 36.30 98.43 
 
+
 c_intra=bgr(log10(seq(1,37,len=n)),n,br=log10(10.59))
 c_intra=bgr(seq(0,40,len=n),n,br=10.59)
+
+#c_intra=bgr(seq(0,25,len=n),n,br=10.59)
 
 # p_intra=levelplot(intra,
 #                   col.regions=c_intra$col,at=c_intra$at,cuts=n-1,
@@ -87,12 +90,14 @@ c_intra=bgr(seq(0,40,len=n),n,br=10.59)
 #   latticeExtra::layer(sp.lines(coast,col="black",lwd=.5),under=F)
 # p_inter$strip=strip.custom(factor.levels="d. Inter-annual Variability (SD)") #  latticeExtra::layer(sp.lines(coast,lwd=.5,),under=F)
 # p_inter$par.strip.text=list(cex=1)
-
+svar=stack(inter,intra)
+NAvalue(svar)=255
 # 
-p_var=levelplot(stack(inter,intra),cuts=n-1,margin=F,maxpixels=res,
+p_var=levelplot(svar,cuts=n-1,margin=F,maxpixels=res,
                   col.regions=c_intra$col,at=c_intra$at,
                   panel=panel.levelplot.raster,ylim=greg$ylim,ylab="",xlab="",#zscaleLog=10,
-                  colorkey=list(title="Cloud Frequency (%)", space="right",height=.5,width=cwidth,
+                  colorkey=list(title="Cloud Frequency (%)", space="right",
+                                height=.5,width=cwidth,
                                 labels=list(at=c(0,20,40)),
                                 labels=c(1,20,40)),useRaster=T,
                   

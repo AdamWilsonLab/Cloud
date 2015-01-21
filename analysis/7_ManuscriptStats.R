@@ -18,7 +18,18 @@ format(as.numeric(nrow(d)),scientific=2,digits=2)
 
 
 ## number of averages
-r=raster("data/MCD09_deriv/MCD09_meanannual_land.tif")
-options( scipen = 10 )
-x=as.numeric(ncell(r)*12*(2014-2000))
-format(x, scientific=T)
+r=raster("data/MCD09_deriv/meanannual.tif")
+NAvalue(r)=32767
+
+## adjust formatting to get scientific format
+options(scipen =-1000)
+options(digits=2)
+
+## nubmer of non-null cells
+ncell=length(na.omit(values(r)))
+## number of observations (twice daily - terra and aqua)
+ndays=as.integer(as.Date("30-3-2014")-as.Date("2-1-2000"))*2
+## print in sci format
+signif(ncell)
+signif(ndays,3)
+exp(log(ncell)+log(ndays))

@@ -73,10 +73,10 @@ ereg@xmin=-81.4
 ## get species data
 require(redshift)
 conn <- redshift.connect("jdbc:postgresql://mol-points.c98tkbi1cfwj.us-east-1.redshift.amazonaws.com:5439/mol?tcpKeepAlive=true",username="mol",password="Apu5apu5")
-
 t1=system.time(spd_all<<-getebird(con=conn,sptaxon=sptaxon,nulltaxon=NULL,region=reg))
 writeLines(paste("eBird extraction for",sp2," took ",round(t1[[3]]/60,2),"seconds and returned",nrow(spd_all),"records"))
 
+write.csv(spd_all,paste0(outputdir,sp2,"_points.csv"))
 ## trim observations by observer effort, distance travelled, etc.
 cdur=4*60
 cdis=5
@@ -121,6 +121,9 @@ write.csv(tcor,file=paste0(outputdir,sp2,"_covariatecorrelation.csv"),row.names=
 ##  Create single stack
 env=stack(tenv[[c("prec_1","prec_7","bio_15","bio_1","alt")]],cf[[c("CLDJAN","CLDJUL","CLDSEAS")]])
 names(env)=c("PPTJAN","PPTJUL","PPTSEAS","MAT","ALT","CLDJAN","CLDJUL","CLDSEAS")
+
+
+#writeRaster(env,paste0(outputdir,sp2,"env.tif"))
 
 ## define metadata that will be embeded in output object
 meta=list(institution="Map of Life, Yale University, New Haven, CT",

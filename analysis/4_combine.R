@@ -177,6 +177,7 @@ Rsd=function(x) calc(x,function(x) {
   sd(x,na.rm=T)
 })
 
+
 Rmean=function(x) calc(x,function(x) {
   mean(x,na.rm=T)
 })
@@ -194,7 +195,7 @@ Rlmean=function(x) calc(x,function(x) {
 
 dintra=clusterR(dmean,Rsd,m=4,file="data/MCD09_deriv/intra_uncompressed.tif",
                 #options=c("COMPRESS=LZW","PREDICTOR=2"),
-                overwrite=T,dataType='INT2U',NAflag=65535)
+                overwrite=T,datatype='INT2U',NAflag=65535)
 system(paste("gdal_translate -ot UInt16 -co COMPRESS=DEFLATE -co ZLEVEL=9 -co BIGTIFF=YES -co COMPRESS=LZW -co PREDICTOR=2",
 " data/MCD09_deriv/intra_uncompressed.tif data/MCD09_deriv/intra.tif"))
 file.remove("data/MCD09_deriv/intra_uncompressed.tif")
@@ -202,7 +203,7 @@ file.remove("data/MCD09_deriv/intra_uncompressed.tif")
 
 dinter=clusterR(dsd,Rmean,m=4,file="data/MCD09_deriv/inter_uncompressed.tif",
                 #options=c("COMPRESS=LZW","PREDICTOR=2"),
-                overwrite=T,dataType='INT2U',NAflag=65535)
+                overwrite=T,datatype='INT2U',NAflag=65535)
 system(paste("gdal_translate -ot UInt16 -co COMPRESS=DEFLATE -co ZLEVEL=9 -co BIGTIFF=YES -co COMPRESS=LZW -co PREDICTOR=2",
        " data/MCD09_deriv/inter_uncompressed.tif data/MCD09_deriv/inter.tif"))
 file.remove("data/MCD09_deriv/inter_uncompressed.tif")
@@ -218,19 +219,53 @@ file.remove("data/MCD09_deriv/intra_log_uncompressed.tif")
 
 dlinter=clusterR(dsd,Rlmean,m=4,file="data/MCD09_deriv/inter_log_uncompressed.tif",
                 #options=c("COMPRESS=LZW","PREDICTOR=2"),
-                overwrite=T,dataType='INT2U',NAflag=65535)
+                overwrite=T,datatype='INT2U',NAflag=65535)
 system(paste("gdal_translate -ot UInt16 -co COMPRESS=DEFLATE -co ZLEVEL=9 -co BIGTIFF=YES -co COMPRESS=LZW -co PREDICTOR=2",
              " data/MCD09_deriv/inter_log_uncompressed.tif data/MCD09_deriv/inter_log.tif"))
 file.remove("data/MCD09_deriv/inter_log_uncompressed.tif")
 
 
+
 ## Overall annual mean
 dmeanannual=clusterR(dmean,Rmean,m=4,file="data/MCD09_deriv/meanannual_uncompressed.tif",
 #                     options=c("COMPRESS=LZW","PREDICTOR=2"),
-                     overwrite=T,dataType='INT2U',NAflag=65535)
+                     overwrite=T,datatype='INT2U',NAflag=65535)
 system(paste("gdal_translate -ot UInt16 -co COMPRESS=DEFLATE -co ZLEVEL=9 -co BIGTIFF=YES -co COMPRESS=LZW -co PREDICTOR=2",
              " data/MCD09_deriv/meanannual_uncompressed.tif data/MCD09_deriv/meanannual.tif"))
 file.remove("data/MCD09_deriv/meanannual_uncompressed.tif")
+
+
+# ## Calculate coefficient of variation (sd/mean)
+# fCV=function(mean,sd){return(1000*sd/mean)}
+# ## interannual CV
+# rCV=stack(c("data/MCD09_deriv/meanannual.tif","data/MCD09_deriv/inter.tif"))
+# 
+# dinterCV=overlay(rCV,fun=fCV)
+# writeRaster(dinterCV,file="data/MCD09_deriv/inter_CV_uncompressed.tif",
+# #                options=c("COMPRESS=LZW","PREDICTOR=2"),format="GTiff",
+#                  overwrite=T,datatype='INT2U',NAflag=65535)
+#   
+# ## intra-annual CV
+# rCV2=stack(c("data/MCD09_deriv/meanannual.tif","data/MCD09_deriv/intra.tif"))
+# 
+# dintraCV=overlay(rCV2,fun=fCV)
+# writeRaster(dintraCV,file="data/MCD09_deriv/intra_CV.tif",
+# #                 options=c("COMPRESS=LZW","PREDICTOR=2"),format="GTiff",
+#                  overwrite=T,datatype='INT2U',NAflag=65535)
+# 
+# varCV=stack("data/MCD09_deriv/inter_CV_uncompressed.tif","data/MCD09_deriv/intra_CV.tif")
+# names(varCV)=c("Interannual CV","Intraannual CV")
+# CVscale=scale_fill_gradientn(colours=c('darkblue','blue','grey','red','darkred'),na.value="transparent")
+# gain(varCV)=.001
+# 
+# png("output/CVplot.png",width=30,height=30,pointsize=40,res=300,unit="cm")
+# gplot(varCV,maxpixels=1e5)+geom_raster(aes(fill=value))+
+#   facet_wrap(~ variable,nrow=2) +
+#   CVscale+
+#   coord_equal()
+# dev.off()  
+
+
 
 #file.copy("data/MCD09_deriv/meanannual.tif","data/MCD09_EarthEngineUpload/meanannual.tif")
 #file.copy("data/MCD09_deriv/inter.tif","data/MCD09_EarthEngineUpload/inter.tif")
