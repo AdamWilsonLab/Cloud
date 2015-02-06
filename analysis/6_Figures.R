@@ -231,6 +231,14 @@ print(k1) #legend
 dev.off()
 
 
+## add key for earth engine legend
+png("manuscript/figures/SeasonalityKey_little.png",width=200,height=200, res=70,bg="white")
+print(k1)
+dev.off()
+
+
+
+
 
 ####################################################################
 ### Regional Comparisons

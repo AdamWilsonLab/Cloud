@@ -132,8 +132,8 @@ regs=list(
   CFR2=extent(c(15,33,-35,-27.8)),
   Madagascar=extent(c(46,52,-17,-12)),
   Borneo=extent(c(107.5, 119.0918,-4.0835, 7.05)),
-  EastAfrica=extent(c( 28.613204,40.786056, -11.103410, 3.304579))
-  
+  EastAfrica=extent(c( 27,40.786056, -11.103410, 3.304579))
+
 )
 
 fratio=function(ext) abs(ext@xmax-ext@xmin)/abs(ext@ymax-ext@ymin)
