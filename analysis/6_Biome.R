@@ -1,5 +1,4 @@
 ### Produce summary of cloud frequency by biome
-
 source("analysis/setup.R")
 
 
@@ -123,32 +122,6 @@ bsfl$value=as.numeric(sub("v","",as.character(bsfl$variable)))
 ## convert area to percentage
 bsfl$ncount=bsfl$count/bsfl$n
 
-## filter to get monthly timeseries for plotting
-bsm=bs[grep("MCD09",bs$product),]
-bsm$monthname=factor(month.name[as.numeric(as.character(sub("MCD09_mean_","",bsm$product)))],ordered=T,levels=month.name)
-
-#biomepl=melt(biomep@data,id.vars=c("id","code","biome","realm"))
-#colnames(biomepl)[grep("variable",colnames(biomepl))]="month"
-#biomepl$value[biomepl$value<0]=NA
-
-### plot by month
-p1=useOuterStrips(xyplot(I(mean/100)~monthname|realm+biome,data=bsm,
-                 panel=function(x,y,subscripts = subscripts){
-                td=bsm[subscripts,]
-                panel.polygon(c(td$monthname,rev(td$monthname)),c(td$meanpsd/100,rev(td$meanmsd/100)),col=grey(0.4),border=NA)
-                panel.xyplot(td$monthname,td$mean/100,col="black",type="l",lwd=1,subscripts=subscripts)
-    },scales=list(y=list(at=c(0,100),lim=c(-20,120),cex=.75,alternating=2,tck=c(0,1)),
-                  x=list(at=c(1,7,12),rot=90,alternating=1)),
-    ylab="Biome",xlab.top="Geographic Realm",ylab.right="MODCF (%)", xlab="Month"),
-    strip=strip.custom(par.strip.text = list(cex = .7)),strip.left=strip.custom(horizontal=TRUE,par.strip.text = list(cex = .75)))
-p1$par.settings$layout.widths$strip.left[1]=13
-p1$par.strip.text$lines=.65
-print(p1)
-
-png("manuscript/figures/Biome_Figures.png",width=5500,height=4000,res=600,pointsize=36,bg="white")
-trellis.par.set(my.theme)
-print(p1)
-dev.off()
 
 ####
 ## Export summary table
@@ -162,8 +135,9 @@ dev.off()
 levels(bs$product)
 
 bs%.%filter(product=="meanannual")%.% arrange(desc(mean)) %.%head(5)
+bs%.%filter(product=="meanannual")%.% arrange(mean) %.%head(5)
 
-bs%.%filter(product=="intra")%.% arrange(desc(mean)) %.%head(5)
+bs%.%filter(product=="intra")%.% arrange(desc(mean)) %.%head(15)
 bs%.%filter(product=="intra")%.% arrange(mean) %.%head(5)
 
 bs%.%filter(product=="inter")%.% arrange(desc(mean)) %.%head(5)

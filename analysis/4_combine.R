@@ -161,8 +161,6 @@ foreach(f=c(f3,f3sd))%dopar% {
 
 dmean=stack(as.list(f3))
 NAvalue(dmean)=65535
-#dmean=crop(dmean,regs[["Venezuela"]])
-#gain(dmean)=0.01
 #dmean=setZ(dmean,z=as.Date(paste0("2014-",1:12,"-15"))-as.Date("2000-01-01"))
 
 dsd=stack(as.list(f3sd))
@@ -185,11 +183,11 @@ Rmean=function(x) calc(x,function(x) {
 ## Function to calculate standard deviation of the log-transformed variables and round them to nearest integer
 Rlsd=function(x) calc(x,function(x) {
   if(all(is.na(x))) return(NA)
-  sd(log(x),na.rm=T)*100
+  sd(log(x/10000),na.rm=T)*100
 })
 
 Rlmean=function(x) calc(x,function(x) {
-  mean(log(x),na.rm=T)*100
+  mean(log(x/1000),na.rm=T)*100
 })
 
 
@@ -209,7 +207,7 @@ system(paste("gdal_translate -ot UInt16 -co COMPRESS=DEFLATE -co ZLEVEL=9 -co BI
 file.remove("data/MCD09_deriv/inter_uncompressed.tif")
 
 
-### calculate sd(log(x))
+### calculate sd(log(mean))
 dlintra=clusterR(dmean,Rlsd,m=4,file="data/MCD09_deriv/intra_log_uncompressed.tif",
                 #options=c("COMPRESS=LZW","PREDICTOR=2"),
                 overwrite=T,dataType='INT2U',NAflag=65535)
@@ -253,17 +251,19 @@ file.remove("data/MCD09_deriv/meanannual_uncompressed.tif")
 # #                 options=c("COMPRESS=LZW","PREDICTOR=2"),format="GTiff",
 #                  overwrite=T,datatype='INT2U',NAflag=65535)
 # 
-# varCV=stack("data/MCD09_deriv/inter_CV_uncompressed.tif","data/MCD09_deriv/intra_CV.tif")
-# names(varCV)=c("Interannual CV","Intraannual CV")
-# CVscale=scale_fill_gradientn(colours=c('darkblue','blue','grey','red','darkred'),na.value="transparent")
-# gain(varCV)=.001
+ varCV=stack("data/MCD09_deriv/intra.tif","data/MCD09_deriv/intra_log.tif","data/MCD09_deriv/intra_CV.tif")
+ names(varCV)=c("intra","intra_log","intra_CV")
+ CVscale=scale_fill_gradientn(colours=c('darkblue','blue','grey','red','darkred'),na.value="transparent")
+ gain(varCV)=.001
 # 
-# png("output/CVplot.png",width=30,height=30,pointsize=40,res=300,unit="cm")
-# gplot(varCV,maxpixels=1e5)+geom_raster(aes(fill=value))+
-#   facet_wrap(~ variable,nrow=2) +
-#   CVscale+
-#   coord_equal()
-# dev.off()  
+ png("output/CVplot_%0d.png",width=30,height=30,pointsize=40,res=300,unit="cm")
+ gplot(varCV,maxpixels=1e5)+geom_raster(aes(fill=value))+
+   facet_wrap(~ variable,nrow=3) +
+   CVscale+
+   coord_equal()
+#plot(varCV)
+splom(varCV)
+ dev.off()  
 
 
 
@@ -289,7 +289,7 @@ stheta=clusterR(dmean,fun=fseastheta,export="seastheta",overwrite=T,filename="da
 seas=stack("data/MCD09_deriv/seasconc.tif","data/MCD09_deriv/seastheta.tif")
 gain(seas)=.1
 names(seas)=c("conc","theta")
-
+NAvalue(seas)=65535
 
 ## extract unique values from seas to develop color table
 ## takes ~30 minutes
