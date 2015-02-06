@@ -20,6 +20,8 @@ library(knitr)
 require(knitcitations)
 ## read in global coasts for nice plotting
 library(maptools)
+library(mapdata)
+
 library(rgdal)
 library(coda)
 #library(spgrass6)
@@ -104,7 +106,9 @@ coast=readOGR("data/gshhs/","coast")
 fcoast=fortify(coast)
 
 ## coastline for ggplot
-gcoast <- fortify(map_data("world"))#, plot = FALSE, fill = TRUE)
+gcoast <- fortify(map_data('world'))#, plot = FALSE, fill = TRUE)
+gcoast2 <- map_data('worldHires')#, plot = FALSE, fill = TRUE)
+
 
 ### 
 knitsDoc <- function(name) {
@@ -126,7 +130,10 @@ regs=list(
   Indonesia=extent(c(93.2,140,-14,12)),
   CFR=extent(c(17.5,29,-35,-29)),
   CFR2=extent(c(15,33,-35,-27.8)),
-  Madagascar=extent(c(46,52,-17,-12))
+  Madagascar=extent(c(46,52,-17,-12)),
+  Borneo=extent(c(107.5, 119.0918,-4.0835, 7.05)),
+  EastAfrica=extent(c( 28.613204,40.786056, -11.103410, 3.304579))
+  
 )
 
 fratio=function(ext) abs(ext@xmax-ext@xmin)/abs(ext@ymax-ext@ymin)

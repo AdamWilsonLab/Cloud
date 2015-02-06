@@ -372,6 +372,16 @@ print(pbox)
 dev.off()
 
 
+## Range size statistics
+rs=pred%.%
+  group_by(species,modelname)%.%
+  summarise(area=sum(pred)) %>%
+  spread(key="modelname", value=area) %>%
+  mutate(pchange=(Precipitation-Cloud)/Precipitation)
+
+rs
+
+
 
 ######################################
 ### Old stuff below here
