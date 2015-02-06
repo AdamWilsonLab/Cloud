@@ -358,7 +358,7 @@ print(p_hot_reg,vp=viewport(x=0.08,y=.29,width=0.2,height=.35,just=c("left","bot
 pushViewport(viewport())
 tgp=gpar(cex = 1, col = "black")
 grid.text(label = "a" ,x = 0.08,y = .98,gp = tgp)
-grid.text(label = "b" ,x = 0.09,y = .59,gp = tgp)
+grid.text(label = "b" ,x = 0.09,y = .61,gp = tgp)
 grid.text(label = "c" ,x = 0.09,y = .33,gp = tgp)
 grid.text(label = "d" ,x = 0.39,y = .33,gp = tgp)
 grid.text(label = "e" ,x = 0.73,y = .33,gp = tgp)
@@ -369,10 +369,11 @@ dev.off()
 ggplot(filter(uvals,include)
 
        
-d4=d2[sample(1:nrow(d2),1000),]
-       ggplot(d4,aes(x=inter/100,y=intra/100))+
+d4=d2[sample(1:nrow(d2),1000000),]
+
+       p_littlekey=       ggplot(d4,aes(x=inter/100,y=intra/100))+
          geom_point(aes(colour=uvals$col[match(class,uvals$class)],
-                        order = uvals$mean[match(class,uvals$class)]),size=.3)+
+                        order = uvals$mean[match(class,uvals$class)]),size=.8)+
          scale_colour_identity() +
          scale_y_continuous(breaks=c(0,20,40),limits=c(0,40))+
          scale_x_continuous(breaks=c(0,15,30))+
@@ -388,6 +389,9 @@ d4=d2[sample(1:nrow(d2),1000),]
                plot.background=element_rect(fill="white"),
                plot.margin=unit(c(0,0,0,0), "npc"))
        
+png("manuscript/figures/HotspotKey.png",width=250,height=250, res=150,bg="white")
+  print(p_littlekey)
+       dev.off()
        
 
 ######################
