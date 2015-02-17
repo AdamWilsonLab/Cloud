@@ -180,16 +180,6 @@ Rmean=function(x) calc(x,function(x) {
   mean(x,na.rm=T)
 })
 
-## Function to calculate standard deviation of the log-transformed variables and round them to nearest integer
-Rlsd=function(x) calc(x,function(x) {
-  if(all(is.na(x))) return(NA)
-  sd(log(x/10000),na.rm=T)*100
-})
-
-Rlmean=function(x) calc(x,function(x) {
-  mean(log(x/1000),na.rm=T)*100
-})
-
 
 dintra=clusterR(dmean,Rsd,m=4,file="data/MCD09_deriv/intra_uncompressed.tif",
                 #options=c("COMPRESS=LZW","PREDICTOR=2"),
@@ -207,23 +197,6 @@ system(paste("gdal_translate -ot UInt16 -co COMPRESS=DEFLATE -co ZLEVEL=9 -co BI
 file.remove("data/MCD09_deriv/inter_uncompressed.tif")
 
 
-### calculate sd(log(mean))
-dlintra=clusterR(dmean,Rlsd,m=4,file="data/MCD09_deriv/intra_log_uncompressed.tif",
-                #options=c("COMPRESS=LZW","PREDICTOR=2"),
-                overwrite=T,dataType='INT2U',NAflag=65535)
-system(paste("gdal_translate -ot UInt16 -co COMPRESS=DEFLATE -co ZLEVEL=9 -co BIGTIFF=YES -co COMPRESS=LZW -co PREDICTOR=2",
-       " data/MCD09_deriv/intra_log_uncompressed.tif data/MCD09_deriv/intra_log.tif"))
-file.remove("data/MCD09_deriv/intra_log_uncompressed.tif")
-
-dlinter=clusterR(dsd,Rlmean,m=4,file="data/MCD09_deriv/inter_log_uncompressed.tif",
-                #options=c("COMPRESS=LZW","PREDICTOR=2"),
-                overwrite=T,datatype='INT2U',NAflag=65535)
-system(paste("gdal_translate -ot UInt16 -co COMPRESS=DEFLATE -co ZLEVEL=9 -co BIGTIFF=YES -co COMPRESS=LZW -co PREDICTOR=2",
-             " data/MCD09_deriv/inter_log_uncompressed.tif data/MCD09_deriv/inter_log.tif"))
-file.remove("data/MCD09_deriv/inter_log_uncompressed.tif")
-
-
-
 ## Overall annual mean
 dmeanannual=clusterR(dmean,Rmean,m=4,file="data/MCD09_deriv/meanannual_uncompressed.tif",
 #                     options=c("COMPRESS=LZW","PREDICTOR=2"),
@@ -231,40 +204,6 @@ dmeanannual=clusterR(dmean,Rmean,m=4,file="data/MCD09_deriv/meanannual_uncompres
 system(paste("gdal_translate -ot UInt16 -co COMPRESS=DEFLATE -co ZLEVEL=9 -co BIGTIFF=YES -co COMPRESS=LZW -co PREDICTOR=2",
              " data/MCD09_deriv/meanannual_uncompressed.tif data/MCD09_deriv/meanannual.tif"))
 file.remove("data/MCD09_deriv/meanannual_uncompressed.tif")
-
-
-# ## Calculate coefficient of variation (sd/mean)
-# fCV=function(mean,sd){return(1000*sd/mean)}
-# ## interannual CV
-# rCV=stack(c("data/MCD09_deriv/meanannual.tif","data/MCD09_deriv/inter.tif"))
-# 
-# dinterCV=overlay(rCV,fun=fCV)
-# writeRaster(dinterCV,file="data/MCD09_deriv/inter_CV_uncompressed.tif",
-# #                options=c("COMPRESS=LZW","PREDICTOR=2"),format="GTiff",
-#                  overwrite=T,datatype='INT2U',NAflag=65535)
-#   
-# ## intra-annual CV
-# rCV2=stack(c("data/MCD09_deriv/meanannual.tif","data/MCD09_deriv/intra.tif"))
-# 
-# dintraCV=overlay(rCV2,fun=fCV)
-# writeRaster(dintraCV,file="data/MCD09_deriv/intra_CV.tif",
-# #                 options=c("COMPRESS=LZW","PREDICTOR=2"),format="GTiff",
-#                  overwrite=T,datatype='INT2U',NAflag=65535)
-# 
- varCV=stack("data/MCD09_deriv/intra.tif","data/MCD09_deriv/intra_log.tif","data/MCD09_deriv/intra_CV.tif")
- names(varCV)=c("intra","intra_log","intra_CV")
- CVscale=scale_fill_gradientn(colours=c('darkblue','blue','grey','red','darkred'),na.value="transparent")
- gain(varCV)=.001
-# 
- png("output/CVplot_%0d.png",width=30,height=30,pointsize=40,res=300,unit="cm")
- gplot(varCV,maxpixels=1e5)+geom_raster(aes(fill=value))+
-   facet_wrap(~ variable,nrow=3) +
-   CVscale+
-   coord_equal()
-#plot(varCV)
-splom(varCV)
- dev.off()  
-
 
 
 #file.copy("data/MCD09_deriv/meanannual.tif","data/MCD09_EarthEngineUpload/meanannual.tif")
@@ -384,11 +323,19 @@ system(paste("gdal_translate -a_nodata 255 -expand rgba -co COMPRESS=LZW -co PRE
 
 #file.copy("data/MCD09_deriv/seas_rgb.tif","data/MCD09_EarthEngineUpload/seas_rgb.tif")
 
+
+
+
 ################################################################################
 ################################################################################
 ################################################################################
 ################################################################################
 ################################################################################
+################################################################################
+################################################################################
+################################################################################
+################################################################################
+
 
 #### old junk below here...
 ################################################################################

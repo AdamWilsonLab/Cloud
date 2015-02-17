@@ -49,47 +49,6 @@ p_spatial$par.strip.text=list(cex=1)
 c_intra=bgr(log10(seq(1,37,len=n)),n,br=log10(10.59))
 c_intra=bgr(seq(0,40,len=n),n,br=10.59)
 
-#c_intra=bgr(seq(0,25,len=n),n,br=10.59)
-
-# p_intra=levelplot(intra,
-#                   col.regions=c_intra$col,at=c_intra$at,cuts=n-1,
-#                   margin=F,maxpixels=res,ylab="",xlab="",
-#                   panel=panel.levelplot.raster,ylim=greg$ylim,
-#                   colorkey=list(space="right",height=.5,width=cwidth,
-# #                                labels=list(at=log10(c(1,5,10,36)),
-# #                                            labels=c(1,5,10,36))),
-#                                 labels=list(at=c(0,20,40),labels=c(0,20,40))),                  
-#                   useRaster=T,scales=list(draw=F))+
-#   latticeExtra::layer(panel.polygon(x=c(-180,-180,180,180),y=c(-61,86,86,-61),col=grey(.2)),under=T)+
-#   latticeExtra::layer(sp.lines(coast,col="black",lwd=.5),under=F)
-# p_intra$strip=strip.custom(factor.levels="b. Intra-annual Variability (SD)") 
-# p_intra$par.strip.text=list(cex=1)
-#                   
-# #quantile(inter,c(.50,.75,.90,.99,1),na.rm=T)
-# #50%    75%    90%    99%   100% 
-# #11.39  13.31  16.20  20.61 140.77 
-# 
-# #c_inter=bgr(log10(seq(1,21,len=n)),n,br=log10(11.39))
-# c_inter=bgr(seq(0,25,len=n),n,br=11.39)
-# 
-# # 
-# p_inter=levelplot(inter,cuts=n-1,margin=F,maxpixels=res,
-#                   col.regions=c_intra$col,at=c_intra$at,
-#                   panel=panel.levelplot.raster,ylim=greg$ylim,ylab="",xlab="",#zscaleLog=10,
-#                   colorkey=list(title="Cloud Frequency (%)", space="right",height=.5,width=cwidth,
-# #                                labels=list(at=log10(c(1,seq(2,8,by=2),10,seq(20,80,by=20),100)),
-# #                                            labels=c(1,rep("",4), 10,rep("",4), 100))),useRaster=T,
-# #                  labels=list(at=log10(c(1,5,10,21)),
-# #                              labels=c(1,5,10,21))),useRaster=T,
-#                   labels=list(at=c(0,10,20)),
-#                               labels=c(1,10,20)),useRaster=T,
-# 
-#                   scales=list(draw=F))+
-# #                  main=textGrob("    d       Inter-annual Variability (SD)", x = 0, hjust = 0,gp=gpar(fontface="bold")))+
-#   latticeExtra::layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col=grey(.2)),under=T)+
-#   latticeExtra::layer(sp.lines(coast,col="black",lwd=.5),under=F)
-# p_inter$strip=strip.custom(factor.levels="d. Inter-annual Variability (SD)") #  latticeExtra::layer(sp.lines(coast,lwd=.5,),under=F)
-# p_inter$par.strip.text=list(cex=1)
 svar=stack(inter,intra)
 NAvalue(svar)=255
 # 
@@ -166,10 +125,6 @@ k1=xyplot(y~x,col=col$val[col$exists],data=col[col$exists,],pch=16,cex=1.2,
   latticeExtra::layer(panel.polygon(pCirc(r=40,n=100),border="grey"))+
   latticeExtra::layer(panel.polygon(pCirc(r=60,n=100),border="grey"))+
   latticeExtra::layer(panel.segments(0,0,60*cos(mangle-(15*pi/180)),60*sin(mangle-(15*pi/180)),col="grey"))+ #draw angles
-  #latticeExtra::layer(panel.text(x=ladj*cos(mangle[lmons]),y=ladj*sin(mangle[lmons]),mon[lmons],
-  #                               pos=4,cex=1,offset=0,srt=(mangle[lmons])*180/pi))+ #add left months))
-  #latticeExtra::layer(panel.text(x=ladj*cos(mangle[rmons]),y=ladj*sin(mangle[rmons]),mon[rmons],
-  #                               pos=2,cex=1,offset=0,srt=((mangle[rmons])*180/pi)-180))+ # add right months
   latticeExtra::layer(panel.text(x=ladj*cos(mangle[lmons[-1]]),y=ladj*sin(mangle[lmons[-1]]),mon[lmons[-1]],
                                  pos=4,cex=1,offset=0,srt=(mangle[lmons[-1]])*180/pi))+ #add left months))
   latticeExtra::layer(panel.text(x=ladj*cos(mangle[rmons[c(1,2,6,7)]]),y=ladj*sin(mangle[rmons[c(1,2,6,7)]]),mon[rmons[c(1,2,6,7)]],
@@ -230,10 +185,51 @@ pdf("manuscript/figures/SeasonalityKey.pdf",width=4,height=4,pointsize=48,bg="tr
 print(k1) #legend
 dev.off()
 
-
-## add key for earth engine legend
+#########################################
+## add keys for earth engine legend
 png("manuscript/figures/SeasonalityKey_little.png",width=200,height=200, res=70,bg="white")
 print(k1)
+dev.off()
+
+
+
+# define palettes
+palette_blues=c("#08306b","#0d57a1","#2878b8","#4997c9","#72b2d7","#a2cbe2","#c7dcef","#deebf7","#f7fbff")
+palette_bgr=c("#0000ff","#00ff00","#ff0000")
+palette_spatial=c("#ffffff","#0000ff","#00ff00","#ff0000","#ff0000")
+
+getbar=function(range=c(0,10000),palette=palette_blues,gain=0.01,name=NULL){
+  df=data.frame(x=seq(range[1],range[2])*gain,y=1)
+  p1=ggplot(df,aes(x=x,y=y,fill=palette(df$x))) + 
+    scale_fill_gradientn( colours=palette,guide=guide_colourbar(title=name) )+
+    geom_tile(aes(fill=x))
+  
+    tmp <- ggplot_gtable(ggplot_build(p1)) 
+    leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box") 
+    legend <- tmp$grobs[[leg]] 
+    return(legend)
+} 
+
+for(m in c("MeanAnnual",month.name)){
+  png(paste0("manuscript/figures/",m,".png"),width=100,height=200, res=70,bg="white")
+  leg=getbar(range=c(0,10000),palette=palette_blues,gain=0.01,name="Cloud\nFrequency\n(%)")
+  grid.draw(leg) 
+  dev.off()
+}
+
+png("manuscript/figures/SpatialSD_100km.png",width=100,height=200, res=70,bg="white")
+leg=getbar(range=c(0,2000),palette=palette_spatial,gain=0.01,name="Spatial SD\nCloud\nFrequency")
+grid.draw(leg) 
+dev.off()
+
+png("manuscript/figures/Inter-AnnualSD.png",width=100,height=200, res=70,bg="white")
+leg=getbar(range=c(0,1500),palette=palette_bgr,gain=0.01,name="Inter-Annual\nSD")
+grid.draw(leg) 
+dev.off()
+
+png("manuscript/figures/Intra-AnnualSD.png",width=100,height=200, res=70,bg="white")
+leg=getbar(range=c(0,2500),palette=palette_bgr,gain=0.01,name="Intra-Annual\nSD")
+grid.draw(leg) 
 dev.off()
 
 
@@ -348,15 +344,16 @@ dev.off()
 
 ##############
 ### validation stations
-v1=xyplot(lat~lon,groups=era, data=st@data,asp=.6,auto.key=F,
+v1=xyplot(lat~lon,groups=era, data=st@data,asp=0.5,auto.key=F,
           ylab="Latitude",xlab="Longitude",ylim=greg$ylim,
-          par.settings=list(superpose.symbol =list(cex=.5,pch=16,col=c("black","red"))))+
-  latticeExtra::layer(sp.lines(coast,col="black",lwd=1),under=T)
+          par.settings=list(superpose.symbol =list(cex=.25,pch=16,col=c("black","red"))))+
+  latticeExtra::layer(sp.lines(coast,col="grey",lwd=1),under=T)
 
-png("manuscript/figures/ValidationStations.png",width=2000,height=1500,res=300,pointsize=47,bg="white")
+png("manuscript/figures/ValidationStations2.png",width=2000,height=1000,res=300,pointsize=47,bg="white")
 trellis.par.set(my.theme)
 print(v1)
 dev.off()
+
 
 ##########################
 ## Sahara orbital correction
