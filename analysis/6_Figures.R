@@ -3,7 +3,7 @@ source("analysis/setup.R")
 source("analysis/6_LoadData.R")
 
 n=100
-res=1e7
+res=1e5
 greg=list(ylim=c(-60,84),xlim=c(-180,180))
     
 ## Figure 1: 4-panel summaries
@@ -141,27 +141,36 @@ g1=levelplot(cf_visseas,col.regions=cf_visseas@legend@colortable,cuts=length(cf_
   latticeExtra::layer(sp.lines(coast,col="white",lwd=.5),under=F)
 
 ## regional plots
+biome=readOGR("/mnt/data/jetzlab/Data/environ/global/teow/official/","wwf_terr_ecos")
+#readOGR("data/src/teow/","biomes")
+
 r_cfr=crop(cf_visseas,regs[["CFR2"]],datatype="INT2U")
+b_cfr=crop(biome,regs[["CFR2"]])
+
 r1=levelplot(r_cfr,col.regions=cf_visseas@legend@colortable,
              cuts=length(cf_visseas@legend@colortable),
              at=0:length(cf_visseas@legend@colortable),
              colorkey=F,panel=panel.levelplot.raster,margin=F,
              maxpixels=res,ylab="",xlab="",useRaster=T,asp=1,
              scales=list(cex=1,y=list(at=c(-34,-30,-26))))+
+  latticeExtra::layer(sp.polygons(b_cfr,fill="transparent",col="red",lwd=1),under=F)+
   latticeExtra::layer(sp.lines(coast,col="white",lwd=.5),under=F)
 
 r_ven=crop(cf_visseas,regs[["Venezuela2"]],datatype="INT2U")
+b_ven=crop(biome,regs[["Venezuela2"]])
+
 r2=levelplot(r_ven,col.regions=cf_visseas@legend@colortable,
              cuts=length(cf_visseas@legend@colortable),
              at=0:length(cf_visseas@legend@colortable),
              asp=1,colorkey=F,panel=panel.levelplot.raster,margin=F,
              maxpixels=res,ylab="",xlab="",useRaster=T,asp=1,
              scales=list(cex=1,y=list(at=c(2,6,10))))+
+  latticeExtra::layer(sp.polygons(b_ven,fill="transparent",col="red",lwd=1),under=F)+
   latticeExtra::layer(sp.lines(coast,col="white",lwd=.5),under=F)
 
 ## draw it
 png(width=2400,height=1600,res=300,pointsize=16,
-    type="cairo-png",file="manuscript/figures/Seasonality.png")
+    type="cairo-png",file="manuscript/figures/Seasonality_biome.png")
 print(g1,position=c(0.4,.5,1,1),more=T) #global
 print(r1,position=c(.51,-0.05,1,.7),more=T)
 print(r2,position=c(0,-.05,.55,.7),more=T)

@@ -27,12 +27,12 @@ library(coda)
 #library(spgrass6)
 #install_github(repo="Rdatatable/data.table")
 library(data.table)
-library(AUC)
-library(dismo)
+#library(AUC)
+#library(dismo)
 library(redshift)
 library(ncdf4)
 
-library(dismo)
+#library(dismo)
 library(grid) # needed for arrow function
 
 
