@@ -33,7 +33,7 @@ bcode=unique(data.frame(icode=biome$icode,code=biome$code,realm=biome$realm,biom
 
 system(paste("gdal_rasterize -a icode -init 0 -l biomes -ot Byte -te -180 -90 180 90 -tr 0.008333333333333 -0.008333333333333",
               " -co COMPRESS=LZW -co ZLEVEL=9 -co PREDICTOR=2 ",
-              " data/src/teow/biomes.shp  data/out/teow/teow.tif"))
+              " data/src/teow/biomes.shp  data/out/teow.tif"))
 
 #########################################
 ### Summarize the cloud data by biome
@@ -238,3 +238,11 @@ biome2=biome
 biome2@data[,colnames(bsw)[-1]]=bsw[match(biome2$code,bsw$code),-1]
 
 spplot(biome2,zcol="meanannual")
+
+
+### multinomial regression
+#teow=raster("data/out/teow.tif")
+#library(nnet)
+
+#ml$prog2 <- relevel(ml$prog, ref = "academic")
+#test <- multinom(prog2 ~ ses + write, data = ml)
