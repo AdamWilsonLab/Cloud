@@ -79,13 +79,9 @@ levels(env[["region"]])=data.frame(ID=1:3,code=c("Africa","Americas","Asia Pacif
 data$region=as.factor(data$region)
 
 models=rbind.data.frame(
-  c("Interpolated Precipitation","cf ~ MAT+I(MAT^2)+MAP+I(MAP^2)+PSeas+region*MAP"),
-  c("Cloud Product","cf ~ MAT+I(MAT^2)+inter+intra+meanannual*region"),
-  c("All","cf ~ MAT+I(MAT^2)+MAP+I(MAP^2)+PSeas+inter+intra+meanannual*region"))#,
-#  c("worldclim_step",""),
-#  c("cloud_step",""),
-#  c("all_step",""))
-
+  c("Interpolated","cf ~ elev+I(elev^2)+MAT+I(MAT^2)+MAP+I(MAP^2)+PSeas+region*MAP"),
+  c("Cloud","cf ~ elev+I(elev^2)+inter+intra+meanannual*region"))
+  
 colnames(models)=c("name","formula")
 
 mods=foreach(f=models$formula[!grepl("step",models$name)]) %dopar%{
@@ -99,10 +95,11 @@ mods=foreach(f=models$formula[!grepl("step",models$name)]) %dopar%{
 names(mods)=models$name
 
 screenreg(mods,bold = 0.05,digits=3,single.row=T,
-          reorder.coef=c(1:6,11:13,7:8,9:10,14:15),
-          groups = list("WorldClim" = 2:6, "Cloud Product"=7:9, "Regions" = 10:11,"Interactions"=12:15))
+          reorder.coef=c(1:8,13:15,9:12,16:17),
+          groups = list("WorldClim" = 4:8, "Cloud Product"=9:11, "Regions" = 12:13,"Interactions"=14:17))
+
 htmlreg(mods,file="output/CloudForest.html",bold = 0.05,digits=2,stars=c(0.001, 0.01, 0.05),caption="Regression Summary",single.row=T,
-        reorder.coef=c(1:6,11:13,7:8,9:10,14:15))
+        reorder.coef=c(1:8,13:15,9:12,16:17))
 
 ### compare models
 BIC(mods[[1]])-BIC(mods[[2]])
@@ -127,18 +124,20 @@ ps=foreach(i=1:nrow(models),.options.multicore=mcoptions,.combine=stack)%dopar%{
 
 #### Read in predictions
 
-ps=stack(list.files("data/out/",pattern="CloudForestPrediction_all.tif",full=T))
+ps=stack(list.files("data/out/",pattern="CloudForestPrediction_Cloud Product.tif",full=T))
 
-psd=ps[[1]]-ps[[2]]
+#psd=ps[[1]]-ps[[2]]
 
 hcols=function(x,bias=1) {
-  colorRampPalette(c('grey20','grey30','grey40','grey50','steelblue4','steelblue2','gold','red1','red4','red4'),bias=bias)(x) 
+  #colorRampPalette(c('grey20','grey30','grey40','grey50','steelblue4','steelblue2','gold','red1','red4','red4'),bias=bias)(x) 
+  colorRampPalette(c('white','grey90','grey80','grey70','steelblue2','gold','red1','red4','red4'),bias=bias)(x) 
+  
 }
 
 p_p1=
   gplot(ps,max=1e6)+
   geom_raster(aes(fill=value))+#facet_wrap("variable",ncol=1)+
-  scale_fill_gradientn(colours=hcols(1000,bias=.5),trans = "log10",#lim=c(1e-3,1),
+  scale_fill_gradientn(colours=hcols(1000,bias=.35),trans = "log10",#lim=c(1e-3,1),
                        name="Relative\nOccurrence\nRate\np(x|Y=1)",na.value="transparent")+
   coord_equal(xlim=c(-100,160))+
 #  geom_polygon(aes(x=long,y=lat,group=group),
@@ -146,12 +145,51 @@ p_p1=
 #               fill="transparent",col="black",size=.2)+
   geom_point(aes(x = x, y = y), 
              data = data[data$cf==1,],
-             col="black",size=1,shape=1)+
+             col="black",size=.5,shape=1)+
   ylab("")+xlab("")
 
-png("figure/CloudForest.png",width=3000,height=1000,res=200)
-p_p1
+png("figure/CloudForest.png",width=3000,height=1000,res=300)
+print(p_p1)
+grid.edit("geom_point.points", grep = TRUE, gp = gpar(lwd = .3)) #make points thinner
 dev.off()
+
+
+## Calculate thresholded area
+thresh=function(model) {
+  evaluate(model=model,p=model$fitted.values[model$model[,response]==1],a=model$fitted.values[model$model[,response]==0])
+  threshold(e1)
+}
+
+## calculate area of each cell
+area=area(env[[1]])
+
+## get threshold
+t1=thresh(mods[["Cloud Product"]])$kappa
+## map the threshold
+pst=ps>=t1
+## get area for each TMCF pixel
+psta=pst*area
+
+## calculate total area of tropical cloud forests in km^2
+cellStats(pst,sum)
+
+p_p2=
+  gplot(pst,max=1e6)+
+  geom_raster(aes(fill=value))+#facet_wrap("variable",ncol=1)+
+  coord_equal(xlim=c(-100,160))+
+#  geom_polygon(aes(x=long,y=lat,group=group),
+#               data=fortify(land),
+#               fill="transparent",col="black",size=.2)+
+  geom_point(aes(x = x, y = y), 
+             data = data[data$cf==1,],
+             col="black",size=.5,shape=1)+
+  ylab("")+xlab("")
+
+png("figure/CloudForest_Thresholded.png",width=3000,height=1000,res=300)
+print(p_p2)
+grid.edit("geom_point.points", grep = TRUE, gp = gpar(lwd = .2)) #make points thinner
+dev.off()
+
 
 #gplot(psd,max=1e5)+geom_raster(aes(fill=value))+
 #  scale_fill_gradient2(low = "red", mid = "white", high = "blue",

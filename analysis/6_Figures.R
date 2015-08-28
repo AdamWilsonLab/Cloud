@@ -133,44 +133,44 @@ k1=xyplot(y~x,col=col$val[col$exists],data=col[col$exists,],pch=16,cex=1.2,
 
 
 g1=levelplot(cf_visseas,col.regions=cf_visseas@legend@colortable,cuts=length(cf_visseas@legend@colortable),at=0:length(cf_visseas@legend@colortable),
-             colorkey=F,panel=panel.levelplot.raster,margin=F,maxpixels=res,ylab="",xlab="",useRaster=T,ylim=c(-60,70),
+             colorkey=F,panel=panel.levelplot.raster,margin=F,maxpixels=1e6,ylab="",xlab="",useRaster=T,ylim=c(-60,70),
              asp=1,scales=list(draw=F))+#cex=1,y=list(at=c(-40,0,40))))+
   latticeExtra::layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col=grey(.2)),under=T)+
-  latticeExtra::layer(sp.polygons(as(regs[["CFR2"]],'SpatialPolygons'),col="red",lwd=1.5),under=F)+
-  latticeExtra::layer(sp.polygons(as(regs[["Venezuela2"]],'SpatialPolygons'),col="red",lwd=1.5),under=F)+
+  latticeExtra::layer(sp.polygons(as(regs[["CFR3"]],'SpatialPolygons'),col="red",lwd=1.5),under=F)+
+  latticeExtra::layer(sp.polygons(as(regs[["SouthAmerica2"]],'SpatialPolygons'),col="red",lwd=1.5),under=F)+
   latticeExtra::layer(sp.lines(coast,col="white",lwd=.5),under=F)
 
 ## regional plots
 biome=readOGR("/mnt/data/jetzlab/Data/environ/global/teow/official/","wwf_terr_ecos")
 #readOGR("data/src/teow/","biomes")
 
-r_cfr=crop(cf_visseas,regs[["CFR2"]],datatype="INT2U")
-b_cfr=crop(biome,regs[["CFR2"]])
+r_cfr=crop(cf_visseas,regs[["CFR3"]],datatype="INT2U")
+b_cfr=crop(biome,regs[["CFR3"]])
 
 r1=levelplot(r_cfr,col.regions=cf_visseas@legend@colortable,
              cuts=length(cf_visseas@legend@colortable),
              at=0:length(cf_visseas@legend@colortable),
              colorkey=F,panel=panel.levelplot.raster,margin=F,
              maxpixels=res,ylab="",xlab="",useRaster=T,asp=1,
-             scales=list(cex=1,y=list(at=c(-34,-30,-26))))+
-  latticeExtra::layer(sp.polygons(b_cfr,fill="transparent",col="red",lwd=1),under=F)+
+             scales=list(cex=1,y=list(at=c(-35,-35,-31))))+
+  latticeExtra::layer(sp.polygons(b_cfr,fill="transparent",col="red",lwd=.75),under=F)+
   latticeExtra::layer(sp.lines(coast,col="white",lwd=.5),under=F)
 
-r_ven=crop(cf_visseas,regs[["Venezuela2"]],datatype="INT2U")
-b_ven=crop(biome,regs[["Venezuela2"]])
+r_ven=crop(cf_visseas,regs[["SouthAmerica2"]],datatype="INT2U")
+b_ven=crop(biome,regs[["SouthAmerica2"]])
 
 r2=levelplot(r_ven,col.regions=cf_visseas@legend@colortable,
              cuts=length(cf_visseas@legend@colortable),
              at=0:length(cf_visseas@legend@colortable),
              asp=1,colorkey=F,panel=panel.levelplot.raster,margin=F,
              maxpixels=res,ylab="",xlab="",useRaster=T,asp=1,
-             scales=list(cex=1,y=list(at=c(2,6,10))))+
-  latticeExtra::layer(sp.polygons(b_ven,fill="transparent",col="red",lwd=1),under=F)+
+             scales=list(cex=1,y=list(at=c(5,7.5,10))))+
+  latticeExtra::layer(sp.polygons(b_ven,fill="transparent",col="red",lwd=.75),under=F)+
   latticeExtra::layer(sp.lines(coast,col="white",lwd=.5),under=F)
 
 ## draw it
 png(width=2400,height=1600,res=300,pointsize=16,
-    type="cairo-png",file="manuscript/figures/Seasonality_biome.png")
+    type="cairo-png",file="manuscript/figures/Seasonality_biome2.png")
 print(g1,position=c(0.4,.5,1,1),more=T) #global
 print(r1,position=c(.51,-0.05,1,.7),more=T)
 print(r2,position=c(0,-.05,.55,.7),more=T)
