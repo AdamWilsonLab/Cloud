@@ -10,6 +10,9 @@ library(texreg)
 library(visreg)
 library(raster)
 
+library(ocedata)
+data(coastlineWorldFine)
+
 library(doParallel)
 registerDoParallel(5)
 
@@ -103,6 +106,7 @@ htmlreg(mods,file="output/CloudForest.html",bold = 0.05,digits=2,stars=c(0.001, 
 
 ### compare models
 BIC(mods[[1]])-BIC(mods[[2]])
+AIC(mods[[1]])-AIC(mods[[2]])
 
 #visreg(mods$step)
 #visreg2d(mods$step,"meanannual","intra")
@@ -117,36 +121,54 @@ psi=1:nrow(models)
 
 ps=foreach(i=1:nrow(models),.options.multicore=mcoptions,.combine=stack)%dopar%{
   fo=paste0("data/out/CloudForestPrediction_",models$name[i],".tif")
-  p1=predict(env,mods[[i]],type=ptype,file=fo,overwrite=T,factors=list(region=c("Africa","Americas","AsiaPacific")))
+  p1=predict(env,mods[[i]],type=ptype,file=fo,overwrite=T,factors=list(region=c("Africa","Americas","AsiaPacific")), options=c("COMPRESS=LZW","PREDICTOR=2"))
   raster(fo)
   }
 
 
 #### Read in predictions
 
-ps=stack(list.files("data/out/",pattern="CloudForestPrediction_Cloud Product.tif",full=T))
+ps=stack(list.files("data/out/",pattern="CloudForestPrediction_Cloud.tif",full=T))
+
+## export version for figshare
+system("gdal_translate CloudForestPrediction_Cloud.tif CloudForestPrediction_Cloud2.tif -co \"COMPRESS=LZW\" -co \"PREDICTOR=2\" -mo \"TIFFTAG_DOCUMENTNAME=Relative Occurrence Rate of Tropical Montane Cloud Forests estimated using MODIS cloud data\" -mo \"TIFFTAG_ARTIST=Adam M. Wilson adamw@buffalo.edu\"")
 
 #psd=ps[[1]]-ps[[2]]
 
 hcols=function(x,bias=1) {
-  #colorRampPalette(c('grey20','grey30','grey40','grey50','steelblue4','steelblue2','gold','red1','red4','red4'),bias=bias)(x) 
+  #colorRampPalette(c('grey20','grey30','grey40','grey50','steelblue4','steelblue2','goldenrod','gold','red1','red1','red4','red4'),bias=bias)(x) 
   colorRampPalette(c('white','grey90','grey80','grey70','steelblue2','gold','red1','red4','red4'),bias=bias)(x) 
   
 }
 
-p_p1=
-  gplot(ps,max=1e6)+
-  geom_raster(aes(fill=value))+#facet_wrap("variable",ncol=1)+
-  scale_fill_gradientn(colours=hcols(1000,bias=.35),trans = "log10",#lim=c(1e-3,1),
+
+p_update=function(p){
+  p+geom_raster(aes(fill=value))+#facet_wrap("variable",ncol=1)+
+  scale_fill_gradientn(colours=hcols(1000,bias=.4),trans = "log10",
                        name="Relative\nOccurrence\nRate\np(x|Y=1)",na.value="transparent")+
-  coord_equal(xlim=c(-100,160))+
-#  geom_polygon(aes(x=long,y=lat,group=group),
-#               data=fortify(land),
-#               fill="transparent",col="black",size=.2)+
+  coord_equal(ylim=range(p$data$y),xlim=range(p$data$x))+
+  geom_polygon(aes(x=long,y=lat,group=group),
+               data=fcoast,
+               fill="transparent",col="black",size=.1)+
   geom_point(aes(x = x, y = y), 
              data = data[data$cf==1,],
-             col="black",size=.5,shape=1)+
-  ylab("")+xlab("")
+             col="black",size=.1,shape=10)+
+  ylab("")+xlab("")+scale_x_continuous(expand = c(0, 0)) + scale_y_continuous(expand = c(0, 0))
+}
+
+
+blanktheme=theme(panel.background = element_blank(),
+                 panel.grid.major = element_blank(), 
+                 panel.grid.minor = element_blank(),
+                 axis.line=element_blank(),axis.text.x=element_blank(),
+                 axis.text.y=element_blank(),axis.ticks=element_blank(),
+                 axis.title.x=element_blank(),
+                 axis.title.y=element_blank(),
+                 panel.background=element_blank(),panel.border=element_blank(),panel.grid.major=element_blank(),
+                 panel.grid.minor=element_blank(),plot.background=element_blank())
+
+p_p1=p_update(gplot(ps,max=1e6))  
+
 
 png("figure/CloudForest.png",width=3000,height=1000,res=300)
 print(p_p1)
@@ -154,6 +176,43 @@ grid.edit("geom_point.points", grep = TRUE, gp = gpar(lwd = .3)) #make points th
 dev.off()
 
 
+
+#### Create condensed version
+extent(ps)
+R1=crop(ps,extent(c(-100,-29.5,extent(ps)@ymin,extent(ps)@ymax)))
+R2=crop(ps,extent(c(-20,55,extent(ps)@ymin,extent(ps)@ymax)))
+R3=crop(ps,extent(c(63.4,extent(ps)@xmax,extent(ps)@ymin,extent(ps)@ymax)))
+
+p1=p_update(gplot(R1,max=1e6))+blanktheme+guides(fill=FALSE)
+p2=p_update(gplot(R2,max=1e6))+blanktheme+guides(fill=FALSE)
+p3=p_update(gplot(R3,max=1e6))+blanktheme
+
+
+
+## Figure 4
+png(file=paste0("figure/CloudForest2.png"),
+    width=3000,height=2300,pointsize=24,res=300)
+
+print(p1, vp = viewport(width = .8, height = .6, x=.25,y=.75))
+print(p2, vp = viewport(width = .8, height = .6, x = .7, y = 0.75))
+print(p3, vp = viewport(width = 1, height = .6, x = 0.5, y = 0.25))
+#grid.edit("geom_point.points", grep = TRUE, gp = gpar(lwd = .3)) #make points thinner
+
+## LinespushViewport(viewport(width = 1, height = 1, x=.5,y=.5))
+pushViewport(viewport(width = 1, height = 1, x=.5,y=.5))
+grid.lines(c(0,1) ,c(.505,.505),gp=gpar(lwd=3), draw = TRUE, vp = NULL)
+grid.lines(c(.65,.31) ,c(.505,1),gp=gpar(lwd=3), draw = TRUE, vp = NULL)
+## add labels
+tgp=gpar(cex = 1, col = "black")
+grid.text(label = "a" ,x = 0.02,y = .98,gp = tgp)
+grid.text(label = "b" ,x = 0.37,y = .98,gp = tgp)
+grid.text(label = "c" ,x = 0.06,y = .48,gp = tgp)
+
+dev.off()
+
+
+
+###################################
 ## Calculate thresholded area
 thresh=function(model) {
   evaluate(model=model,p=model$fitted.values[model$model[,response]==1],a=model$fitted.values[model$model[,response]==0])
