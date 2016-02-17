@@ -5,7 +5,7 @@ source("analysis/6_LoadData.R")
 n=100
 res=1e5
 greg=list(ylim=c(-60,84),xlim=c(-180,180))
-    
+
 ## Figure 1: 4-panel summaries
 #- Annual average
 n=100
@@ -14,13 +14,13 @@ cwidth=.5
 #quantile(cf_mean,c(0,0.01,0.1,0.25,.50,.75,.90,.99,1),na.rm=T)
 
 p_mean=  levelplot(cf_mean,col.regions=bgr(1:100,n,br=50.9)$col,cuts=99,at=seq(0,100,len=n),
-                 colorkey=list(space="left",width=cwidth,height=.5,labels=list(at=c(0, 50, 100)),border=NA),
-                 scales=list(draw=F),
-                 panel=panel.levelplot.raster,margin=F,maxpixels=res,ylab="",xlab="",useRaster=T,ylim=greg$ylim)+
-    latticeExtra::layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col=grey(.2)),under=T)+
+                   colorkey=list(space="left",width=cwidth,height=.5,labels=list(at=c(0, 50, 100)),border=NA),
+                   scales=list(draw=F),
+                   panel=panel.levelplot.raster,margin=F,maxpixels=res,ylab="",xlab="",useRaster=T,ylim=greg$ylim)+
+  latticeExtra::layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col=grey(.2)),under=T)+
   latticeExtra::layer(sp.lines(coast,lwd=.5,),under=F)
- p_mean$strip=strip.custom(factor.levels="a. Mean Cloud Frequency (%)")
- p_mean$par.strip.text=list(cex=1)
+p_mean$strip=strip.custom(factor.levels="a. Mean Cloud Frequency (%)")
+p_mean$par.strip.text=list(cex=1)
 #quantile(spatial,c(0,0.01,0.1,0.25,.50,.75,.90,.99,1),na.rm=T)
 #0%    1%   10%   25%   50%   75%   90%   99%  100% 
 #0.01  0.38  0.50  0.65  1.05  2.42  4.99 11.69 57.50 
@@ -33,14 +33,14 @@ p_spatial=levelplot(spatial,margin=F,maxpixels=res,
                     panel=panel.levelplot.raster,ylim=greg$ylim,ylab="",xlab="",#zscaleLog=T,
                     colorkey=list(title="SD Cloud Frequency", space="left",width=cwidth,height=.5,
                                   labels=list(
-                    at=c(0,10,20),
-                    labels= c(0,10,20))),
-scales=list(draw=F),useRaster=T)+
+                                    at=c(0,10,20),
+                                    labels= c(0,10,20))),
+                    scales=list(draw=F),useRaster=T)+
   latticeExtra::layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col=grey(.2)),under=T)+
   latticeExtra::layer(sp.lines(coast,col="black",lwd=.5),under=F)
 p_spatial$strip=strip.custom(factor.levels="c. Spatial Variability (SD)") #  latticeExtra::layer(sp.lines(coast,lwd=.5,),under=F)
 p_spatial$par.strip.text=list(cex=1)
-                    
+
 # quantile(intra,c(.50,.75,.90,.99,1),na.rm=T)
 #50%   75%   90%   99%  100% 
 #10.59 15.26 23.11 36.30 98.43 
@@ -53,14 +53,14 @@ svar=stack(inter,intra)
 NAvalue(svar)=255
 # 
 p_var=levelplot(svar,cuts=n-1,margin=F,maxpixels=res,
-                  col.regions=c_intra$col,at=c_intra$at,
-                  panel=panel.levelplot.raster,ylim=greg$ylim,ylab="",xlab="",#zscaleLog=10,
-                  colorkey=list(title="Cloud Frequency (%)", space="right",
-                                height=.5,width=cwidth,
-                                labels=list(at=c(0,20,40)),
-                                labels=c(1,20,40)),useRaster=T,
-                  
-                  scales=list(draw=F),layout=c(1,2))+
+                col.regions=c_intra$col,at=c_intra$at,
+                panel=panel.levelplot.raster,ylim=greg$ylim,ylab="",xlab="",#zscaleLog=10,
+                colorkey=list(title="Cloud Frequency (%)", space="right",
+                              height=.5,width=cwidth,
+                              labels=list(at=c(0,20,40)),
+                              labels=c(1,20,40)),useRaster=T,
+                
+                scales=list(draw=F),layout=c(1,2))+
   latticeExtra::layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col=grey(.2)),under=T)+
   latticeExtra::layer(sp.lines(coast,col="black",lwd=.5),under=F)
 p_var$strip=strip.custom(factor.levels=c("b. Inter-annual Variability (SD)","d. Intra-annual Variability (SD)")) #  latticeExtra::layer(sp.lines(coast,lwd=.5,),under=F)
@@ -77,7 +77,7 @@ print(p_mean,position=c(0,.5-ndify,.5+ndifx,1),more=T)
 print(p_spatial,position=c(0,0,.5+ndifx,.5+ndify),more=T)
 #print(p_inter,position=c(.5-ndifx,0,1,.5+ndify),more=F)
 print(p_var,position=c(.5-ndifx,0,1,1),more=F)
-                         
+
 dev.off()
 
 ## Scatterplots of variables
@@ -118,9 +118,9 @@ lims=c(-80,80)
 
 ## color key
 k1=xyplot(y~x,col=col$val[col$exists],data=col[col$exists,],pch=16,cex=1.2,
-       xlab="",ylab="",scales=list(draw=F),ylim=lims,xlim=lims,asp=1,
-#          main="Seasonal Cloud Concentration"
-       par.settings = list(axis.line = list(col = "transparent")))+
+          xlab="",ylab="",scales=list(draw=F),ylim=lims,xlim=lims,asp=1,
+          #          main="Seasonal Cloud Concentration"
+          par.settings = list(axis.line = list(col = "transparent")))+
   latticeExtra::layer(panel.polygon(pCirc(r=20,n=100),border="grey"))+
   latticeExtra::layer(panel.polygon(pCirc(r=40,n=100),border="grey"))+
   latticeExtra::layer(panel.polygon(pCirc(r=60,n=100),border="grey"))+
@@ -129,7 +129,7 @@ k1=xyplot(y~x,col=col$val[col$exists],data=col[col$exists,],pch=16,cex=1.2,
                                  pos=4,cex=1,offset=0,srt=(mangle[lmons[-1]])*180/pi))+ #add left months))
   latticeExtra::layer(panel.text(x=ladj*cos(mangle[rmons[c(1,2,6,7)]]),y=ladj*sin(mangle[rmons[c(1,2,6,7)]]),mon[rmons[c(1,2,6,7)]],
                                  pos=2,cex=1,offset=0,srt=((mangle[rmons[c(1,2,6,7)]])*180/pi)-180))+ # add right months
-    latticeExtra::layer(panel.text(x=-2,y=c(-20,-40,-60),c(20,40,60),pos=4,cex=1,col=c("white","black","black"))) #add scale text
+  latticeExtra::layer(panel.text(x=-2,y=c(-20,-40,-60),c(20,40,60),pos=4,cex=1,col=c("white","black","black"))) #add scale text
 
 
 g1=levelplot(cf_visseas,col.regions=cf_visseas@legend@colortable,cuts=length(cf_visseas@legend@colortable),at=0:length(cf_visseas@legend@colortable),
@@ -194,6 +194,38 @@ pdf("manuscript/figures/SeasonalityKey.pdf",width=4,height=4,pointsize=48,bg="tr
 print(k1) #legend
 dev.off()
 
+## Create "striking" image
+g2=levelplot(cf_visseas,col.regions=cf_visseas@legend@colortable,cuts=length(cf_visseas@legend@colortable),at=0:length(cf_visseas@legend@colortable),
+             colorkey=F,panel=panel.levelplot.raster,margin=F,maxpixels=1e6,ylab="",xlab="",useRaster=T,ylim=c(-60,70),
+             asp=1,scales=list(draw=F))+#cex=1,y=list(at=c(-40,0,40))))+
+  latticeExtra::layer(panel.polygon(x=c(-180,-180,180,180),y=c(-90,90,90,-90),col=grey(.2)),under=T)+
+  latticeExtra::layer(sp.lines(coast,col="white",lwd=.5),under=F)
+
+
+k2=xyplot(y~x,col=col$val[col$exists],data=col[col$exists,],pch=16,cex=1.2,
+          xlab="",ylab="",scales=list(draw=F),ylim=lims,xlim=lims,asp=1,
+          #          main="Seasonal Cloud Concentration"
+          par.settings = list(axis.line = list(col = "transparent"),
+                              layout.widths=list(left.padding=30,right.padding=30)))+
+  latticeExtra::layer(panel.polygon(pCirc(r=20,n=100),border="grey"))+
+  latticeExtra::layer(panel.polygon(pCirc(r=40,n=100),border="grey"))+
+  latticeExtra::layer(panel.polygon(pCirc(r=60,n=100),border="grey"))+
+  latticeExtra::layer(panel.segments(0,0,60*cos(mangle-(15*pi/180)),60*sin(mangle-(15*pi/180)),col="grey"))+ #draw angles
+  latticeExtra::layer(panel.text(x=ladj*cos(mangle[lmons[-1]]),y=ladj*sin(mangle[lmons[-1]]),mon[lmons[-1]],
+                                 pos=4,cex=1.2,offset=0,srt=(mangle[lmons[-1]])*180/pi,col="white"))+ #add left months))
+  latticeExtra::layer(panel.text(x=ladj*cos(mangle[rmons[c(1,2,6,7)]]),y=ladj*sin(mangle[rmons[c(1,2,6,7)]]),mon[rmons[c(1,2,6,7)]],
+                                 pos=2,cex=1.2,offset=0,srt=((mangle[rmons[c(1,2,6,7)]])*180/pi)-180,col="white"))+ # add right months
+  latticeExtra::layer(panel.text(x=-2,y=c(-20,-40,-60),c(20,40,60),pos=4,cex=1.2,col=c("white")))#,"black","black"))) #add scale text
+
+## draw it
+png(width=2400,height=1300,res=200,pointsize=16,
+    type="cairo-png",file="manuscript/figures/Seasonality_Striking.png")
+print(g2,more=T) 
+print(k2,position=c(-.20,0,.7,.7), more=F)
+dev.off()
+
+
+
 #########################################
 ## add keys for earth engine legend
 png("manuscript/figures/SeasonalityKey_little.png",width=200,height=200, res=70,bg="white")
@@ -213,10 +245,10 @@ getbar=function(range=c(0,10000),palette=palette_blues,gain=0.01,name=NULL){
     scale_fill_gradientn( colours=palette,guide=guide_colourbar(title=name) )+
     geom_tile(aes(fill=x))
   
-    tmp <- ggplot_gtable(ggplot_build(p1)) 
-    leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box") 
-    legend <- tmp$grobs[[leg]] 
-    return(legend)
+  tmp <- ggplot_gtable(ggplot_build(p1)) 
+  leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box") 
+  legend <- tmp$grobs[[leg]] 
+  return(legend)
 } 
 
 for(m in c("MeanAnnual",month.name)){
@@ -274,14 +306,14 @@ pars=list(layout.heights=list(key.bottom=2,key.top=1),layout.widths = list(axis.
 p1=levelplot(cf_r,col.regions=colR(n),at=seq(0,100,len=99),
              ylab="",xlab="", scales=list(draw=F),
              colorkey=list(space="left",width=1,height=.75,labels=list(labels=c(0,50,100),at=c(0,50,100))),
-    cuts=99,margin=F,maxpixels=1e7,par.settings = pars)+
+             cuts=99,margin=F,maxpixels=1e7,par.settings = pars)+
   latticeExtra::layer(sp.lines(coast,col="black",lwd=.5),under=F)
 
 p2=levelplot(crop(gewex,regs[[r]]),col.regions=colR(n),at=seq(0,1,len=99),cuts=99,margin=F,max.pixels=1e6,
              ylab="",xlab="",
              colorkey=F,scales=list(y=list(draw=F),x=list(draw=T)),
-#             colorkey=list(space="right",width=1,height=.75,labels=list(labels=c(0,50,100),at=c(.0,.5,1))),
-    par.settings = pars)+
+             #             colorkey=list(space="right",width=1,height=.75,labels=list(labels=c(0,50,100),at=c(.0,.5,1))),
+             par.settings = pars)+
   latticeExtra::layer(sp.lines(coast,col="black",lwd=.5),under=F)
 
 p3=levelplot(tmap,col.regions=rev(terrain.colors(n)),cuts=100,
@@ -289,19 +321,19 @@ p3=levelplot(tmap,col.regions=rev(terrain.colors(n)),cuts=100,
              scales=list(draw=F),
              colorkey=list(space="right",height=.5,width=1,
                            labels=list(labels=c(2000,6000,10000),at=c(2000,6000,10000))),
-                           xlab="",ylab="",
+             xlab="",ylab="",
              useRaster=T,
-    par.settings = pars)+
+             par.settings = pars)+
   latticeExtra::layer(sp.lines(coast,col="black",lwd=.5),under=F)
 
 p4=levelplot(crop(wc_dem,regs[[r]]),col.regions=terrain.colors(n),
              cuts=99,margin=F,max.pixels=1e6,
              ylab="",xlab="",maxpixels=1e7,
-#             scales=list(draw=F),
+             #             scales=list(draw=F),
              colorkey=list(space="right",height=.5,width=1,
                            labels=list(labels=c(0,2500,5000),
-                           at=c(0,2500,5000))),
-    par.settings = pars,scales=list(y=list(at=c(2,6,10))))+
+                                       at=c(0,2500,5000))),
+             par.settings = pars,scales=list(y=list(at=c(2,6,10))))+
   latticeExtra::layer(sp.lines(coast,col="black",lwd=.5),under=F)
 
 ## combine
@@ -309,13 +341,13 @@ lside=c("a    MODCF (%)"=p1,"c     PATMOS-x GEWEX (%)"=p2,
         layout=c(1,2),merge.legends=T,x.same=T,y.same=T)
 rside=c("b    WorldClim Precip (mm)"=p3,"d    Elevation (m)"=p4,
         layout=c(1,2),x.same=T,y.same=T,merge.legends=T)
-      
+
 
 png("manuscript/figures/Resolution2.png",width=3000,height=1500,res=300,pointsize=47,bg="white")
 trellis.par.set(my.theme)
 #pdf("output/mod09_resolution.pdf",width=11,height=8.5)
 #print(c("b    WorldClim Precip (mm)"=p3,"d    Elevation (m)"=p4,x.same=T,y.same=T,merge.legends=T,layout=c(1,2))
-      #print(c("a     PATMOS-x GEWEX (%)"=p2,"b    MODCF (%)"=p1,"c    Elevation (m)"=p4,x.same=T,y.same=T,merge.legends=T,layout=c(1,3)))
+#print(c("a     PATMOS-x GEWEX (%)"=p2,"b    MODCF (%)"=p1,"c    Elevation (m)"=p4,x.same=T,y.same=T,merge.legends=T,layout=c(1,3)))
 print(lside,position=c(0,0,.5,1),more=T)
 print(rside,position=c(0.48,0,1,1),more=F)
 dev.off()
@@ -328,18 +360,18 @@ l1=xyplot(conc~theta,col=col$val[col$exists],data=col[col$exists,],pch=16,cex=1,
                    at=seq(15,360,30))),
           xlab="Month",ylab="Concentration (%)")
 l1b=xyplot(conc~theta,col=col$rgbcol,data=col,pch=16,cex=1,
-          scales=list(
-            x=list(labels=c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"),
-                   at=seq(15,360,30))),
-          xlab="Month",ylab="Concentration (%)")
+           scales=list(
+             x=list(labels=c("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"),
+                    at=seq(15,360,30))),
+           xlab="Month",ylab="Concentration (%)")
 c(l1,l1b)
 
 l2=levelplot(x~x*y,colours=seasl$col,data=seasl,pch=16,cex=1,
-            panel = function(x, y, colours, subscripts, ...) {
-            panel.xyplot(x, y, pch = 21, col = "transparent",fill = colours[subscripts])
-            },ylab="",xlab="",
-          colorkey=F,scales=list(draw=T))+
-    layer(sp.lines(coast,col="black"),under=F)
+             panel = function(x, y, colours, subscripts, ...) {
+               panel.xyplot(x, y, pch = 21, col = "transparent",fill = colours[subscripts])
+             },ylab="",xlab="",
+             colorkey=F,scales=list(draw=T))+
+  layer(sp.lines(coast,col="black"),under=F)
 
 pdf(width=11,height=8.5,file="manuscript/figures/Seasonality.pdf",useDingbats=F,pointsize=12)
 trellis.par.set(my.theme)
@@ -364,6 +396,47 @@ print(v1)
 dev.off()
 
 
+### heatmap of mod09 vs. NDP for all months
+hmcols=colorRampPalette(c("grey","blue","red","purple"))
+#hmcols=colorRampPalette(c(grey(.8),grey(.3),grey(.2)))
+tr=c(0,50)
+colkey <- draw.colorkey(list(col = hmcols(tr[2]), at = tr[1]:tr[2],labels=list(at=c(0,25,50),labels=c(0,25,50)),height=.4))
+
+pv=xyplot(cld~MCD09_mean|seas,data=cldm,panel=function(x,y,subscripts){
+  n=50
+  bins=seq(0,100,len=n)
+  tb=melt(as.matrix(table(
+    x=cut(x,bins,labels=bins[-1]),
+    y=cut(y,bins,labels=bins[-1]))))
+  qat=unique(tb$value)
+  print(max(qat))
+  qat=tr[1]:tr[2]#unique(tb$value)
+  panel.levelplot(tb$x,tb$y,tb$value,at=qat,col.regions=c("transparent",hmcols(length(qat))),subscripts=1:nrow(tb))
+  panel.abline(0,1,col="black",lwd=2,lty="dashed")
+  panel.abline(lm(y ~ x),col="black",lwd=2)
+  #  panel.ablineq(lm(y ~ x), r.sq = TRUE,at = 0.6,pos=1, offset=0,digits=2,col="blue")
+  panel.text(70,10,bquote(paste(R^2,"=",.(round(summary(lm(y ~ x))$r.squared,2)))),cex=1.5)
+},asp=1,scales=list(at=seq(0,100,len=3)),useRaster=T,
+ylab.right="# of Stations",
+ylab="Validation Mean Cloud Amount (%)",xlab="MODIS Cloud Frequency (%)",
+alternating=2, strip=strip.custom(par.strip.text = list(cex =1.5)),
+par.settings = list(layout.heights=list(strip=1.5)),as.table=T,
+legend= list(right = list(fun = colkey)))#+ layer(panel.abline(0,1,col="black",lwd=2))
+
+tiff("manuscript/figures/validateScatter.tif",width=2000,height=2000,res=300,pointsize=36,bg="white")
+pres.theme = trellis.par.get()
+pres.theme$strip.background=list(col="transparent")
+pres.theme$par.ylab.text$cex=1.5
+pres.theme$par.xlab.text$cex=1.5
+pres.theme$axis.text$cex=1.5
+pres.theme$layout.widths$key.right=1.5
+trellis.par.set(pres.theme)
+
+pv
+dev.off()
+
+
+
 ##########################
 ## Sahara orbital correction
 dt=stack("data/out/SaharaBiasCorrectionExample.tif")[[1:2]]
@@ -376,9 +449,9 @@ bcols=colorRampPalette(c("#08306b","#0d57a1","#2878b8","#4997c9","#72b2d7","#a2c
 png("manuscript/figures/Sahara.png",width=2000,height=1500,res=300,pointsize=47,bg="white")
 trellis.par.set(my.theme)
 s1=levelplot(dt[[1]],col.regions=bcols(100),at=seq(0,75,len=101),
-          cuts=99,margin=F,max.pixels=1e6,par.settings = pars)+layer(sp.lines(coast))
+             cuts=99,margin=F,max.pixels=1e6,par.settings = pars)+layer(sp.lines(coast))
 s2=levelplot(dt[[2]],col.regions=bcols(100),at=seq(0,75,len=101),
-          cuts=99,margin=F,max.pixels=1e6,par.settings = pars)+layer(sp.lines(coast))
+             cuts=99,margin=F,max.pixels=1e6,par.settings = pars)+layer(sp.lines(coast))
 print(c("a   Uncorrected Terra"=s1,"b    Corrected Terra"=s2))
 dev.off()
 
@@ -388,3 +461,4 @@ vectorplot(seas,narrows=2e3, lwd.arrows=0.6, length=unit(5e-2, 'npc'),
            isField=TRUE, reverse=FALSE,
            unit='degrees', scaleSlope=TRUE,
            aspX=0.08)
+

@@ -38,7 +38,7 @@ print(
   xtable(
     select(eval,c(species,modelname,nPresence,nTrials,auc,cor,DIC,GlobalGelmanMPSRF,MoransI,GearyC)),
     caption="Evaluation of distribution models using interpolated precipitation or cloud product"), 
-      include.rownames = FALSE,"html",file="manuscript/modeltable.html",digits=2)
+  include.rownames = FALSE,"html",file="manuscript/modeltable.html",digits=2)
 
 
 ## combine to a single dataframe
@@ -56,9 +56,9 @@ spregs=list(
 pd=mutate(pd,reg=ifelse(species=="Protea_cynaroides"&x>=20&x<=21.&y>=-34.1&y<=-33.7|
                           species%in%c("Rupicola_peruvianus","Lepidocolaptes_lacrymiger")&x>=-78&x<=-73&y>=4&y<=5.5,1,0))
 pred=mutate(pred,reg=ifelse(species=="Protea_cynaroides"&x>=20&x<=21.&y>=-34.1&y<=-33.7|
-                          species%in%c("Rupicola_peruvianus","Lepidocolaptes_lacrymiger")&x>=-78&x<=-73&y>=4&y<=5.5,1,0))
-idata=mutate(idata,reg=ifelse(species=="Protea_cynaroides"&x>=20&x<=21.&y>=-34.1&y<=-33.7|
                               species%in%c("Rupicola_peruvianus","Lepidocolaptes_lacrymiger")&x>=-78&x<=-73&y>=4&y<=5.5,1,0))
+idata=mutate(idata,reg=ifelse(species=="Protea_cynaroides"&x>=20&x<=21.&y>=-34.1&y<=-33.7|
+                                species%in%c("Rupicola_peruvianus","Lepidocolaptes_lacrymiger")&x>=-78&x<=-73&y>=4&y<=5.5,1,0))
 
 ranges=by(pred,list(pred$species),function(x) c(range(x$x),range(x$y)))
 
@@ -67,6 +67,9 @@ ranges=by(pred,list(pred$species),function(x) c(range(x$x),range(x$y)))
 fcoast1=fortify(crop(coast,extent(ranges[[2]])))
 fcoast2=fortify(crop(coast,extent(ranges[[1]])))
 
+## write out tables for PLoS Bio
+write.csv(ac,"output/sdm/Fig5_sdm_autocorrelation.csv",row.names=F)
+write.csv(filter(pred,trials>0), "output/sdm/Fig5_predictions.csv",row.names=F)
 
 library(grid) # needed for arrow function
 library(gridExtra)
@@ -113,11 +116,11 @@ ps1=
   facet_grid(~modelname) +
   predscale+
   coord_equal(ratio=1.2)+ theme(legend.position="none",
-                              legend.margin=unit(0, "cm"),
+                                legend.margin=unit(0, "cm"),
                                 legend.key.height = unit(0.5, "cm"),
-                              plot.margin=unit(c(0.1,0.1,0.1,0.1), "cm"),
-#                              axis.title.x=element_blank(),
-#                                axis.title.y=element_blank(),
+                                plot.margin=unit(c(0.1,0.1,0.1,0.1), "cm"),
+                                #                              axis.title.x=element_blank(),
+                                #                                axis.title.y=element_blank(),
                                 strip.text.x=element_blank(),
                                 strip.background = element_blank(),
                                 text = element_text(size=tsize))+
@@ -166,7 +169,7 @@ ps2=
                                 legend.margin=unit(0, "cm"),
                                 legend.key.width = unit(0.25, "cm"),
                                 axis.title.x=element_blank(),
-#                                axis.title.y=element_blank(),
+                                #                                axis.title.y=element_blank(),
                                 strip.text.x=element_blank(),
                                 strip.background = element_blank(),
                                 text=element_text(size=tsize))+
@@ -241,10 +244,10 @@ pbox=
   theme(legend.position="none",
         panel.grid.minor = element_blank(),
         plot.margin=unit(c(0,0,0,0), "cm"),
-#        panel.margin=unit(c(0,0,0,0), "cm"),
-#        axis.title.x=element_blank(),
+        #        panel.margin=unit(c(0,0,0,0), "cm"),
+        #        axis.title.x=element_blank(),
         text=element_text(size=tsize),
-#        axis.text.x = element_text(angle = 20, hjust = 1),
+        #        axis.text.x = element_text(angle = 20, hjust = 1),
         strip.background = element_blank(), strip.text = element_blank())+
   scale_fill_manual(name = "Model",values = c(csp2,csp1)) +   
   geom_boxplot(notch=T,varwidth=T,outlier.colour=grey(.8),outlier.size=.8,position=position_dodge(.8),lwd=.8,col="black")+
@@ -331,8 +334,8 @@ penv1=ggplot(filter(envl,species=="Protea_cynaroides"),aes(x=x,y=y,fill=value)) 
                        na.value="transparent")+
   coord_equal(ratio=1.2)+ 
   theme(legend.position="bottom",
-      legend.margin=unit(0, "cm"),
-      legend.key.height = unit(0.5, "cm"))+
+        legend.margin=unit(0, "cm"),
+        legend.key.height = unit(0.5, "cm"))+
   ylab("")+xlab("")+labs(fill = "Standardized Value")+
   geom_path(data=fcoast1,aes(x=long,y=lat,group = group,fill=1),lwd=.2)
 
@@ -343,8 +346,8 @@ penv2=ggplot(filter(envl,species=="Lepidocolaptes_lacrymiger"),aes(x=x,y=y,fill=
                        na.value="transparent",name="Standardized Value")+
   coord_equal(ratio=1.2)+ 
   theme(legend.position="none",
-      legend.margin=unit(0, "cm"),
-      legend.key.height = unit(0.5, "cm"))+
+        legend.margin=unit(0, "cm"),
+        legend.key.height = unit(0.5, "cm"))+
   ylab("")+xlab("")+labs(fill = "Standardized Value")+
   geom_path(data=fcoast2,aes(x=long,y=lat,group = group,fill=1),lwd=.2)
 
@@ -442,71 +445,73 @@ ggplot(filter(pred),aes(x=x,y=y,fill=pred)) + geom_tile() +
 ## compare predictions
 p1=
   gplot(filter(pred,aes(x=x,y=y,fill=pred,maxpixels=1e4) + 
-          geom_tile() +
-          facet_grid(species~modeltype) +
-  scale_fill_gradientn(colours=c('white','blue','red'),values = c(0,.6,.75,1), 
-                       rescaler = function(x, ...) x,
-                       na.value="transparent") +
-  coord_equal()+xlab("Longitude")+ylab("Latitude")+
-  geom_point(data=spd[spd$presence==0,]@data,aes(x=lon,y=lat),pch=1,col=grey(.8),cex=1)+
-  geom_point(data=spd[spd$presence==1,]@data,aes(x=lon,y=lat),pch=3,cex=2)+
-  #  geom_line(data=fcoast,mapping=aes(long,lat,group=group)) +
-  labs(fill = "p(presence)")+ 
-  theme(legend.position="bottom")
-
-p2=ggplot(aucdat, aes(factor(presences>0,labels=c("Absent","Present")), pred))+ 
-  geom_boxplot()+facet_wrap(~model)+
-  xlab("Observed")+ylab("p(presence)")+
-  coord_flip()
-
-## plot the correlogram
-p3=ggplot(ac, aes(x=dist2, y=mean, group=modelname))+
-  geom_line(aes(colour=modelname))+
-          facet_grid(.~species)+
-  #geom_pointrange(aes(ymax = max, ymin=min, group=modelname,colour=modelname))+
-  geom_pointrange(aes(ymax = mean+sd, ymin=mean-sd, group=modelname,colour=modelname))+
-  geom_line(col="black")+
-  scale_x_continuous(trans = log10_trans(),
-                     breaks = trans_breaks("log10", function(x) 10^x),
-                     labels = trans_format("log10", math_format(10^.x)))+
-  ylab("Autocorrelation")+xlab("Distance (km)")+
-  theme(legend.position=c(.25, .25))
-
-      
-p4=  gplot(predr,maxpixels=1e7) + geom_tile(aes(fill = value)) +
-  facet_wrap(~ variable) +
-  scale_fill_gradientn(colours=c('white','blue','red'),values = c(0,.6,.75,1), 
-                       rescaler = function(x, ...) x,
-                       na.value="white") +
-  coord_equal()+xlab("Longitude")+ylab("Latitude")+
-  geom_point(data=spd[spd$presence==0,]@data,aes(x=lon,y=lat),pch=1,col=grey(.8),cex=1)+
-  geom_point(data=spd[spd$presence==1,]@data,aes(x=lon,y=lat),pch=3,cex=2)+
-  labs(fill = "p(presence)")+ 
-  theme(legend.position="bottom")+
-  ylim(c(-1,7.5))+xlim(c(-79.5,-72))
-
-## make the pdf
-pdf(file=paste0(outputdir,"env_",sp2,".pdf"),width=5,height=10)
-penv
-dev.off()
-
-
-pdf(file=paste0(outputdir,"SDM_",sp2,".pdf"),width=5,height=10)
-grid.newpage()
-
-vp1 <- viewport(width = 1, height = 0.3, x=.5,y=.15)
-vp2 <- viewport(width = 1, height = .5, x = .5, y = 0.55)
-vp3 <- viewport(width = .95, height = .2, x = .5, y = 0.9)
-
-print(p3, vp = vp1)
-print(p4, vp = vp2)
-print(p2, vp = vp3)
-
-dev.off()
-
-
-
-ggplot(coef[coef$param!="Deviance",], aes(x = Mean, y = param,colour=model))+  
-  geom_segment(aes(xend = X97.5.,yend=param),lwd=2)
-
-dev.off()
+                 geom_tile() +
+                 facet_grid(species~modeltype) +
+                 scale_fill_gradientn(colours=c('white','blue','red'),values = c(0,.6,.75,1), 
+                                      rescaler = function(x, ...) x,
+                                      na.value="transparent") +
+                 coord_equal()+xlab("Longitude")+ylab("Latitude")+
+                 geom_point(data=spd[spd$presence==0,]@data,aes(x=lon,y=lat),pch=1,col=grey(.8),cex=1)+
+                 geom_point(data=spd[spd$presence==1,]@data,aes(x=lon,y=lat),pch=3,cex=2)+
+                 #  geom_line(data=fcoast,mapping=aes(long,lat,group=group)) +
+                 labs(fill = "p(presence)")+ 
+                 theme(legend.position="bottom")
+               
+               p2=ggplot(aucdat, aes(factor(presences>0,labels=c("Absent","Present")), pred))+ 
+                 geom_boxplot()+facet_wrap(~model)+
+                 xlab("Observed")+ylab("p(presence)")+
+                 coord_flip()
+               
+               ## plot the correlogram
+               p3=ggplot(ac, aes(x=dist2, y=mean, group=modelname))+
+                 geom_line(aes(colour=modelname))+
+                 facet_grid(.~species)+
+                 #geom_pointrange(aes(ymax = max, ymin=min, group=modelname,colour=modelname))+
+                 geom_pointrange(aes(ymax = mean+sd, ymin=mean-sd, group=modelname,colour=modelname))+
+                 geom_line(col="black")+
+                 scale_x_continuous(trans = log10_trans(),
+                                    breaks = trans_breaks("log10", function(x) 10^x),
+                                    labels = trans_format("log10", math_format(10^.x)))+
+                 ylab("Autocorrelation")+xlab("Distance (km)")+
+                 theme(legend.position=c(.25, .25))
+               
+               
+               p4=  gplot(predr,maxpixels=1e7) + geom_tile(aes(fill = value)) +
+                 facet_wrap(~ variable) +
+                 scale_fill_gradientn(colours=c('white','blue','red'),values = c(0,.6,.75,1), 
+                                      rescaler = function(x, ...) x,
+                                      na.value="white") +
+                 coord_equal()+xlab("Longitude")+ylab("Latitude")+
+                 geom_point(data=spd[spd$presence==0,]@data,aes(x=lon,y=lat),pch=1,col=grey(.8),cex=1)+
+                 geom_point(data=spd[spd$presence==1,]@data,aes(x=lon,y=lat),pch=3,cex=2)+
+                 labs(fill = "p(presence)")+ 
+                 theme(legend.position="bottom")+
+                 ylim(c(-1,7.5))+xlim(c(-79.5,-72))
+               
+               ## make the pdf
+               pdf(file=paste0(outputdir,"env_",sp2,".pdf"),width=5,height=10)
+               penv
+               dev.off()
+               
+               
+               pdf(file=paste0(outputdir,"SDM_",sp2,".pdf"),width=5,height=10)
+               grid.newpage()
+               
+               vp1 <- viewport(width = 1, height = 0.3, x=.5,y=.15)
+               vp2 <- viewport(width = 1, height = .5, x = .5, y = 0.55)
+               vp3 <- viewport(width = .95, height = .2, x = .5, y = 0.9)
+               
+               print(p3, vp = vp1)
+               print(p4, vp = vp2)
+               print(p2, vp = vp3)
+               
+               dev.off()
+               
+               
+               
+               ggplot(coef[coef$param!="Deviance",], aes(x = Mean, y = param,colour=model))+  
+                 geom_segment(aes(xend = X97.5.,yend=param),lwd=2)
+               
+               dev.off()
+               
+               

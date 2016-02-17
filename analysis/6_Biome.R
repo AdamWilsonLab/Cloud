@@ -32,8 +32,8 @@ biome=readOGR("data/src/teow/","biomes")
 bcode=unique(data.frame(icode=biome$icode,code=biome$code,realm=biome$realm,biome=biome$biome,area=biome$areakm))
 
 system(paste("gdal_rasterize -a icode -init 0 -l biomes -ot Byte -te -180 -90 180 90 -tr 0.008333333333333 -0.008333333333333",
-              " -co COMPRESS=LZW -co ZLEVEL=9 -co PREDICTOR=2 ",
-              " data/src/teow/biomes.shp  data/out/teow.tif"))
+             " -co COMPRESS=LZW -co ZLEVEL=9 -co PREDICTOR=2 ",
+             " data/src/teow/biomes.shp  data/out/teow.tif"))
 
 #########################################
 ### Summarize the cloud data by biome
@@ -45,7 +45,7 @@ bprods=c("data/MCD09_deriv/inter.tif",
          "data/MCD09_deriv/seastheta.tif",
          "data/MCD09_deriv/meanannual.tif",
          "data/MCD09_deriv/mean_1deg_sd.tif",
-    paste("data/MCD09/MCD09_mean_",sprintf("%02d",1:12),".tif",sep=""))
+         paste("data/MCD09/MCD09_mean_",sprintf("%02d",1:12),".tif",sep=""))
 
 ### loop over products and summarize by biome
 foreach(m=bprods)%do%{
@@ -60,24 +60,24 @@ foreach(m=bprods)%do%{
   if(grepl("1deg_sd",m)) nas=0
   system(paste("pksetmask -i data/out/teow.tif -m ",m," -ot Byte ",
                "--operator='=' --msknodata ",nas," --nodata 0  -co COMPRESS=LZW -co PREDICTOR=2 -o ",tbiome))
-##select only one biome
-   system(paste("pksetmask -i data/out/teow.tif -ot Byte  ",   
-                " -m data/out/teow.tif --operator='=' --msknodata 18 --nodata 70 ",
-                " -m data/out/teow.tif --operator='=' --msknodata 29 --nodata 70 ",
-                " -m data/out/teow.tif --operator='=' --msknodata 65 --nodata 70 ",
-                " -m data/out/teow.tif --operator='=' --msknodata 69 --nodata 70 ",
-                " -m ",m," --operator='=' --msknodata ",nas," --nodata 0 ",
-#                " -m ",m," --operator='>' --msknodata 10000 --nodata 0 ",
-                " -co COMPRESS=LZW -co PREDICTOR=2 -o ",tbiome))
-
+  ##select only one biome
+  system(paste("pksetmask -i data/out/teow.tif -ot Byte  ",   
+               " -m data/out/teow.tif --operator='=' --msknodata 18 --nodata 70 ",
+               " -m data/out/teow.tif --operator='=' --msknodata 29 --nodata 70 ",
+               " -m data/out/teow.tif --operator='=' --msknodata 65 --nodata 70 ",
+               " -m data/out/teow.tif --operator='=' --msknodata 69 --nodata 70 ",
+               " -m ",m," --operator='=' --msknodata ",nas," --nodata 0 ",
+               #                " -m ",m," --operator='>' --msknodata 10000 --nodata 0 ",
+               " -co COMPRESS=LZW -co PREDICTOR=2 -o ",tbiome))
+  
   
   ## calculate biome-level summary metrics
   system(paste("oft-stat -i ",m," -o ",tcloudbiome," -um ",tbiome," -mm"))
   ## calculate biome-level histograms for monthly data
   system(paste("gdal_translate  -scale 0 10000 0 100 -ot Byte -of vrt  ",m,tcloud))
   system(paste("oft-his -i ",tcloud," -o ",tcloudhist," -um ",tbiome," -hr -maxval 100 "))
-               
-               ## clean up
+  
+  ## clean up
   file.remove(tbiome,tcloud)
 }    
 
@@ -90,24 +90,24 @@ bs=do.call(rbind.data.frame,lapply(bprods,function(m){
   td$meanpsd=td$mean+td$sd
   td$meanmsd=td$mean-td$sd
   td=merge(td,bcode,by="icode")
-#  file.remove(tcloudbiome)
+  #  file.remove(tcloudbiome)
   return(td)
-  }))
+}))
 write.csv(bs,file="data/out/biomesummary.csv",row.names=F)
 
 ## summarize histograms
 fhist=list.files("data/out/biomesummaries/",pattern="teowhist_MCD09_mean_.*txt",full=T)
 bsf=do.call(rbind.data.frame,lapply(fhist,
-            function(tcloudbiome){
-  print(tcloudbiome)
-  td=read.table(tcloudbiome)
-  colnames(td)=c("icode","n","band",paste("v",0:100,sep=""))
-  td$product=sub(".tif","",basename(tcloudbiome))
-  td=merge(td,bcode,by="icode")
-  td$month=as.numeric(sub(".txt","",sub("^.*teowhist_MCD09_mean_","",tcloudbiome)))
-  #  file.remove(tcloudbiome)
-  return(td)
-}))
+                                    function(tcloudbiome){
+                                      print(tcloudbiome)
+                                      td=read.table(tcloudbiome)
+                                      colnames(td)=c("icode","n","band",paste("v",0:100,sep=""))
+                                      td$product=sub(".tif","",basename(tcloudbiome))
+                                      td=merge(td,bcode,by="icode")
+                                      td$month=as.numeric(sub(".txt","",sub("^.*teowhist_MCD09_mean_","",tcloudbiome)))
+                                      #  file.remove(tcloudbiome)
+                                      return(td)
+                                    }))
 write.csv(bsf,file="data/out/biomesummaryhist.csv",row.names=F)
 
 
@@ -208,7 +208,7 @@ qs=group_by(bsfl,biome2,realm,month)%.% summarize(
   areakm=sum(area[variable=="v0"])) 
 
 pbiome=
-
+  
   ggplot(qs) +
   geom_ribbon(mapping=aes(x=month, ymin=Q0,ymax=Q100),fill=grey(.7))+
   geom_ribbon(mapping=aes(x=month, ymin=Q02.5,ymax=Q97.5),fill=grey(.5))+
@@ -231,6 +231,8 @@ print(pbiome)
 dev.off()
 
 
+## Save Biome Timeseries
+write.csv(qs,"output/FigS6_data.csv",row.names=F)
 
 ### Spatial plot using shapefile
 bsw=dcast(bs,code~product,value.var="mean")
@@ -246,3 +248,4 @@ spplot(biome2,zcol="meanannual")
 
 #ml$prog2 <- relevel(ml$prog, ref = "academic")
 #test <- multinom(prog2 ~ ses + write, data = ml)
+
