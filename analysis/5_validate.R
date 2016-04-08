@@ -38,7 +38,7 @@ cld=do.call(rbind.data.frame,mclapply(sprintf("%02d",1:12),function(m) {
   d$month=as.numeric(m)
   print(m)
   return(d)}
-  ))
+))
 
 ## add lat/lon
 cld[,c("lat","lon")]=coordinates(st)[match(cld$StaID,st$id),]
@@ -61,16 +61,16 @@ Nobsthresh=20 #minimum number of observations to include
 
 cldm=do.call(rbind.data.frame,by(cld,list(month=as.factor(cld$month),StaID=as.factor(cld$StaID)),function(x){
   data.frame(
-      month=x$month[1],
-      StaID=x$StaID[1],
-      cld_all=mean(x$Amt[x$Nobs>=Nobsthresh],na.rm=T),  # full record
-      cldsd_all=sd(x$Amt[x$Nobs>=Nobsthresh],na.rm=T),
-      cldn_all=length(x$Amt[x$Nobs>=Nobsthresh]),
-      cld=mean(x$Amt[x$YR>=2000&x$Nobs>=Nobsthresh],na.rm=T), #only MODIS epoch
-      cldsd=sd(x$Amt[x$YR>=2000&x$Nobs>=Nobsthresh],na.rm=T),
-      cldn=length(x$Amt[x$YR>=2000&x$Nobs>=Nobsthresh]))}))
+    month=x$month[1],
+    StaID=x$StaID[1],
+    cld_all=mean(x$Amt[x$Nobs>=Nobsthresh],na.rm=T),  # full record
+    cldsd_all=sd(x$Amt[x$Nobs>=Nobsthresh],na.rm=T),
+    cldn_all=length(x$Amt[x$Nobs>=Nobsthresh]),
+    cld=mean(x$Amt[x$YR>=2000&x$Nobs>=Nobsthresh],na.rm=T), #only MODIS epoch
+    cldsd=sd(x$Amt[x$YR>=2000&x$Nobs>=Nobsthresh],na.rm=T),
+    cldn=length(x$Amt[x$YR>=2000&x$Nobs>=Nobsthresh]))}))
 
-    cldm[,c("lat","lon")]=coordinates(st)[match(cldm$StaID,st$id),c("lat","lon")]
+cldm[,c("lat","lon")]=coordinates(st)[match(cldm$StaID,st$id),c("lat","lon")]
 
 
 
@@ -137,6 +137,7 @@ Mode <- function(x) {
       ux <- na.omit(unique(x))
         ux[which.max(tabulate(match(x, ux)))]
       }
+
 lulcst=raster::extract(lulc,st,fun=Mode,buffer=buf,df=T)
 colnames(lulcst)=c("id","lulc")
 lulcst$StaID=st$id
@@ -232,22 +233,22 @@ colnames(t3)[1]="Month/Season"
 vtable=rbind.data.frame(t3,t2,t1)
 
 print(xtable(vtable,digits=2,#caption="Summary of validation data by month and season"),
-"html",format.args=list(big.mark = ",", decimal.mark = "."),include.rownames=F,file="manuscript/validtable.html"))
+  "html",format.args=list(big.mark = ",", decimal.mark = "."),include.rownames=F,file="manuscript/validtable.html"))
 
 
-      cldm %.% group_by(StaID) %.% summarise(
-        MCD09=mean(MCD09_mean,na.rm=T),
-        cld=mean(cld,na.rm=T),
-        elev=mean(elev,na.rm=T)) %.%
-        summarize(
-        cld_R2=lm_summary(cld,elev,"rs"),
-        MCD09_R2=lm_summary(MCD09,elev,"rs"),
-        cld_rho=cor.test(cld,elev,method="spearman",alternative="two.sided",continuity=T)$estimate,
-        cld_n=nrow(na.omit(cbind(cld,elev))),
-        MCD09_rho=cor.test(MCD09,elev,method="spearman",alternative="two.sided",continuity=T)$estimate,
-        MCD09_n=nrow(na.omit(cbind(MCD09,elev))))
-      
-      
+cldm %>% group_by(StaID) %>% summarise(
+  MCD09=mean(MCD09_mean,na.rm=T),
+  cld=mean(cld,na.rm=T),
+  elev=mean(elev,na.rm=T)) %>%
+  summarize(
+    cld_R2=lm_summary(cld,elev,"rs"),
+    MCD09_R2=lm_summary(MCD09,elev,"rs"),
+    cld_rho=cor.test(cld,elev,method="spearman",alternative="two.sided",continuity=T)$estimate,
+    cld_n=nrow(na.omit(cbind(cld,elev))),
+    MCD09_rho=cor.test(MCD09,elev,method="spearman",alternative="two.sided",continuity=T)$estimate,
+    MCD09_n=nrow(na.omit(cbind(MCD09,elev))))
+
+
 ########################
 ### Temporal stability
 ### Compare two time periods
@@ -264,6 +265,114 @@ texreg(mods,custom.model.names = names(mods),custom.coef.names = c("Intercept", 
 
 
 
+### Spatial plot
+ggplot(cldm,aes(x=lon,y=lat,colour=difm_all,order=desc(abs(difm_all))))+
+  scale_colour_gradient2(low="blue",mid="grey",high="red")+
+  facet_wrap(~monthname)+
+  geom_point()+
+  coord_equal()
+
+ggplot(cldm,aes(x=difm,y=lat,col=difm))+
+  scale_colour_gradient2(low="blue",mid="grey",high="red",na.value="transparent",name=expression(paste(Delta,"CLD")))+
+  facet_grid(month~.)+
+  ylab("")+
+  xlab(expression(paste(Delta,"CLD")))+
+  geom_point(size=.75)+
+  geom_vline(xintercept=0)+
+  stat_summary(geom = "smooth")
+
+
+###############
+## Calculate seasonal differences
+clds$difs=clds$MCD09_mean-clds$cld_all
+clds$resid=NA
+clds$resid[!is.na(clds$cld_all)&!is.na(clds$MCD09_mean)]=
+  residuals(lm(MCD09_mean~cld_all,data=clds[!is.na(clds$cld_all)&!is.na(clds$MCD09_mean),]))
+
+
+## Add panel ID
+clds$panelid1=factor(clds$seas, labels=letters[1:4])
+clds$panelid2=factor(clds$seas, labels=letters[5:8])
+
+
+gp=gpar(fontsize=14, col="black",fontface="bold")
+
+pmap=ggplot(clds,aes(x=lon,y=lat,colour=resid,order=desc(abs(resid))))+
+  scale_colour_gradient2(low="blue",mid="grey",high="red",na.value="transparent",name="CF Residuals",guide=F)+
+  facet_grid(seas~.)+
+  geom_point(size=.75)+
+  geom_path(data=gcoast,mapping=aes(x=long,y=lat,group=group,order=order),col="black",size=.2)+
+  ylab("Latitude")+xlab("Longitude")+
+  geom_text(aes(x=-180,y=80,label=panelid1),col="black",stat="unique",gp=gp)+
+  coord_equal()+
+  theme(strip.text.x = element_blank(),strip.text.y = element_blank(),strip.background = element_blank())
+
+pzonal=ggplot(clds,aes(x=resid,y=lat,col=resid))+
+  scale_colour_gradient2(low="blue",mid="grey",high="red",na.value="transparent",name="CF Residuals")+
+  facet_grid(seas~.)+
+  ylab("")+
+  xlab("CF Residuals")+
+  geom_point(size=.75)+
+  geom_vline(xintercept=0)+
+  geom_text(aes(x=-58,y=72,label=panelid2) ,col="black" ,stat="unique",gp=gp)+
+  stat_summary(geom = "smooth")
+
+png(width=2400,height=1600,res=300,pointsize=16,
+    type="cairo-png",file="manuscript/figures/validationMap.png")
+print(pmap, vp = viewport(width = .7, height = 1, x=.35,y=.5))
+print(pzonal, vp = viewport(width = .5, height = 1, x = .75, y = 0.5))
+dev.off()
+
+
+#################
+#####  LULC plots
+ggplot(clds,aes(x=resid,group=seas,col=seas))+
+  scale_colour_discrete(name="Season")+
+  facet_wrap(~lulcc)+
+  ylab("")+
+  xlab("Cloud Frequency Residuals")+
+  geom_density(size=.75)+
+  geom_vline(xintercept=0)
+
+plulc=
+  ggplot(clds,aes(y=resid,x=seas,col=seas,fill=seas))+
+  scale_colour_discrete(guide=F)+
+  scale_fill_discrete(guide=F)+  
+  facet_wrap(~lulcc)+
+  xlab("Season")+
+  ylab("Cloud Frequency Residuals")+
+  geom_jitter(size=1,col=grey(.6))+
+  geom_violin(size=.75,scale="count",alpha=.5)+
+  geom_hline(yintercept=0,linetype="dashed",col=grey(.2))
+
+
+png(width=3000,height=1600,res=300,pointsize=16,
+    type="cairo-png",file="manuscript/figures/validationLULC.png")
+plulc
+dev.off()
+
+
+ggplot(clds[clds$lulcc=="Snow and ice ",],aes(x=cld_all,y=MCD09_mean))+
+  facet_grid(lulcc~seas)+
+  geom_point(size=.75)+
+  geom_abline()+
+  stat_smooth(method="lm",col="red")+
+  coord_equal()+
+  theme(strip.text.y = element_text(angle=0))
+
+
+## Table of LULC residuals
+
+cldm %>% group_by(lulcc) %>% summarise(
+  resid=mean(resid,na.rm=T),
+  residsd=sd(resid,na.rm=T))
+
+## Write out seasonal validation data
+head(clds)
+write.csv(select(clds,-c(panelid1,panelid2)),"output/SeasonalValidation.csv",row.names=F)
+
+
+##############
 ### Extract regional transects
 cids=c(10866,10980,11130,11135,11138,11146,11210,11212,13014)
 

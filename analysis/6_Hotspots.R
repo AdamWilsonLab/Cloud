@@ -312,7 +312,7 @@ p_key=
 
 ## create coastal plotting object
 p_coast=  geom_polygon(data=gcoast,aes(x=long,y=lat,group=group),col="black",fill="transparent",size=.05)
-p_coast2=  geom_polygon(data=gcoast2,aes(x=long,y=lat,group=group),col="black",fill="transparent",size=.1)
+p_coast2=  geom_polygon(data=gcoast2,aes(x=long,y=lat,group=group),col=grey(.2),fill="transparent",size=.05)
 
 hotspot_region="EastAfrica"
 #ggplot()+p_coast2+
@@ -333,8 +333,13 @@ p_hot_coast= p_hot+p_coast+p_reg
 
 
 ## Regional plot 
+r_hotspot=crop(hotspot,regs[[hotspot_region]])
+
+## load kenya EBAs
+eba=readOGR("/media/data/Cloud/data/src/eba/ke_eba","ke_eba")
+
 p_hot_reg=
-  gplot(crop(hotspot,regs[[hotspot_region]]),maxpixels=2e6)+
+  gplot(r_hotspot,maxpixels=2e6)+
   geom_raster(aes(fill=value))+
   scale_fill_gradientn(colours=cols,guide=F,na.value="white",
                        values = 0:(length(cols)-1), 
@@ -342,11 +347,12 @@ p_hot_reg=
   ylab("")+xlab("")+blanktheme+p_coast2+
   coord_cartesian(xlim=c(regs[[hotspot_region]]@xmin,regs[[hotspot_region]]@xmax),
                   ylim=c(regs[[hotspot_region]]@ymin,regs[[hotspot_region]]@ymax))+
-  theme(panel.border=element_rect(colour="red",fill="transparent"))
+  theme(panel.border=element_rect(colour="red",fill="transparent"))+
+  geom_path(aes(x=long,y=lat,group=group,order=order),data=fortify(eba),fill="transparent",size=.2)
 
 
 ## Draw it!
-png("manuscript/figures/Q20_Hotspots5.png",width=3500,height=2000,
+png("manuscript/figures/Q20_Hotspots6.png",width=3500,height=2000,
     res=600,bg="white")
 print(p_hot_coast,vp=viewport(x=0,y=0.28,width=1,height=.7,just=c("left","bottom")))
 print(p_key,vp=viewport(x=0,y=0,width=0.32,height=.3,just=c("left","bottom")))
@@ -366,7 +372,7 @@ dev.off()
 
 
 ### Little color figure for earth engine
-ggplot(filter(uvals,include)
+ggplot(filter(uvals,include))
 
        
 d4=d2[sample(1:nrow(d2),1000000),]
