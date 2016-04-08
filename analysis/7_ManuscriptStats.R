@@ -28,7 +28,7 @@ options(digits=2)
 ## nubmer of non-null cells
 ncell=length(na.omit(values(r)))
 ## number of observations (twice daily - terra and aqua)
-ndays=as.integer(as.Date("30-3-2014")-as.Date("2-1-2000"))*2
+ndays=as.integer(as.Date("2014-3-30")-as.Date("2000-2-1"))*2
 ## print in sci format
 signif(ncell)
 signif(ndays,3)
