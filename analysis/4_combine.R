@@ -220,14 +220,29 @@ fseasconc=function(x) calc(x,seasconc,na.rm=F)
 fseastheta=function(x) calc(x,seastheta,na.rm=F)
 
 ## calculate seasonality
-sconc=clusterR(dmean,fun=fseasconc,export="seasconc",overwrite=T,filename="data/MCD09_deriv/seasconc.tif",NAflag=65535,datatype="INT2U")
-stheta=clusterR(dmean,fun=fseastheta,export="seastheta",overwrite=T,filename="data/MCD09_deriv/seastheta.tif",NAflag=65535,datatype="INT2U")
+sconc=clusterR(dmean,
+               fun=fseasconc,
+               export="seasconc",
+               overwrite=T,
+               filename="data/MCD09_deriv/seasconc.tif",
+               NAflag=65535,
+               datatype="INT2U")
+
+stheta=clusterR(dmean,
+                fun=fseastheta,
+                export="seastheta",
+                overwrite=T,
+                filename="data/MCD09_deriv/seastheta.tif",
+                NAflag=65535,
+                datatype="INT2U")
 
 
 ### generate color key
-seas=stack("data/MCD09_deriv/seasconc.tif","data/MCD09_deriv/seastheta.tif")
+seas=stack("data/MCD09_deriv/seasconc.tif",
+           "data/MCD09_deriv/seastheta.tif")
 gain(seas)=.1
-names(seas)=c("conc","theta")
+names(seas)=c("conc",
+              "theta")
 NAvalue(seas)=65535
 
 ## extract unique values from seas to develop color table

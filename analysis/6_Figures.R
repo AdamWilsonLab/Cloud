@@ -116,6 +116,27 @@ lims=c(-80,80)
 ####################################
 ## Seasonality plot
 
+## blank key
+## color key
+k0=xyplot(y~x,data=data.frame(x=0,y=0),pch=16,cex=1.2,
+          xlab="",ylab="",scales=list(draw=F),ylim=lims,xlim=lims,asp=1,
+          #          main="Seasonal Cloud Concentration"
+          par.settings = list(axis.line = list(col = "transparent")))+
+  latticeExtra::layer(panel.polygon(pCirc(r=20,n=100),border="grey"))+
+  latticeExtra::layer(panel.polygon(pCirc(r=40,n=100),border="grey"))+
+  latticeExtra::layer(panel.polygon(pCirc(r=60,n=100),border="grey"))+
+  latticeExtra::layer(panel.segments(0,0,60*cos(mangle-(15*pi/180)),60*sin(mangle-(15*pi/180)),col="grey"))+ #draw angles
+  latticeExtra::layer(panel.text(x=ladj*cos(mangle[lmons[-1]]),y=ladj*sin(mangle[lmons[-1]]),mon[lmons[-1]],
+       pos=4,cex=1,offset=0,srt=(mangle[lmons[-1]])*180/pi))+ #add left months))
+  latticeExtra::layer(panel.text(x=ladj*cos(mangle[rmons[c(1,2,6,7)]]),y=ladj*sin(mangle[rmons[c(1,2,6,7)]]),mon[rmons[c(1,2,6,7)]],
+     pos=2,cex=1,offset=0,srt=((mangle[rmons[c(1,2,6,7)]])*180/pi)-180))+ # add right months
+  latticeExtra::layer(panel.text(x=-2,y=c(-20,-40,-60),c(20,40,60),pos=4,cex=1,col=c("white","black","black"))) #add scale text
+
+png(width=2400,height=1600,res=400,pointsize=24,
+    type="cairo-png",file="seaskey.png")
+print(k0)
+dev.off()
+
 ## color key
 k1=xyplot(y~x,col=col$val[col$exists],data=col[col$exists,],pch=16,cex=1.2,
           xlab="",ylab="",scales=list(draw=F),ylim=lims,xlim=lims,asp=1,
