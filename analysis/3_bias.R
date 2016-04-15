@@ -1,5 +1,6 @@
 ###  Script to compile the monthly cloud data from earth engine into a netcdf file for further processing
 
+# Download VSNR from http://www.math.univ-toulouse.fr/~weiss/Codes/VSNR/VNSR_VariationalStationaryNoiseRemover.html
 ## Specify path to VSNR souce code and add it to RcppOctave path
 library(RcppOctave)
 mpath="/mnt/data/personal/adamw/projects/environmental-layers/climate/research/cloud/MOD09/vsnr/"

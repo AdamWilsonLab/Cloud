@@ -1,13 +1,8 @@
 source("analysis/setup.R")
 
-#tropics=extent(c(20,25,0,5))
-
 #library(devtools) 
 #install_github("adammwilson/rasterAutocorr")
-#detach("package:rasterAutocorr", unload=TRUE)
 #library(rasterAutocorr)
-## mask cloud values where MAP is missing
-#cf_mean=mask(cf_mean,map)
 
 ## define tropics and crop to tropics
 tropics=extent(c(-180,180,-23.4378,23.4378))
@@ -46,10 +41,6 @@ bcode=unique(data.frame(icode=biome$icode,code=biome$code,realm=biome$realm,biom
 
 region= biome[biome$realm=="Neotropics"&biome$biome=="Tropical & Subtropical Moist Broadleaf Forests",]
 
-#wc=crop(prods[[2]],region)
-#cld=crop(prods[[1]],region)
-#dem=crop(prods[[3]],region)
-#plot(stack(wc,cld,dem))
 i=1
 ## loop through products and write out autocorrelation data
 foreach(i=1:length(prods)) %do% {

@@ -250,16 +250,6 @@ grid.edit("geom_point.points", grep = TRUE, gp = gpar(lwd = .2)) #make points th
 dev.off()
 
 
-#gplot(psd,max=1e5)+geom_raster(aes(fill=value))+
-#  scale_fill_gradient2(low = "red", mid = "white", high = "blue",
-#                        midpoint = 0, space = "rgb", na.value = "grey50", guide = "colourbar")+
-#  coord_equal(xlim=c(90,160))+
-  #geom_polygon(aes(x=long,y=lat,group=group),
-  #             data=fortify(range),
-  #             fill="transparent",col="black",size=.2)+
-#  geom_point(aes(x = x, y = y), 
-#             data = data[data$cf==1,],
-#             col="black",size=2)
 
 d1=fortify(mods[[2]])
 

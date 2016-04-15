@@ -1,6 +1,6 @@
 // MCD09CF
 ///////////////////////////////////////////////////////////
-// Adam.wilson@yale.edu
+// Adamw@buffalo.edu
 // Generate a cloud frequency climatology from M*D09 data
 // This script does the following
 // 1) Extracts daily cloud flag from MOD09GA and MYD09GA and create single collection for each month

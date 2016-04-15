@@ -1,17 +1,4 @@
 
-
-#  f=list.files(ebirddir,pattern="checklists.csv",recursive=T,full=T)[10]
-#d=fread( f,header = T, sep = '\t',select=c(idcols,spcols),na.strings="?",showProgress=T,verbose=T)
-#  d=read.csv.ffdf(file=f)
-
-
-
-
-
-
-
-
-
 ### using standard reference data
 ## which colnames are in our list
 tsp=grep(paste(c(idcols,spcols),collapse="|"),hdr,value=T)
@@ -183,7 +170,8 @@ sfn=function(f,species,lat,lon){
              LATITUDE<=bbox(reg)["y","max"],
              LONGITUDE>=bbox(reg)["x","min"],
              LONGITUDE<=bbox(reg)["x","max"],
-             ALL.SPECIES.REPORTED==1)
+             ALL.SPECIES.REPORTED==1)}
+  
   grep(paste(sub("_"," ",spcols),collapse="|"),as.character(d2$SCIENTIFIC.NAME))
   
   

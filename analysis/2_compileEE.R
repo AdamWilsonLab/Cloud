@@ -5,9 +5,6 @@ library(doMC)
 registerDoMC(12)
 
 
-## start raster cluster
-#beginCluster(5)
-
 setwd("~/acrobates/adamw/projects/cloud")
 
 datadir="/mnt/data2/projects/cloud/"

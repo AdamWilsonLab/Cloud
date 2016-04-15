@@ -54,12 +54,3 @@ system(paste("gdal_translate -co COMPRESS=DEFLATE -co ZLEVEL=9 -co BIGTIFF=YES -
 
 file.copy("data/MCD09_deriv/mean_1deg_sd.tif","data/MCD09_EarthEngineUpload/mean_1deg_sd.tif")
 
-
-#file.remove(list.files(paste0(datadir,"/mcd09focal"),full=T))
-
-#file.remove("data/MCD09_deriv/mean_1deg_sd_uncompressed.tif")
-#file.remove("data/MCD09_deriv/mean_1deg_sd.tif")
-
-#d=raster("data/MCD09_deriv/mean_1deg_sd_uncompressed.tif")
-#gain(d)=0.01
-#plot(d)
